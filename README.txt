@@ -15,7 +15,7 @@ Controls
 On the title card, click Jab, Heavy, Block, or Dodge and press a new key. Movement stays on WASD. The Z, X, C, V, and Shift aliases stay.
 
 Gamepad, standard mapping: left stick or d-pad moves, X jabs, Y is heavy, A dodges. LT and RT block once the trigger is past halfway. LB, RB, and B block as buttons.
-The title card has a rumble slider. 0 is off. Key bindings and rumble are saved in local storage when the browser allows it.
+The title card has Easy, Normal, and Hard. Normal uses the bout table as tuned. Easy and Hard scale that table: health, speed, damage, guard rate, and reaction. The same card has a rumble slider. 0 is off. Key bindings, difficulty, and rumble are saved in local storage when the browser allows it.
 
 Touch: move stick on the left, Jab in the bottom-right of the button cluster. The view does not scroll or zoom.
 

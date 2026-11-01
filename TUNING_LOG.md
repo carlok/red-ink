@@ -252,3 +252,55 @@ The bot walks into jab range, jabs on a 0.95 s pause, blocks or dodges a swing o
 | Target | 85 / 65 / 45 | 25–60 s | under 20% | 0 | ≤ 40 s |
 
 Stamina and stalemates are inside the target. Reyes ends too fast and too clean. Pike wins none. Dag is long enough and too easy.
+
+### Change 1 — median bot waits 1.55 s between jabs, then the bout table moves
+
+Hypothesis: a longer pause between the bot's jabs stretches Reyes past 16 s, and per-bout levers can pull the three win rates onto 85 / 65 / 45 without emptying stamina or opening a 40 s gap.
+
+Kept constants, old -> new:
+
+| Constant | Old | New |
+| --- | --- | --- |
+| Bot pause between jabs | 0.95 s | 1.55 s |
+| Reyes react | 0.50 s | 0.08 s |
+| Reyes block | 0.08 | 0.28 |
+| Reyes damage | 0.80 | 0.85 |
+| Dag cooldown | 1.30 s | 1.40 s |
+| Pike block | 0.35 | 0.18 |
+| Pike damage | 1.00 | 0.49 |
+
+Hp stays 70 / 115 / 120. Stamina regen stays 26 per second. Dodge cost stays 16 and the invulnerable window stays 0.22 s. 200 fights, seed 1.
+
+| Bout | Win % | Median | Empty | Stalemates | Longest gap |
+| --- | --- | --- | --- | --- | --- |
+| Reyes | 84.5 | 33.1 s | 0% | 0 | 4.8 s |
+| Dag | 66.5 | 37.1 s | 0% | 0 | 5.1 s |
+| Pike | 44.5 | 46.2 s | 0% | 0 | 3.2 s |
+
+Verdict: **keep**. A jab still costs 10 stamina and deals 7. Block chip on that jab is still 0.7, and a counter is still 8.75.
+
+Tried and dropped: a bot that only attacked after a whiff (win rates fell to 45 / 30 / 0). Pike cooldown 0.95 -> 1.35 (win rate 0.5%). Pike damage 0.46 (72% wins) and 0.50 (39.5%). Dag damage 1.09 (74%) versus 1.10 and above (61%). The kept Pike and Dag values are the ones on the near side of those cliffs.
+
+### Change 2 — easy / normal / hard are multipliers
+
+Hypothesis: one table of multipliers, with normal at 1, leaves the 200-fight result above unchanged and moves easy above it and hard below it. The same multiplier scales the bot's reaction for the easy and hard bots. The jab pause does not scale, so a harder bot does not walk into Pike faster.
+
+Normal difficulty, 200 fights, seed 1: identical to the table above.
+
+Median bot, enemy multipliers:
+
+| | Reyes | Dag | Pike |
+| --- | --- | --- | --- |
+| Easy | 100% | 98.5% | 100% |
+| Normal | 84.5% | 66.5% | 44.5% |
+| Hard | 29.5% | 29.5% | 1% |
+
+Bot skill, normal difficulty:
+
+| | Reyes | Dag | Pike |
+| --- | --- | --- | --- |
+| Easy bot | 81% | 63% | 44.5% |
+| Normal bot | 84.5% | 66.5% | 44.5% |
+| Hard bot | 86.5% | 65% | 44.5% |
+
+Verdict: **keep**. Easy and hard difficulty move every bout the right way. Bot skill moves Reyes the right way. On Pike the three bots land in the same place, because none of them react inside a jab's 0.10 s startup.

@@ -89,6 +89,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .tuneRow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .bind{font:600 11px var(--f-data);letter-spacing:.06em;text-transform:uppercase;background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:5px 8px;cursor:pointer}
 .bind.listen{background:var(--tape)}
+.bind.on{background:var(--ink);color:var(--tape)}
 .bind kbd{font:inherit}
 .rumble{font:600 11px var(--f-data);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);gap:8px}
 #rumble{width:140px;accent-color:#111}
@@ -170,6 +171,11 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
               <button type="button" class="bind" data-bind="block">Block <kbd>L</kbd></button>
               <button type="button" class="bind" data-bind="dodge">Dodge <kbd>Space</kbd></button>
             </div>
+            <div class="tuneRow" id="diffRow">
+              <button type="button" class="bind" data-diff="easy">Easy</button>
+              <button type="button" class="bind on" data-diff="normal">Normal</button>
+              <button type="button" class="bind" data-diff="hard">Hard</button>
+            </div>
             <label class="tuneRow rumble" for="rumble">Rumble <input id="rumble" type="range" min="0" max="100" value="100"></label>
           </div>
           <small id="avHint">Export a cartoon avatar as GLB (MetaPerson or Avaturn), then pick it here or drop it anywhere on this page.</small>
@@ -220,15 +226,15 @@ const LOOKS={
   pike:   {iris:'#7d8a93',skin:'#b7bcc0',shirt:'#4d535a',pants:'#1a1c20',shoes:'#0f1012',tie:'#0e0e10',hair:'#2b1d15',wrap:'#b9bdbf',sx:1,sy:1}
 };
 const BOUTS=[
-  {foe:'Reyes',role:'Sanitation',place:'The Cellar',look:'reyes',hp:70,speed:2.7,react:.5,cd:1.7,heavy:.18,block:.08,dodge:.04,dmg:.8,reach:1,
+  {foe:'Reyes',role:'Sanitation',place:'The Cellar',look:'reyes',hp:70,speed:2.7,react:.08,cd:1.7,heavy:.18,block:.28,dodge:.04,dmg:.85,reach:1,
    tip:'Jab to open him up. When he winds back, block (L), then answer.',
    intro:'A taped circle on bare concrete, a dozen people in work clothes, one bulb swinging. Reyes cleans these floors at three in the morning. Tonight he wants you in the middle of them.',
    after:'You expected to feel sick. Instead the numbers in your head go quiet for the first time in eleven months. Pike claps once from the stairs. "Again," he says.'},
-  {foe:'Dag',role:'Forklift operator',place:'The Loading Dock',look:'dag',hp:115,speed:2.5,react:.38,cd:1.3,heavy:.42,block:.18,dodge:.06,dmg:1.15,reach:1.12,
+  {foe:'Dag',role:'Forklift operator',place:'The Loading Dock',look:'dag',hp:115,speed:2.5,react:.38,cd:1.4,heavy:.42,block:.18,dodge:.06,dmg:1.15,reach:1.12,
    tip:'Slow and heavy. A red mark over his head means a big swing: dodge (Space), then punish.',
    intro:'Dag drives the forklift you sign off every Thursday. He knows exactly which rotation you cut. He does not wait for a bell, because there is no bell.',
    after:'On Monday you reroute forty trucks for no reason you could defend on paper. Someone has added lines to your ledger in handwriting that looks like yours.'},
-  {foe:'Pike',role:'Unlisted',place:'The Floor Plan',look:'pike',hp:120,speed:3.7,react:.24,cd:.95,heavy:.3,block:.35,dodge:.14,dmg:1,reach:1,echo:true,
+  {foe:'Pike',role:'Unlisted',place:'The Floor Plan',look:'pike',hp:120,speed:3.7,react:.24,cd:.95,heavy:.3,block:.18,dodge:.14,dmg:.49,reach:1,echo:true,
    tip:'He answers with your own last three punches. Break your rhythm.',
    intro:'The door that is not on the floor plan. Pike takes his jacket off and stands the way you stand. Whatever you throw, he remembers.'}
 ];
@@ -1058,7 +1064,7 @@ function titleCard(){
 
 /* ---------- flow ---------- */
 function startBout(i){
-  G.bout=i; const cfg=BOUTS[i];
+  G.bout=i; const cfg=scaleCfg(BOUTS[i]);
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
   resetFighter(E,2.3,-Math.PI/2,cfg.hp);
@@ -1206,6 +1212,36 @@ if(document.fonts&&document.fonts.load){
 }
 titleCard();
 const SKILL={easy:1.45,normal:1,hard:.72};
+const DIFF={
+  easy:{hp:.85,speed:.92,react:1.18,dmg:.88,guard:.75,cd:1.12},
+  normal:{hp:1,speed:1,react:1,dmg:1,guard:1,cd:1},
+  hard:{hp:1.12,speed:1.06,react:.86,dmg:1.12,guard:1.2,cd:.9}
+};
+let diff='normal';
+function scaleCfg(cfg){
+  const d=DIFF[diff]||DIFF.normal;
+  const o=Object.assign({},cfg);
+  o.hp=Math.max(1,Math.round(cfg.hp*d.hp));
+  o.speed=cfg.speed*d.speed;
+  o.react=cfg.react*d.react;
+  o.dmg=cfg.dmg*d.dmg;
+  o.block=Math.min(.95,cfg.block*d.guard);
+  o.dodge=Math.min(.9,cfg.dodge*d.guard);
+  o.cd=cfg.cd*d.cd;
+  return o;
+}
+function loadDiff(){
+  try{ const v=localStorage.getItem('sublevel-diff'); if(v&&DIFF[v]) diff=v; }catch(e){}
+}
+function saveDiff(){ try{ localStorage.setItem('sublevel-diff', diff); }catch(e){} }
+function paintDiff(){
+  document.querySelectorAll('[data-diff]').forEach(b=>b.classList.toggle('on', b.dataset.diff===diff));
+}
+loadDiff();
+paintDiff();
+document.querySelectorAll('[data-diff]').forEach(b=>{
+  b.addEventListener('click',()=>{ diff=b.dataset.diff; saveDiff(); paintDiff(); });
+});
 function botIntent(p,e,dt,skill){
   const m=SKILL[skill]||1;
   const I={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
@@ -1224,14 +1260,16 @@ function botIntent(p,e,dt,skill){
   if(p.stam<28){ I.mx=-dir.x; I.mz=-dir.z; return I; }
   if(dist>1.62){ I.mx=dir.x; I.mz=dir.z; return I; }
   if(B.hold<=0&&p.cd<=0&&!threat){
-    if(e.state==='hit'&&p.stam>36&&dist<2.05){ I.heavy=true; B.hold=.7*m; }
-    else { I.jab=true; B.hold=.95*m; }
+    if(e.state==='hit'&&p.stam>36&&dist<2.05){ I.heavy=true; B.hold=.7; }
+    else { I.jab=true; B.hold=1.55; }
   }
   return I;
 }
 function simMeet(opt){
   opt=opt||{};
   const n=opt.n||200, skill=opt.skill||'normal', seed0=opt.seed>>>0||1;
+  const prevDiff=diff;
+  if(opt.diff&&DIFF[opt.diff]) diff=opt.diff;
   const bouts=opt.bouts||[0,1,2];
   const prevRng=rng, prevState=G.state;
   const dt=1/60, CAP=60, out=[];
@@ -1239,7 +1277,7 @@ function simMeet(opt){
     const bout=bouts[bi], rows=[];
     for(let i=0;i<n;i++){
       rng=mulberry32((seed0+bout*10007+i*97)>>>0);
-      const cfg=BOUTS[bout];
+      const cfg=scaleCfg(BOUTS[bout]);
       E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
       resetFighter(E,2.3,-Math.PI/2,cfg.hp);
       resetFighter(P,-2.3,Math.PI/2,100); P.hp=100; P.speed0=4.4; P.reach=1; P.dmgMul=1;
@@ -1259,21 +1297,23 @@ function simMeet(opt){
         else { gap+=dt; if(gap>maxGap) maxGap=gap; }
         if(G.state!=='fight') break;
       }
-      rows.push({win:G.winner===P,t:Math.round(real*10)/10,empty:real?empty/real:0,gap:Math.round(maxGap*10)/10,ko:G.state==='ko'});
+      rows.push({win:G.winner===P,t:Math.round(real*10)/10,empty:real?empty/real:0,gap:Math.round(maxGap*10)/10,ko:G.state==='ko',ehp:Math.max(0,Math.round(E.hp)),php:Math.max(0,Math.round(P.hp))});
     }
     const lens=rows.map(r=>r.t).sort((a,b)=>a-b);
     const empty=rows.reduce((s,r)=>s+r.empty,0)/n;
     out.push({
-      foe:BOUTS[bout].foe, skill, n,
+      foe:BOUTS[bout].foe, skill, diff, n,
       win:Math.round(rows.filter(r=>r.win).length/n*1000)/10,
       median:lens[Math.floor(n/2)],
       p25:lens[Math.floor(n*.25)], p75:lens[Math.floor(n*.75)],
       empty:Math.round(empty*1000)/10,
       stale:rows.filter(r=>r.gap>40||!r.ko).length,
-      maxGap:Math.max.apply(null, rows.map(r=>r.gap))
+      maxGap:Math.max.apply(null, rows.map(r=>r.gap)),
+      ehp:Math.round(rows.reduce((s,r)=>s+r.ehp,0)/n),
+      php:Math.round(rows.reduce((s,r)=>s+r.php,0)/n)
     });
   }
-  rng=prevRng;
+  rng=prevRng; diff=prevDiff;
   E.cfg=BOUTS[0]; E.speed0=BOUTS[0].speed; E.reach=BOUTS[0].reach; E.dmgMul=BOUTS[0].dmg;
   resetFighter(P,-2.3,Math.PI/2,100);
   resetFighter(E,2.3,-Math.PI/2,BOUTS[0].hp);

@@ -12,6 +12,7 @@ const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const N = Number(process.argv[2] || 200);
 const SKILL = process.argv[3] || "normal";
 const SEED = Number(process.argv[4] || 1);
+const DIFFNAME = process.argv[5] || "normal";
 
 function serve() {
   const types = { ".html": "text/html", ".js": "text/javascript", ".txt": "text/plain" };
@@ -83,7 +84,7 @@ try {
       if (performance.now() - t > 15000) throw new Error("boot");
       await new Promise((r) => requestAnimationFrame(r));
     }
-    const rows = window.__sublevel.simMeet({ n: ${N}, skill: ${JSON.stringify(SKILL)}, seed: ${SEED} });
+    const rows = window.__sublevel.simMeet({ n: ${N}, skill: ${JSON.stringify(SKILL)}, seed: ${SEED}, diff: ${JSON.stringify(DIFFNAME)} });
     return { ms: Math.round(performance.now() - t), rows };
   })()`;
   const out = await cdp.send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
