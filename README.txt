@@ -18,6 +18,7 @@ Gamepad, standard mapping: left stick or d-pad moves, X jabs, Y is heavy, A dodg
 The title card has Easy, Normal, and Hard. Normal uses the bout table as tuned. Easy and Hard scale that table: health, speed, damage, guard rate, and reaction. The same card has a rumble slider. 0 is off. Key bindings, difficulty, and rumble are saved in local storage when the browser allows it.
 Reyes shows a mark before a jab. Dag answers a miss with a marked heavy. Pike repeats your last three attacks. The card after a bout lists hits, blocks, dodges, and seconds in the corner.
 A hit turns the head toward that side. Knockdowns fall back, crumple, or drop sideways. Bruises and sweat build during the bout.
+The overhead light is cold. The hanging bulbs are sodium orange. The crowd around the ring is built from shoulders, arms, and legs, and they sway while they stand.
 
 Touch: move stick on the left, Jab in the bottom-right of the button cluster. The view does not scroll or zoom.
 

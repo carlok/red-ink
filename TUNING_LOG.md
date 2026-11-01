@@ -422,4 +422,53 @@ A jab from the left still falls backward. A jab from the right drops sideways. A
 
 Verdict: **keep**. Damp stays 24. `tuning/s6-ko-before.jpg` is the old flat fall. `tuning/s6-ko-after.jpg` is the side drop.
 
+## Sprint 7 — Visual quality inside the budget
+
+Goal: a cold overhead, sodium bulbs, and a crowd with shoulders and legs, without leaving the draw and mesh budgets. Anything that costs more than 1 ms of GPU time has to sit on the quality ladder.
+
+Probe: `node tools/look-probe.mjs`. Draws are the per-frame delta of `engine._drawCalls`. GPU time is `EngineInstrumentation`, in milliseconds. This machine's frame is still capped at 16.7 ms, so the GPU timer is the cost.
+
+### Baseline
+
+| | Value |
+| --- | --- |
+| Fight draws | 148 |
+| Active meshes | 120 |
+| Meshes | 182 |
+| GPU frame | 1.107 ms |
+| Key light | 1.00, 0.90, 0.72 |
+| Fill | 0.62, 0.70, 0.95 |
+| Bulb | 1.00, 0.68, 0.34 |
+| Exposure / contrast | 1.50 / 1.10 |
+| Crowd | capsule, 154 verts, bounds 0.57 × 1.50 × 0.60 |
+| Crowd yaw over ~1.5 s | 0 |
+| HUD at 360 px | Auditor and Reyes fit, 12 px type, 18 px bars |
+
+`ColorCurves` is not in the tree-shaken engine, so the grade stays on the lights and the exposure.
+
+### Change 1 — fluorescent key, sodium bulbs, block crowd, soft shadow
+
+Hypothesis: a cold key against the orange bulbs will read as two kinds of light, and a merged box figure will read as a person, if the instance count stays 34 bodies and 34 heads.
+
+| | Before | After |
+| --- | --- | --- |
+| Key | 1.00, 0.90, 0.72 | 0.62, 0.78, 1.00 |
+| Fill | 0.62, 0.70, 0.95 | 0.55, 0.68, 1.00 |
+| Bulb | 1.00, 0.68, 0.34 | 1.00, 0.62, 0.28 |
+| Exposure / contrast | 1.50 / 1.10 | 1.35 / 1.22 |
+| Hair specular | 0.28, power 14 | 0.55, power 28 |
+| Eye emissive scale | 0.45 | 0.70 |
+| Crowd bounds | 0.57 × 1.50 × 0.60 | 0.76 × 1.43 × 0.22 |
+| Crowd verts | 154 | 144 |
+| Crowd yaw span | 0 | 0.37 rad |
+| Fight draws | 148 | 149 |
+| Active meshes | 120 | 124 |
+| GPU, blur on | 1.107 ms (poisson, no blur) | 1.355 ms |
+| GPU, blur off | — | 1.179 ms |
+
+The blur pass costs about 0.18 ms here. Quality step 2 turns it off together with the poisson filter. The enemy bar and the K.O. word stay the red accent. At 360 px the names still fit and the bars stay 18 px.
+
+Verdict: **keep**. `tuning/s7-after.jpg` is the desktop frame. `tuning/s7-before-360.jpg` and `tuning/s7-after-360.jpg` are the phone check.
+
+
 

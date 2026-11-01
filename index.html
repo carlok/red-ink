@@ -253,17 +253,17 @@ const cam=new B.FreeCamera('cam',new V3(0,5,-11.5),scene);
 cam.minZ=.2; cam.maxZ=90; cam.fov=.85; cam.setTarget(new V3(0,1.2,0));
 
 const hemi=new B.HemisphericLight('hemi',new V3(0,1,0),scene);
-hemi.intensity=.38; hemi.diffuse=new C3(.62,.7,.95); hemi.groundColor=new C3(.14,.11,.1);
+hemi.intensity=.42; hemi.diffuse=new C3(.55,.68,1); hemi.groundColor=new C3(.16,.1,.08);
 const key=new B.SpotLight('key',new V3(0,8.4,0),new V3(0,-1,0),1.5,5,scene);
-key.intensity=2.5; key.diffuse=new C3(1,.9,.72); key.shadowMinZ=2; key.shadowMaxZ=14;
-const bulbA=new B.PointLight('bulbA',new V3(-5,6.6,-3),scene); bulbA.diffuse=new C3(1,.68,.34); bulbA.range=16; bulbA.intensity=.9;
-const bulbB=new B.PointLight('bulbB',new V3(5.5,6.6,3.5),scene); bulbB.diffuse=new C3(1,.7,.4); bulbB.range=16; bulbB.intensity=.8;
+key.intensity=2.2; key.diffuse=new C3(.62,.78,1); key.shadowMinZ=2; key.shadowMaxZ=14;
+const bulbA=new B.PointLight('bulbA',new V3(-5,6.6,-3),scene); bulbA.diffuse=new C3(1,.62,.28); bulbA.range=16; bulbA.intensity=.9;
+const bulbB=new B.PointLight('bulbB',new V3(5.5,6.6,3.5),scene); bulbB.diffuse=new C3(1,.64,.3); bulbB.range=16; bulbB.intensity=.8;
 
 const ipc=scene.imageProcessingConfiguration;
-ipc.toneMappingEnabled=true; ipc.toneMappingType=B.ImageProcessingConfiguration.TONEMAPPING_ACES; ipc.exposure=1.5; ipc.contrast=1.1;
+ipc.toneMappingEnabled=true; ipc.toneMappingType=B.ImageProcessingConfiguration.TONEMAPPING_ACES; ipc.exposure=1.35; ipc.contrast=1.22;
 ipc.vignetteEnabled=true; ipc.vignetteWeight=1.6; ipc.vignetteStretch=.4; ipc.vignetteColor=new B.Color4(0,0,0,0);
 const sg=new B.ShadowGenerator(1024,key);
-sg.usePoissonSampling=true; sg.bias=.002; sg.setDarkness(.35);
+sg.usePoissonSampling=true; sg.useBlurExponentialShadowMap=true; sg.blurKernel=16; sg.bias=.002; sg.setDarkness(.42);
 
 /* ---------- material + mesh helpers ---------- */
 const matCache={};
@@ -413,16 +413,29 @@ const crowd=[];
 function buildCrowd(){
   const pal=[['#5b3a4a','#c68e6b'],['#2f4a5c','#8a5a3c'],['#4a5a3a','#e0b28a'],['#5c4a2f','#a8714e'],['#3b3b46','#d3a07c']];
   const src=pal.map((p,i)=>{
-    const bd=B.MeshBuilder.CreateCapsule('cb'+i,{height:1.5,radius:.3,tessellation:10,subdivisions:1},scene); bd.material=toon(p[0],{e:.18}); bd.position.y=-30;
-    const hd=B.MeshBuilder.CreateSphere('ch'+i,{diameter:.44,segments:8},scene); hd.material=toon(p[1],{e:.18}); hd.position.y=-30;
-    return {bd,hd};
+    const shirt=toon(p[0],{e:.18}), skin=toon(p[1],{e:.18}), bits=[];
+    const put=(mesh,mat,x,y,z)=>{ mesh.material=mat; mesh.position.set(x,y,z); mesh.isPickable=false; bits.push(mesh); };
+    put(box(.46,.58,.22),shirt,0,1.18,0);
+    put(box(.34,.26,.2),shirt,0,.78,0);
+    put(box(.13,.72,.14),shirt,-.11,.4,0);
+    put(box(.13,.72,.14),shirt,.11,.4,0);
+    put(box(.12,.52,.12),shirt,-.32,1.12,0);
+    put(box(.12,.52,.12),shirt,.32,1.12,0);
+    bits.forEach(m=>m.computeWorldMatrix(true));
+    const body=B.Mesh.MergeMeshes(bits,true,true);
+    body.position.y=-30; body.isPickable=false; body.metadata={kind:'person',parts:6};
+    const hd=B.MeshBuilder.CreateSphere('ch'+i,{diameter:.34,segments:8},scene);
+    hd.material=skin; hd.position.y=-30; hd.isPickable=false; hd.metadata={kind:'person'};
+    return {bd:body,hd};
   });
   const n=34;
   for(let i=0;i<n;i++){
     const a=i/n*Math.PI*2+rand(-.08,.08), r=rand(9.2,12.2), s=src[Math.floor(rand(0,src.length))], sc=rand(.92,1.1);
     const bd=s.bd.createInstance('b'+i), hd=s.hd.createInstance('h'+i), x=Math.sin(a)*r, z=Math.cos(a)*r;
-    bd.position.set(x,.75*sc,z); hd.position.set(x,1.72*sc,z); bd.scaling.setAll(sc); hd.scaling.setAll(sc);
-    crowd.push({bd,hd,b:.75*sc,h:1.72*sc,ph:rand(0,6.28),rate:rand(2.5,4.5),amp:rand(.02,.05)});
+    bd.position.set(x,0,z); hd.position.set(x,1.55*sc,z); bd.scaling.setAll(sc); hd.scaling.setAll(sc);
+    bd.metadata={kind:'person'};
+    bd.rotation.y=Math.atan2(-x,-z);
+    crowd.push({bd,hd,b:0,h:1.55*sc,face:bd.rotation.y,ph:rand(0,6.28),rate:rand(2.5,4.5),amp:rand(.02,.05)});
   }
 }
 
@@ -541,8 +554,8 @@ function rmat(hex,kind){
   if(kind==='skin'){ m.specularColor=new C3(.2,.16,.13); m.specularPower=20; m.emissiveColor=c.scale(.25); }
   else if(kind==='cloth'){ m.specularColor=new C3(.06,.06,.06); m.specularPower=8; }
   else if(kind==='leather'){ m.specularColor=new C3(.55,.55,.55); m.specularPower=70; m.emissiveColor=c.scale(.04); }
-  else if(kind==='hair'){ m.specularColor=new C3(.28,.24,.2); m.specularPower=14; m.emissiveColor=c.scale(.05); }
-  else if(kind==='eye'){ m.specularColor=new C3(.9,.9,.9); m.specularPower=120; m.emissiveColor=c.scale(.45); }
+  else if(kind==='hair'){ m.specularColor=new C3(.55,.48,.36); m.specularPower=28; m.emissiveColor=c.scale(.08); }
+  else if(kind==='eye'){ m.specularColor=new C3(1,1,1); m.specularPower=80; m.emissiveColor=c.scale(.7); }
   else { m.specularColor=new C3(0,0,0); }
   rmCache[k]=m; return m;
 }
@@ -1221,6 +1234,7 @@ function updateAmbient(dt){
   crowd.forEach(c=>{
     const a=Math.abs(Math.sin(G.t*c.rate+c.ph))*(c.amp+G.cheer*.3);
     c.bd.position.y=c.b+a; c.hd.position.y=c.h+a;
+    if(c.face!==undefined) c.bd.rotation.y=c.face+Math.sin(G.t*1.7+c.ph)*.2;
   });
   const fl=.9+Math.sin(G.t*13)*.03+Math.sin(G.t*5.3+1)*.05+(Math.sin(G.t*.9)>.985?-.35:0);
   bulbA.intensity=.9*fl; bulbB.intensity=.8*(1.02-(fl-.9)*.8);
@@ -1312,7 +1326,7 @@ const Q={t:0,n:0,lvl:0,warm:2500,base:engine.getHardwareScalingLevel()};
 function qualityStep(){
   Q.lvl++;
   if(Q.lvl===1) engine.setHardwareScalingLevel(Q.base*1.35);
-  else if(Q.lvl===2) sg.usePoissonSampling=false;
+  else if(Q.lvl===2){ sg.usePoissonSampling=false; sg.useBlurExponentialShadowMap=false; }
   else if(Q.lvl===3) engine.setHardwareScalingLevel(Q.base*1.8);
   else if(Q.lvl===4){ key.shadowEnabled=false; scene.imageProcessingConfiguration.vignetteEnabled=false; }
   else if(Q.lvl===5){ scene.imageProcessingConfiguration.toneMappingEnabled=false; engine.setHardwareScalingLevel(Q.base*2); }
