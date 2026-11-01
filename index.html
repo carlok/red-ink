@@ -1851,6 +1851,24 @@ function hubProbe(){
   hubCard(Math.min(progress.wins,BOUTS.length-1));
   return {state:G.state,title:$('cTitle').textContent,rules:L('rule_1')};
 }
+function qaEndBout(playerWins){
+  if(G.state!=='fight') return {ok:false,state:G.state};
+  G.winner=playerWins?P:E; G.state='ko'; G.koTimer=0;
+  afterKO();
+  return {ok:G.state==='card',state:G.state,title:$('cTitle').textContent};
+}
+function qaClickGo(){
+  if(wrapEl.hidden||!$('go')) return {ok:false};
+  $('go').click();
+  return {ok:true,state:G.state};
+}
+function qaResetProgress(){
+  progress={wins:0,outfit:'auditor',arena:0,dock:0};
+  saveProgressData();
+  applyArena(0);
+  syncPlayerOutfit();
+  return Object.assign({},progress);
+}
 function botIntent(p,e,dt,skill){
   const m=SKILL[skill]||1;
   const I={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
@@ -2237,6 +2255,6 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;}};
+window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress};
 })();
 </script>
