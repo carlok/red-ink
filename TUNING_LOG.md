@@ -74,3 +74,32 @@ Hypothesis: walls, tape, pipes, pillars, hazard bands, crates, cords and bulbs a
 | Geometries over 40 restarts | flat | 107 → 107 |
 
 Verdict: **keep**. Most of the merged meshes were already outside the view, so draw calls fell by 12 rather than by the full mesh drop of 36. The picture still shows the walls, pipes, striped pillars, crates, cords and bulbs.
+
+### Change 3 — phone viewport
+
+Hypothesis: with no viewport meta, a phone lays the page out at the old 980 px default and then scales it down, so the canvas renders far more pixels than the screen.
+
+Measured with touch emulation, device pixel ratio 2, fonts blocked.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Layout size | 980×2121 | 390×844 |
+| Render size | 1225×2651 | 487×1055 |
+| Render pixels | 3,247,475 | 513,785 |
+| Desktop 1920×1080 render | 1920×1080 | 1920×1080 |
+| Touch controls | shown, `touch-action: none` | shown, buttons 70×70, stick 136×136 |
+| Meshes | 175 | 175 |
+
+Verdict: **keep**. Desktop resolution did not move. The game still boots with the font hosts blocked.
+
+### Checked, no code change
+
+Crowd. Already `createInstance` for 68 body and head meshes. Fight draw calls (157) sit below the active mesh count (131), which is the instancing saving the extra draws. Sources sit below the floor and are not in the active set. Verdict: **keep** as it is.
+
+Dispose. Across 40 `startBout` calls, mesh count and geometry count stayed flat (211/143 before the merge, 175/107 after). Twenty GLB swaps returned to the same mesh count after clear. Heap used-size grew about 0.1–0.4 MB on the second 20 restarts; that is allocator slack, not a mesh leak. Verdict: **keep**, no dispose change.
+
+Freeze world matrices. Active-mesh evaluation is 0.40–0.58 ms and the run-to-run spread is larger than the time freezing could save. Verdict: **revisit** on a machine where that cost shows up. Not shipped.
+
+Quality ladder. Threshold is already 44 fps and the window is already 1,800 ms. The floor is already hardware scaling 2 (half of the 1080p view, 960×540). Isolated GPU times were taken in one pass and drifted down even after settings were restored, so they are not clean enough to reorder the steps. Poisson off, measured next to the full-quality sample, saved about 0.11 ms. Verdict: **keep** the current order and floor.
+
+Input check, not a tune: a jab key reached `attack` inside two frames at 16.7 ms, which is inside the 80 ms budget.
