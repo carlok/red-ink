@@ -2,6 +2,13 @@
 
 All notable releases of **Sublevel Three** (red-ink). Combat tuning details live in `TUNING_LOG.md`. **Sprint 11 (photo avatar) was skipped** by project decision.
 
+## Sprint 13 — Curve, fullscreen, audio (2026-11-01)
+
+- Monotonic bout 4–6 tuning (200 fights, seed 1, normal): Voss 36%, Chen 30%, Halvorsen 22%; bouts 1–3 unchanged.
+- Mobile auto fullscreen on first bout-start gesture; `sublevel-fs` opt-out; standalone-capable meta tags.
+- Audio: 19 CC0 clips (hit pools, dual fight stems, hub/dock beds); `audioMetrics()`; `samples.js` +380 KB.
+- Regression 22/22 including audio variants and fullscreen pref reload (`file://`).
+
 ## Sprint 12 — Release and QA (2026-11-01)
 
 - Headless regression suite: `node tools/regression.mjs` (20 checks: title, bouts 1–6, hub, dock flow, win/lose, restart, keyboard, gamepad, touch, GLB avatar, draw/mesh budget, offline `file://`).
