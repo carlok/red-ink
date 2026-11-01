@@ -5,12 +5,18 @@
   "description": "Build tooling for the tree-shaken Babylon bundle. The game itself is index.html.",
   "scripts": {
     "build:engine": "node tools/build-engine.mjs",
-    "measure": "node tools/measure.mjs"
+    "measure": "node tools/measure.mjs",
+    "regression": "node tools/regression.mjs",
+    "balance": "node tools/balance-run.mjs 200 normal 1 normal 0-5",
+    "offline-zip": "node tools/offline-zip.mjs",
+    "qa:a11y": "node tools/lighthouse-a11y.mjs"
   },
   "devDependencies": {
+    "@axe-core/cli": "^4.14.0",
     "@babylonjs/core": "9.30.0",
     "@babylonjs/loaders": "9.30.0",
-    "esbuild": "0.25.12"
+    "esbuild": "0.25.12",
+    "lighthouse": "^13.6.0"
   },
   "license": "Apache-2.0"
 }

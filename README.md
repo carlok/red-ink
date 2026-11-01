@@ -22,6 +22,14 @@ Open `index.html` in Chrome, Firefox, or Edge.
 
 License: Apache-2.0 (`LICENSE`, `NOTICE`). The sounds are CC0 (`audio/CC0.txt`).
 
+## Quality assurance
+
+- `npm run regression` — headless Chrome checks (bouts 1–6, hub/dock, input, offline `file://`).
+- `npm run balance` — seeded bot win rates for all six foes.
+- `npm run offline-zip` — writes `dist/sublevel-three-offline.zip` for offline play.
+- `npm run qa:a11y` — axe on the title card (+ Lighthouse when the host finishes in time).
+- Viewports: `docs/DEVICE-MATRIX.md`.
+
 Engine: `lib/babylon.js` is a tree-shaken build of `@babylonjs/core` 9.30.0 plus the glTF 2.0 loader. License text: `lib/babylon.Apache-2.0.txt`. Regenerate the bundle with `npm install && npm run build:engine`.
 
 ## Controls

@@ -1,3 +1,7 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
 <title>Sublevel Three</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -76,7 +80,7 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .kick{font:600 11px/1.4 var(--f-data);letter-spacing:.14em;text-transform:uppercase;color:#4a4d49;min-width:0;padding-top:4px}
 .card h2{margin:0;font:800 clamp(44px,12vw,72px)/.9 var(--f-display);letter-spacing:.01em;text-transform:uppercase;text-wrap:balance}
 .card p{margin:0;font-size:17px;line-height:1.45;max-width:62ch}
-.stamp{flex:none;transform:rotate(5deg);font:800 18px/1 var(--f-display);letter-spacing:.08em;color:var(--stain);border:3px solid var(--stain);padding:4px 8px;opacity:.88;text-transform:uppercase;white-space:nowrap}
+.stamp{flex:none;transform:rotate(5deg);font:800 18px/1 var(--f-display);letter-spacing:.08em;color:#6b1a12;border:3px solid #6b1a12;background:var(--paper);padding:4px 8px;opacity:1;text-transform:uppercase;white-space:nowrap}
 dl.rows{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:0;font:500 13px/1.35 var(--f-data);border-top:1px dashed #6b6e69;padding-top:10px}
 dl.rows dt{color:#5a5d58;text-transform:uppercase;letter-spacing:.08em}
 dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
@@ -128,8 +132,10 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .drop{position:absolute;inset:12px;display:grid;place-items:center;border:3px dashed var(--tape);background:rgba(8,8,9,.7);font:800 clamp(28px,6vw,48px)/1 var(--f-display);text-transform:uppercase;color:var(--tape);text-align:center;padding:16px;pointer-events:none}
 .fail{position:absolute;inset:0;display:grid;place-items:center;margin:0;padding:24px;text-align:center;font-size:18px}
 </style>
+</head>
+<body>
 
-<div id="app">
+<div id="app" role="main">
   <canvas id="view" tabindex="0" aria-label="Fight arena, 3D view"></canvas>
 
   <div class="hud" id="hud" hidden>
@@ -1851,6 +1857,24 @@ function hubProbe(){
   hubCard(Math.min(progress.wins,BOUTS.length-1));
   return {state:G.state,title:$('cTitle').textContent,rules:L('rule_1')};
 }
+function qaEndBout(playerWins){
+  if(G.state!=='fight') return {ok:false,state:G.state};
+  G.winner=playerWins?P:E; G.state='ko'; G.koTimer=0;
+  afterKO();
+  return {ok:G.state==='card',state:G.state,title:$('cTitle').textContent};
+}
+function qaClickGo(){
+  if(wrapEl.hidden||!$('go')) return {ok:false};
+  $('go').click();
+  return {ok:true,state:G.state};
+}
+function qaResetProgress(){
+  progress={wins:0,outfit:'auditor',arena:0,dock:0};
+  saveProgressData();
+  applyArena(0);
+  syncPlayerOutfit();
+  return Object.assign({},progress);
+}
 function botIntent(p,e,dt,skill){
   const m=SKILL[skill]||1;
   const I={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
@@ -2237,6 +2261,8 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;}};
+window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress};
 })();
 </script>
+</body>
+</html>

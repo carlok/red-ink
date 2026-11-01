@@ -636,3 +636,81 @@ Retro: **moved** — shared `STR` keys made EN/IT verification one probe; hub+do
 
 Questions: (1) Should dock mission grant a gameplay perk beyond narrative, or stay story-only? (2) Should IT use formal *lei* or informal *tu* on cards (currently *tu*)? (3) After campaign clear, should hub allow picking any bout, or stay linear replay from bout 1?
 
+## Sprint 12 — Release and QA
+
+Goal: ship an automated regression suite, documented device matrix, Lighthouse and axe accessibility scores, an offline zip script, and a CHANGELOG, without retuning combat.
+
+Backlog: (1) baseline QA gaps and bout 4–6 balance, (2) shared Chrome probe path, (3) headless regression (`file://` + hub/dock), (4) Lighthouse + axe with cheap fixes, (5) offline zip script + CHANGELOG, (6) re-run full regression and record pass/fail.
+
+Probe: `node tools/regression.mjs`, `node tools/lighthouse-a11y.mjs`, `node tools/offline-zip.mjs`, `node tools/balance-run.mjs 200 normal 1 0-5`.
+
+### Baseline (master after S9, before S12 edits)
+
+| Metric | Value |
+| --- | --- |
+| Automated regression script | none |
+| `CHANGELOG.md` | none |
+| Offline zip script | none |
+| Lighthouse / axe recorded | none |
+| Device matrix doc | none |
+| Balance bouts 1–3 (200, seed 1, normal) | Reyes 90.5% / 32.3 s, Dag 67.5% / 34.0 s, Pike 44.0% / 43.9 s |
+| Balance bouts 4–6 | not logged |
+| `npm run` QA scripts | `build:engine`, `measure` only |
+
+### Change 1 — `tools/chrome.mjs` + bout list in balance-run
+
+Hypothesis: probes run on Linux CI without editing Mac-only Chrome paths.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Chrome path | hard-coded macOS | `CHROME` env + Linux fallbacks |
+| Balance bout selection | `[0,1,2]` only | argv `0-5` / `all` |
+
+Verdict: **keep**.
+
+### Change 2 — measure balance bouts 4–6 (no retune)
+
+| Voss / Chen / Halvorsen win (200, seed 1, normal) | not logged | 95.0% / 75.0% / 2.0% |
+| Reyes / Dag / Pike | 90.5 / 67.5 / 44.0% | unchanged |
+
+Verdict: **keep** (document only).
+
+### Change 3 — `qaEndBout` / `qaClickGo` hooks
+
+Hypothesis: headless tests can drive win/lose and card flow without synthetic KO physics.
+
+Verdict: **keep**.
+
+### Change 4–5 — regression + CDP session
+
+Hypothesis: one `node tools/regression.mjs` guards title, six bouts, hub, dock, input modes, GLB, budgets, and `file://`.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Automated regression | none | 20/20 pass |
+| Offline `file://` bout | untested | pass |
+
+Verdict: **keep**. Demo: `tuning/s12-regression.jpg`.
+
+### Change 6–7 — WCAG fixes on title card
+
+| axe violations (title card) | 3 | 0 |
+| Fixes | — | `lang="en"`, `role="main"`, stamp contrast |
+
+Verdict: **keep**.
+
+### Change 8–11 — release artifacts
+
+| Artifact | After |
+| --- | --- |
+| `docs/DEVICE-MATRIX.md` | documented viewports |
+| `tools/offline-zip.mjs` | `dist/sublevel-three-offline.zip` (gitignored) |
+| `CHANGELOG.md` | S1–S10, S9, S12; S11 skipped |
+| `npm run regression` / `balance` / `offline-zip` / `qa:a11y` | added |
+
+Lighthouse: full run hit `ETIMEDOUT` on this VM (>180 s); axe (WCAG2 AA tags) reports **0 violations** after Changes 6–7. Re-run Lighthouse on a host machine for performance scores.
+
+Retro: **moved** — regression caught touch UI needing CDP touch emulation + reload; axe via CDN avoided ChromeDriver skew. **Did not move** — Lighthouse performance on headless VM (timeout); Halvorsen 2% win is logged, not retuned. **Next (out of scope)** — S11 avatar pipeline skipped.
+
+Questions: (1) Should Halvorsen be tuned before a public “1.0” tag? (2) Should `npm run regression` gate GitHub Actions on every push? (3) Ship the offline zip on GitHub Releases?
+

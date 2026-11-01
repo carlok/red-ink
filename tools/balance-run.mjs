@@ -1,18 +1,26 @@
 /**
- * Run seeded bot meets. Usage: node tools/balance-run.mjs [n] [skill]
+ * Run seeded bot meets. Usage: node tools/balance-run.mjs [n] [skill] [seed] [diff] [bouts]
+ * bouts: comma list (default 0,1,2) or all / 0-5 for six foes.
  */
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CHROME } from "./chrome.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const N = Number(process.argv[2] || 200);
 const SKILL = process.argv[3] || "normal";
 const SEED = Number(process.argv[4] || 1);
 const DIFFNAME = process.argv[5] || "normal";
+const BOUTS_ARG = process.argv[6] || "0,1,2";
+
+function parseBouts(arg) {
+  if (arg === "all" || arg === "0-5") return [0, 1, 2, 3, 4, 5];
+  return arg.split(",").map((s) => Number(s.trim())).filter((n) => n >= 0 && n < 6);
+}
+const BOUT_LIST = parseBouts(BOUTS_ARG);
 
 function serve() {
   const types = { ".html": "text/html", ".js": "text/javascript", ".txt": "text/plain" };
@@ -84,7 +92,7 @@ try {
       if (performance.now() - t > 15000) throw new Error("boot");
       await new Promise((r) => requestAnimationFrame(r));
     }
-    const rows = window.__sublevel.simMeet({ n: ${N}, skill: ${JSON.stringify(SKILL)}, seed: ${SEED}, diff: ${JSON.stringify(DIFFNAME)} });
+    const rows = window.__sublevel.simMeet({ n: ${N}, skill: ${JSON.stringify(SKILL)}, seed: ${SEED}, diff: ${JSON.stringify(DIFFNAME)}, bouts: ${JSON.stringify(BOUT_LIST)} });
     return { ms: Math.round(performance.now() - t), rows };
   })()`;
   const out = await cdp.send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
