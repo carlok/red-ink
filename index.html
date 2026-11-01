@@ -5,6 +5,8 @@
 <title>Sublevel Three</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap">
@@ -218,6 +220,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
             <label class="tuneRow rumble" for="sfxVol">Hits <input id="sfxVol" type="range" min="0" max="100" value="100"></label>
             <label class="tuneRow rumble" for="musVol">Music <input id="musVol" type="range" min="0" max="100" value="100"></label>
             <label class="tuneRow rumble" for="lessMotion"><input id="lessMotion" type="checkbox"> Less motion</label>
+            <label class="tuneRow rumble" for="autoFs"><input id="autoFs" type="checkbox" checked> Auto fullscreen on phone</label>
           </div>
           <small id="avHint">Export a cartoon avatar as GLB (MetaPerson or Avaturn), then pick it here or drop it anywhere on this page.</small>
         </div>
@@ -393,8 +396,8 @@ const BOUTS=[
   {foe:'Dag',roleKey:'role_dag',placeKey:'place_b2',introKey:'intro_b2',afterKey:'after_b2',tipKey:'tip_b2',look:'dag',hp:115,speed:2.5,react:.38,cd:1.4,heavy:.42,block:.18,dodge:.06,dmg:1.15,reach:1.12,style:'punish'},
   {foe:'Pike',roleKey:'role_pike',placeKey:'place_b3',introKey:'intro_b3',afterKey:'after_b3',tipKey:'tip_b3',look:'pike',hp:120,speed:3.7,react:.24,cd:1.05,heavy:.3,block:.18,dodge:.14,dmg:.49,reach:1,echo:true,style:'echo'},
   {foe:'Voss',roleKey:'role_voss',placeKey:'place_b4',introKey:'intro_b4',afterKey:'after_b4',tipKey:'tip_b4',look:'voss',hp:175,speed:2.985,react:.29,cd:1.155,heavy:.335,block:.405,dodge:.10,dmg:1.20,reach:1.1,style:'teach'},
-  {foe:'Chen',roleKey:'role_chen',placeKey:'place_b5',introKey:'intro_b5',afterKey:'after_b5',tipKey:'tip_b5',look:'chen',hp:125,speed:2.4,react:.35,cd:1.35,heavy:.45,block:.2,dodge:.08,dmg:1.08,reach:1.1,style:'punish'},
-  {foe:'Halvorsen',roleKey:'role_halvor',placeKey:'place_b6',introKey:'intro_b6',afterKey:'after_b6',tipKey:'tip_b6',look:'halvor',hp:130,speed:3.5,react:.22,cd:1.0,heavy:.32,block:.2,dodge:.12,dmg:.55,reach:1,echo:true,style:'echo'}
+  {foe:'Chen',roleKey:'role_chen',placeKey:'place_b5',introKey:'intro_b5',afterKey:'after_b5',tipKey:'tip_b5',look:'chen',hp:152,speed:2.66,react:.445,cd:1.17,heavy:.48,block:.31,dodge:.10,dmg:1.17,reach:1.12,style:'punish'},
+  {foe:'Halvorsen',roleKey:'role_halvor',placeKey:'place_b6',introKey:'intro_b6',afterKey:'after_b6',tipKey:'tip_b6',look:'halvor',hp:122,speed:3.435,react:.202,cd:1.03,heavy:.29,block:.17,dodge:.11,dmg:.498,reach:1,echo:true,style:'echo'}
 ];
 const UNLOCK_CHAIN=[
   {type:'outfit',id:'sanitation',labelKey:'unlock_outfit_san'},
@@ -712,7 +715,12 @@ let master=null, sfxGain=null, musicGain=null, duckGain=null, roomGain=null, cro
 const stemGain={calm:null,tense:null,finish:null};
 const stemNow={calm:1,tense:0,finish:0};
 let duck=1, duckT=0, bufs={}, gains={}, audioP=null;
-const PEAK={jab:.5012,heavy:.5012,block:.5012,ko:.5012,whoosh:.1995,ui:.2512,room:.02512,crowd:.0631,calm:.1259,tense:.1259,finish:.1259};
+const PEAK={jab:.5012,jab2:.5012,jab3:.5012,heavy:.5012,heavy2:.5012,block:.5012,block2:.5012,ko:.5012,whoosh:.1995,ui:.2512,room:.02512,crowd:.0631,calm:.1259,calm2:.1259,tense:.1259,tense2:.1259,finish:.1259,hub:.1259,dock:.1259};
+const HIT_POOL={jab:['jab','jab2','jab3'],heavy:['heavy','heavy2'],block:['block','block2']};
+const HIT_RATE=[1,.97,1.04,.92,1.08];
+let hitPick=0, boutMusicRate=1;
+const loopSrc={};
+let hubGain=null, hubNow=0;
 function loadAudioPrefs(){
   try{
     const m=localStorage.getItem('sublevel-mute');
@@ -756,10 +764,19 @@ function audioInit(src){
     crowdGain=ac.createGain(); crowdGain.connect(master);
     stemGain.calm=ac.createGain(); stemGain.tense=ac.createGain(); stemGain.finish=ac.createGain();
     stemGain.calm.connect(musicGain); stemGain.tense.connect(musicGain); stemGain.finish.connect(musicGain);
+    hubGain=ac.createGain(); hubGain.gain.value=0; hubGain.connect(musicGain);
     applyBus();
   }
   if(!audioP) audioP=loadSamples();
   return audioP;
+}
+function applyBoutMusic(i){
+  const rates=[1,.985,1.02,1.035,.97,1.05,1.025];
+  boutMusicRate=rates[i]||1;
+  if(loopSrc.calm) loopSrc.calm.playbackRate.value=boutMusicRate;
+  if(loopSrc.calm2) loopSrc.calm2.playbackRate.value=1.04/boutMusicRate;
+  if(loopSrc.tense) loopSrc.tense.playbackRate.value=boutMusicRate*1.02;
+  if(loopSrc.tense2) loopSrc.tense2.playbackRate.value=.98/boutMusicRate;
 }
 function wavBytes(b64){
   const bin=atob(b64), bytes=new Uint8Array(bin.length);
@@ -777,8 +794,13 @@ function loadSamples(){
     startLoop('room', roomGain);
     startLoop('crowd', crowdGain);
     startLoop('calm', stemGain.calm);
+    startLoop('calm2', stemGain.calm);
     startLoop('tense', stemGain.tense);
+    startLoop('tense2', stemGain.tense);
     startLoop('finish', stemGain.finish);
+    startLoop('hub', hubGain);
+    startLoop('dock', hubGain);
+    applyBoutMusic(G.bout||0);
   });
 }
 function bufPeak(buf){
@@ -791,14 +813,20 @@ function startLoop(name, dest){
   const s=ac.createBufferSource(), g=ac.createGain();
   g.gain.value=gains[name]||1;
   s.buffer=bufs[name]; s.loop=true; s.connect(g); g.connect(dest);
-  try{ s.start(); }catch(e){}
+  try{ s.start(); loopSrc[name]=s; }catch(e){}
 }
-function playSample(name){
+function playSample(name, rate){
   if(!ac||muted||!bufs[name]||!sfxGain) return;
   const s=ac.createBufferSource(), g=ac.createGain();
   g.gain.value=gains[name]||1;
-  s.buffer=bufs[name]; s.connect(g); g.connect(sfxGain);
+  s.buffer=bufs[name]; s.playbackRate.value=rate||1;
+  s.connect(g); g.connect(sfxGain);
   try{ s.start(); }catch(e){}
+}
+function playHit(kind){
+  const pool=HIT_POOL[kind]||[kind];
+  const name=pool[hitPick++%pool.length];
+  playSample(name, HIT_RATE[hitPick%HIT_RATE.length]);
 }
 function duckHit(){
   duck=.35; duckT=.4;
@@ -826,7 +854,32 @@ function audioTick(dt){
     stemGain.tense.gain.value=stemNow.tense;
     stemGain.finish.gain.value=stemNow.finish;
   }
-  if(crowdGain) crowdGain.gain.value=.4+1.1*clamp(G.cheer||0,0,1.4)/1.4;
+  if(crowdGain){
+    crowdGain.gain.value=.4+1.1*clamp(G.cheer||0,0,1.4)/1.4;
+    if(loopSrc.crowd) loopSrc.crowd.playbackRate.value=.92+.18*clamp(G.cheer||0,0,1.2);
+  }
+  const cardEl=$('wrap');
+  const onCard=G.state==='card'&&cardEl&&!cardEl.hidden;
+  const hubT=onCard?(progress.dock?1:.55):0;
+  hubNow=lerp(hubNow, hubT, Math.min(1, dt*2));
+  if(hubGain) hubGain.gain.value=hubNow*(gains.hub||1)*.7;
+  if(loopSrc.hub) loopSrc.hub.playbackRate.value=.94+boutMusicRate*.06;
+  if(loopSrc.dock) loopSrc.dock.playbackRate.value=progress.dock?1.05:.88;
+}
+function audioMetrics(){
+  const pack=window.SUBLEVEL_AUDIO;
+  const names=pack&&pack.clips?Object.keys(pack.clips):[];
+  let b64Chars=0;
+  names.forEach(n=>{ b64Chars+=(pack.clips[n]||'').length; });
+  return {
+    clipCount:names.length,
+    hitPoolJab:HIT_POOL.jab.length,
+    hitPoolHeavy:HIT_POOL.heavy.length,
+    hitPoolBlock:HIT_POOL.block.length,
+    b64Chars,
+    calmLoopSec:2,
+    minHitRepeat:1/HIT_POOL.jab.length
+  };
 }
 function peakDb(name){
   const buf=bufs[name]; if(!buf) return null;
@@ -854,10 +907,10 @@ function setAudio(o){
   saveAudioPrefs(); applyBus(); paintAudio();
 }
 const SFX={
-  jab:()=>{ playSample('jab'); duckHit(); },
-  heavy:()=>{ playSample('heavy'); duckHit(); },
-  block:()=>{ playSample('block'); duckHit(); },
-  whoosh:()=>playSample('whoosh'),
+  jab:()=>{ playHit('jab'); duckHit(); },
+  heavy:()=>{ playHit('heavy'); duckHit(); },
+  block:()=>{ playHit('block'); duckHit(); },
+  whoosh:()=>playSample('whoosh', .9+(hitPick%4)*.05),
   ko:()=>{ playSample('ko'); duckHit(); },
   ui:()=>playSample('ui')
 };
@@ -1338,6 +1391,47 @@ const keys=new Set(), buf={jab:0,heavy:0,dodge:0};
 let touchVec={x:0,y:0}, touchBlock=false;
 const isTouch=window.matchMedia&&window.matchMedia('(pointer: coarse)').matches;
 if(isTouch) $('app').classList.add('is-touch');
+let autoFs=true, fsPlayDone=false;
+function loadFsPref(){
+  try{
+    const v=localStorage.getItem('sublevel-fs');
+    if(v==='0') autoFs=false;
+  }catch(e){}
+}
+function saveFsPref(){ try{ localStorage.setItem('sublevel-fs', autoFs?'1':'0'); }catch(e){} }
+function paintFsPref(){ const el=$('autoFs'); if(el) el.checked=autoFs; }
+function wantsMobileImmersive(){
+  if(isTouch) return true;
+  try{ return window.matchMedia('(max-width:820px)').matches; }catch(e){ return false; }
+}
+function maybeAutoFullscreen(){
+  if(!autoFs||fsPlayDone||!wantsMobileImmersive()) return;
+  fsPlayDone=true;
+  const el=document.documentElement;
+  const req=el.requestFullscreen||el.webkitRequestFullscreen||el.webkitEnterFullscreen;
+  if(typeof req==='function'){
+    try{
+      const p=req.call(el);
+      if(p&&typeof p.catch==='function') p.catch(()=>{});
+    }catch(e){}
+  }
+  try{
+    if(screen.orientation&&screen.orientation.lock){
+      screen.orientation.lock('landscape').catch(()=>{});
+    }
+  }catch(e){}
+}
+function fullscreenProbe(){
+  const el=document.documentElement;
+  return {
+    autoFs, fsPlayDone,
+    canRequest:!!(el.requestFullscreen||el.webkitRequestFullscreen),
+    immersive:wantsMobileImmersive()
+  };
+}
+loadFsPref();
+paintFsPref();
+if($('autoFs')) $('autoFs').addEventListener('change',e=>{ autoFs=!!e.target.checked; saveFsPref(); });
 const DEFAULT_BINDS={jab:'j',heavy:'k',block:'l',dodge:'space'};
 let binds={jab:'j',heavy:'k',block:'l',dodge:'space'};
 let listenAct=null, keysHtml='', rumbleAmt=1;
@@ -1606,7 +1700,7 @@ function titleRows(){
 function introCard(i,lead){
   const c=BOUTS[i];
   showCard({stamp:L('bout_stamp')+' '+(i+1),kick:lead||L('company_kick'),title:boutPlace(c),body:L(c.introKey),
-    rows:boutRows(i),btn:L('bout_btn'),go:()=>startBout(i)});
+    rows:boutRows(i),btn:L('bout_btn'),go:()=>{ maybeAutoFullscreen(); startBout(i); }});
 }
 function titleCard(){
   showCard({stamp:L('card_title_stamp'),kick:L('company_form'),title:L('card_title_name'),
@@ -1645,6 +1739,7 @@ function winCard(){
 /* ---------- flow ---------- */
 function startBout(i){
   G.bout=i; resetLog(); syncPlayerOutfit(); const cfg=scaleCfg(BOUTS[i]);
+  applyBoutMusic(i);
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
   resetFighter(E,2.3,-Math.PI/2,cfg.hp);
@@ -2261,7 +2356,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress};
+window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
