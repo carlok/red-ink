@@ -103,14 +103,33 @@ const clips = {
     noise(N.jab, 3).map((x, i) => x * Math.exp(-i / RATE / 0.02) * (i / RATE < 0.05 ? 1 : 0)),
     tone(N.jab, 90, 70, 0.1).map((x) => x * 0.6),
   ]), HIT),
+  jab2: normalize(mix([
+    tone(N.jab, 148, 62, 0.15),
+    noise(N.jab, 7).map((x, i) => x * Math.exp(-i / RATE / 0.018) * (i / RATE < 0.04 ? 1 : 0)),
+    tone(N.jab, 110, 75, 0.09).map((x) => x * 0.55),
+  ]), HIT),
+  jab3: normalize(mix([
+    tone(N.jab, 172, 48, 0.17),
+    noise(N.jab, 17).map((x, i) => x * Math.exp(-i / RATE / 0.022) * (i / RATE < 0.06 ? 1 : 0)),
+    tone(N.jab, 80, 65, 0.11).map((x) => x * 0.5),
+  ]), HIT),
   heavy: normalize(mix([
     tone(N.heavy, 90, 32, 0.3),
     tone(N.heavy, 50, 30, 0.34).map((x) => x * 0.8),
     noise(N.heavy, 9).map((x, i) => x * Math.exp(-i / RATE / 0.04)),
   ]), HIT),
+  heavy2: normalize(mix([
+    tone(N.heavy, 82, 38, 0.28),
+    tone(N.heavy, 44, 26, 0.32).map((x) => x * 0.75),
+    noise(N.heavy, 19).map((x, i) => x * Math.exp(-i / RATE / 0.035)),
+  ]), HIT),
   block: normalize(mix([
     tone(N.block, 640, 220, 0.08),
     noise(N.block, 11).map((x, i) => x * Math.exp(-i / RATE / 0.012)),
+  ]), HIT),
+  block2: normalize(mix([
+    tone(N.block, 580, 260, 0.07),
+    noise(N.block, 23).map((x, i) => x * Math.exp(-i / RATE / 0.014)),
   ]), HIT),
   whoosh: normalize(noise(N.whoosh, 13).map((x, i) => {
     const t = i / RATE;
@@ -134,13 +153,29 @@ const clips = {
     loopTone(2, 196, 0.25),
     loopTone(2, 294, 0.2).map((x) => x * 0.45),
   ]), MUSIC),
+  calm2: normalize(mix([
+    loopTone(2, 207, 0.31),
+    loopTone(2, 311, 0.17).map((x) => x * 0.38),
+  ]), MUSIC),
   tense: normalize(mix([
     loopTone(2, 155, 2.2),
     loopTone(2, 164, 3.1).map((x) => x * 0.7),
   ]), MUSIC),
+  tense2: normalize(mix([
+    loopTone(2, 147, 2.6),
+    loopTone(2, 174, 2.8).map((x) => x * 0.65),
+  ]), MUSIC),
   finish: normalize(mix([
     loopTone(2, 98, 0.5),
     tone(N.finish, 392, 98, 1.6).map((x) => x * 0.4),
+  ]), MUSIC),
+  hub: normalize(mix([
+    loopTone(2, 220, 0.12),
+    loopTone(2, 330, 0.08).map((x) => x * 0.35),
+  ]), MUSIC),
+  dock: normalize(mix([
+    loopTone(2, 130, 3.4),
+    noise(N.room, 41).map((x, i) => x * (0.15 + 0.1 * Math.sin(i / RATE * 40))),
   ]), MUSIC),
 };
 
