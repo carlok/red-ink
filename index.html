@@ -93,7 +93,11 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .touch{position:absolute;inset:0;pointer-events:none}
 .stick{position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));width:132px;height:132px;border:2px solid rgba(217,219,211,.45);border-radius:50%;pointer-events:auto;touch-action:none}
 .stick i{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(240,196,0,.55);border:2px solid var(--tape)}
-.btns{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:repeat(2,70px);gap:10px}
+.btns{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:repeat(2,70px);grid-template-areas:"heavy block" "dodge jab";gap:10px}
+.tb[data-act="heavy"]{grid-area:heavy}
+.tb[data-act="block"]{grid-area:block}
+.tb[data-act="dodge"]{grid-area:dodge}
+.tb[data-act="jab"]{grid-area:jab}
 .tb{pointer-events:auto;touch-action:none;height:70px;font:800 17px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--paper);background:rgba(10,10,11,.6);border:2px solid var(--paper);cursor:pointer;padding:0}
 .tb.on{background:var(--tape);color:#111;border-color:var(--tape)}
 
