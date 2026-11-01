@@ -1,4 +1,5 @@
 node_modules/
+_site/
 .tmp-chrome-*/
 .DS_Store
 lib/babylon.js.LEGAL.txt

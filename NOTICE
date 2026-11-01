@@ -1,0 +1,13 @@
+Sublevel Three
+Copyright 2026 Carlo Perassi
+
+This game is licensed under the Apache License, Version 2.0.
+See the LICENSE file.
+
+lib/babylon.js is a tree-shaken build of @babylonjs/core 9.30.0 and
+@babylonjs/loaders 9.30.0 (https://github.com/BabylonJS/Babylon.js).
+Those projects are licensed under the Apache License, Version 2.0.
+The license text is lib/babylon.Apache-2.0.txt.
+
+audio/samples.js was generated for this game and is released under
+CC0 1.0. See audio/CC0.txt.

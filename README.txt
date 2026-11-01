@@ -1,6 +1,8 @@
 SUBLEVEL THREE - browser fighting game (Babylon.js 9.30, Apache-2.0)
 
-Run: open index.html in Chrome, Firefox, or Edge. No build step and no account.
+Play: https://carlok.github.io/red-ink/
+Run locally: open index.html in Chrome, Firefox, or Edge. No build step and no account.
+License: Apache-2.0 (LICENSE, NOTICE). The sounds are CC0 (audio/CC0.txt).
 The game files are local. Google Fonts load when you are online and fall back to system fonts when you are not.
 
 Engine: lib/babylon.js is a tree-shaken build of @babylonjs/core 9.30.0 plus the glTF 2.0 loader.
