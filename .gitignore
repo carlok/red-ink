@@ -1,6 +1,8 @@
 node_modules/
 _site/
 .tmp-chrome-*/
+.tmp-lh-*/
+dist/
 .DS_Store
 lib/babylon.js.LEGAL.txt
 tuning/*.json
