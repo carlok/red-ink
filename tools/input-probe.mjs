@@ -98,7 +98,7 @@ const DESK = String.raw`
       if (poseMs === null && Math.abs(arm() - arm0) > 0.02) poseMs = Math.round(now);
       if (stateMs !== null && poseMs !== null) break;
     }
-    key("j", false); key("k", false); key("space", false);
+    key("j", false); key("k", false); key("u", false); key("z", false); key("space", false);
     return { stateMs, poseMs, state: S.P.state, atk: S.P.atk && S.P.atk.type };
   };
 
@@ -226,6 +226,19 @@ const DESK = String.raw`
   const rumble = { calls: calls.slice(), hp: S.E.hp, dhp: Math.round((hp0 - S.E.hp) * 10) / 10 };
 
   if (desc) Object.defineProperty(navigator, "getGamepads", desc);
+  let remap = null;
+  const jabBind = document.querySelector('[data-bind="jab"]');
+  if (jabBind) {
+    jabBind.click();
+    key("u", true); key("u", false);
+    await waitIdle();
+    const uHit = await latency(() => key("u", true));
+    await waitIdle();
+    const jMiss = await latency(() => key("j", true));
+    await waitIdle();
+    const zHit = await latency(() => key("z", true));
+    remap = { label: jabBind.querySelector("kbd").textContent, u: uHit.stateMs, j: jMiss.stateMs, z: zHit.stateMs };
+  }
   return {
     keyboard, touch, pad,
     deadIn: Math.round(deadIn * 1000) / 1000,
@@ -236,8 +249,9 @@ const DESK = String.raw`
     dodge: { cd0, cdMid, dodgeBlocked, dodgeAgain },
     turnIdle, turnAtk,
     rumble,
-    hasBinds: !!document.getElementById("binds"),
+    hasBinds: !!document.querySelector("[data-bind]"),
     hasRumble: !!document.getElementById("rumble"),
+    remap,
   };
 })()
 `;
@@ -279,6 +293,11 @@ const PHONE = String.raw`
     scrollDelta: window.scrollY - scroll0,
     scale: window.visualViewport ? window.visualViewport.scale : null,
     nearest: btns.slice().sort((a, b) => a.dist - b.dist)[0].act,
+    saved: {
+      binds: (() => { try { return localStorage.getItem("sublevel-binds"); } catch (e) { return null; } })(),
+      rumble: (() => { try { return localStorage.getItem("sublevel-rumble"); } catch (e) { return null; } })(),
+      label: (document.querySelector('[data-bind="jab"] kbd') || {}).textContent || null,
+    },
   };
 })()
 `;

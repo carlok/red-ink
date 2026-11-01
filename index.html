@@ -50,7 +50,7 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .snd{pointer-events:auto;font:600 11px var(--f-data);letter-spacing:.12em;text-transform:uppercase;background:rgba(10,10,11,.55);color:var(--paper);border:1px solid var(--mute);padding:7px 10px;cursor:pointer}
 .is-touch .keys{display:none}
 .is-touch .snd{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:calc(76px + env(safe-area-inset-top,0px));padding:5px 8px;font-size:10px}
-.snd:focus-visible,.go:focus-visible,.btn2:focus-visible,.tb:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
+.snd:focus-visible,.go:focus-visible,.btn2:focus-visible,.tb:focus-visible,.bind:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
 
 /* Banner (BOUT 1 / FIGHT / K.O.) */
 .banner{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%) rotate(-3deg);font:800 clamp(56px,15vw,160px)/.9 var(--f-display);letter-spacing:.02em;color:var(--tape);text-shadow:5px 5px 0 #0b0b0c;opacity:0;pointer-events:none;white-space:nowrap}
@@ -85,6 +85,11 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .avatar .acts{display:flex;gap:8px;flex-wrap:wrap}
 .btn2{display:inline-block;font:600 11px var(--f-data);letter-spacing:.1em;text-transform:uppercase;background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:6px 10px;cursor:pointer}
 .avatar small{color:#4a4d49;line-height:1.35}
+.tune{display:flex;flex-direction:column;gap:8px}
+.tuneRow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.bind{font:600 11px var(--f-data);letter-spacing:.06em;text-transform:uppercase;background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:5px 8px;cursor:pointer}
+.bind.listen{background:var(--tape)}
+.bind kbd{font:inherit}
 .avatar small.err{color:#a02a18}
 .go{width:calc(100% - 40px);margin:4px 20px 0;font:800 clamp(22px,6.4vw,28px)/1 var(--f-display);letter-spacing:.05em;text-transform:uppercase;background:var(--ink);color:var(--tape);border:0;padding:14px 18px;cursor:pointer;text-align:left;display:flex;justify-content:space-between;gap:12px}
 .go:hover{background:#000}
@@ -154,6 +159,14 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
               <label class="btn2" for="glb" tabindex="0" id="glbLbl">Load .glb</label>
               <input id="glb" type="file" accept=".glb,model/gltf-binary" hidden>
               <button class="btn2" id="avReset" type="button" hidden>Use placeholder</button>
+            </div>
+          </div>
+          <div class="tune" id="tune">
+            <div class="tuneRow">
+              <button type="button" class="bind" data-bind="jab">Jab <kbd>J</kbd></button>
+              <button type="button" class="bind" data-bind="heavy">Heavy <kbd>K</kbd></button>
+              <button type="button" class="bind" data-bind="block">Block <kbd>L</kbd></button>
+              <button type="button" class="bind" data-bind="dodge">Dodge <kbd>Space</kbd></button>
             </div>
           </div>
           <small id="avHint">Export a cartoon avatar as GLB (MetaPerson or Avaturn), then pick it here or drop it anywhere on this page.</small>
@@ -839,16 +852,62 @@ const keys=new Set(), buf={jab:0,heavy:0,dodge:0};
 let touchVec={x:0,y:0}, touchBlock=false;
 const isTouch=window.matchMedia&&window.matchMedia('(pointer: coarse)').matches;
 if(isTouch) $('app').classList.add('is-touch');
+const DEFAULT_BINDS={jab:'j',heavy:'k',block:'l',dodge:'space'};
+let binds={jab:'j',heavy:'k',block:'l',dodge:'space'};
+let listenAct=null, keysHtml='';
+const RESERVED=new Set(['enter','escape','tab','w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']);
+function loadBinds(){
+  try{
+    const raw=localStorage.getItem('sublevel-binds');
+    const b=raw?JSON.parse(raw):null;
+    if(b&&typeof b==='object'){
+      for(const act of Object.keys(DEFAULT_BINDS)) if(typeof b[act]==='string'&&b[act]&&!RESERVED.has(b[act])) binds[act]=b[act];
+    }
+  }catch(e){}
+}
+function saveBinds(){ try{ localStorage.setItem('sublevel-binds', JSON.stringify(binds)); }catch(e){} }
+function keyLabel(k){ return k==='space'?'Space':k.length===1?k.toUpperCase():k; }
+function paintBinds(){
+  document.querySelectorAll('[data-bind]').forEach(el=>{
+    const kbd=el.querySelector('kbd'); if(kbd) kbd.textContent=keyLabel(binds[el.dataset.bind]);
+    el.classList.toggle('listen', listenAct===el.dataset.bind);
+  });
+  keysHtml='<kbd>WASD</kbd> move <kbd>'+keyLabel(binds.jab)+'</kbd> jab <kbd>'+keyLabel(binds.heavy)+'</kbd> heavy <kbd>'+keyLabel(binds.block)+'</kbd> block (hold) <kbd>'+keyLabel(binds.dodge)+'</kbd> dodge';
+  if(!padOn) $('keys').innerHTML=keysHtml;
+  document.querySelectorAll('#cRows dt').forEach(dt=>{
+    if(dt.textContent==='Strike') dt.nextElementSibling.textContent=keyLabel(binds.jab)+' jab, '+keyLabel(binds.heavy)+' heavy';
+    if(dt.textContent==='Defend') dt.nextElementSibling.textContent=keyLabel(binds.block)+' block (hold), '+keyLabel(binds.dodge)+' dodge';
+  });
+}
+function actionFor(k){
+  for(const act of ['jab','heavy','block','dodge']) if(binds[act]===k) return act;
+  if(k==='z') return 'jab';
+  if(k==='x') return 'heavy';
+  if(k==='v') return 'dodge';
+  if(k==='c'||k==='shift') return 'block';
+  return null;
+}
+loadBinds();
 function keyName(e){ return e.key===' '?'space':e.key.toLowerCase(); }
 window.addEventListener('keydown',e=>{
   const k=keyName(e);
+  if(listenAct){
+    e.preventDefault();
+    if(!RESERVED.has(k)){
+      const other=Object.keys(binds).find(a=>a!==listenAct&&binds[a]===k);
+      if(other) binds[other]=binds[listenAct];
+      binds[listenAct]=k; saveBinds();
+    }
+    listenAct=null; paintBinds(); return;
+  }
   if(k==='enter'&&!$('wrap').hidden){ e.preventDefault(); $('go').click(); return; }
   if(['space','arrowup','arrowdown','arrowleft','arrowright'].includes(k)&&$('wrap').hidden) e.preventDefault();
   if(e.repeat) return;
   keys.add(k);
-  if(k==='j'||k==='z') buf.jab=.22;
-  if(k==='k'||k==='x') buf.heavy=.22;
-  if(k==='space'||k==='v') buf.dodge=.22;
+  const act=actionFor(k);
+  if(act==='jab') buf.jab=.22;
+  else if(act==='heavy') buf.heavy=.22;
+  else if(act==='dodge') buf.dodge=.22;
 });
 window.addEventListener('keyup',e=>keys.delete(keyName(e)));
 window.addEventListener('blur',()=>{keys.clear();touchBlock=false;});
@@ -860,12 +919,15 @@ function playerIntent(){
   const l=Math.hypot(ix,iz); if(l>1){ix/=l;iz/=l;}
   return {mx:G.camR.x*ix+G.camF.x*iz, mz:G.camR.z*ix+G.camF.z*iz,
           jab:buf.jab>0,heavy:buf.heavy>0,dodge:buf.dodge>0,
-          block:keys.has('l')||keys.has('c')||keys.has('shift')||touchBlock||padBlock};
+          block:[...keys].some(k=>actionFor(k)==='block')||touchBlock||padBlock};
 }
 /* gamepad (standard mapping): left stick or d-pad move, X jab, Y heavy, A dodge, LT/RT/LB/RB/B block */
 let padIdx=-1, padVec={x:0,y:0}, padBlock=false, padPrev=[], padOn=false;
-const KEYS_HTML=$('keys').innerHTML;
 const PAD_HTML='<kbd>L stick</kbd> move <kbd>X</kbd> jab <kbd>Y</kbd> heavy <kbd>LT</kbd> block (hold) <kbd>A</kbd> dodge';
+paintBinds();
+document.querySelectorAll('[data-bind]').forEach(el=>{
+  el.addEventListener('click',()=>{ listenAct=el.dataset.bind; paintBinds(); });
+});
 function rumble(strong,weak,ms){
   if(padIdx<0||!navigator.getGamepads) return;
   const gp=navigator.getGamepads()[padIdx], v=gp&&gp.vibrationActuator;
@@ -874,7 +936,7 @@ function rumble(strong,weak,ms){
 function pollPad(){
   const list=navigator.getGamepads?navigator.getGamepads():[]; let gp=null;
   for(let i=0;i<list.length;i++){ if(list[i]&&list[i].connected){ gp=list[i]; padIdx=i; break; } }
-  if(!gp){ padVec={x:0,y:0}; padBlock=false; padPrev=[]; padIdx=-1; if(padOn){ padOn=false; $('keys').innerHTML=KEYS_HTML; } return; }
+  if(!gp){ padVec={x:0,y:0}; padBlock=false; padPrev=[]; padIdx=-1; if(padOn){ padOn=false; $('keys').innerHTML=keysHtml; } return; }
   if(!padOn){ padOn=true; $('keys').innerHTML=PAD_HTML; }
   const pr=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed), dn=i=>pr(i)&&!padPrev[i];
   let x=gp.axes[0]||0, y=-(gp.axes[1]||0); const m=Math.hypot(x,y);
@@ -964,7 +1026,7 @@ function introCard(i,lead){
 function titleCard(){
   showCard({stamp:'Night shift',kick:'Halvorsen Freight · Form 7-B',title:'Sublevel Three',
     body:'You audit pallet counts from ten to six. The totals always reconcile. You have not slept properly in eleven months. Tonight a man called Pike hands you a keycard and points at a door that is not on the floor plan.',
-    rows:isTouch?[['Move','left stick'],['Strike','Jab, Heavy'],['Defend','Block (hold), Dodge']]:[['Move','W A S D or arrows'],['Strike','J jab, K heavy'],['Defend','L block (hold), Space dodge'],['Gamepad','L stick move, X jab, Y heavy, LT block, A dodge']],
+    rows:isTouch?[['Move','left stick'],['Strike','Jab, Heavy'],['Defend','Block (hold), Dodge']]:[['Move','W A S D or arrows'],['Strike',keyLabel(binds.jab)+' jab, '+keyLabel(binds.heavy)+' heavy'],['Defend',keyLabel(binds.block)+' block (hold), '+keyLabel(binds.dodge)+' dodge'],['Gamepad','L stick move, X jab, Y heavy, LT block, A dodge']],
     avatar:true,btn:'Take the stairs',go:()=>introCard(0)});
 }
 
