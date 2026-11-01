@@ -233,3 +233,22 @@ Hypothesis: advancing the word on unscaled time, while the fighters stay on the 
 Verdict: **keep**. The burst is up while the fighters are still in the freeze, and the freeze is over before a jab has recovered (0.40 s) enough to swing again.
 
 Camera punch-in was not added. FOV stays 0.85; the distance change is the follow camera. Spark counts stay 14 on a jab and 26 on a heavy. KO slow motion stays the 0.14 s hitstop: the K.O. word is readable at 16 ms, and the fall is still the 0.9 s pose. Those three did not miss the read once the word was on real time.
+
+## Sprint 4 — Balance
+
+Goal: a median scripted bot, 200 fights per bout from seed 1, wins about 85 / 65 / 45 percent against Reyes / Dag / Pike. Median length 25 to 60 s. No fight goes 40 s without a hit, and none reaches 60 s without a KO. The bot's stamina is empty less than 20 percent of the time.
+
+The sim steps at a fixed 1/60 s with the same `step` and `aiIntent` the game uses. `mulberry32(seed + bout*10007 + i*97)` replaces the combat random calls for the run. An 8-fight repeat of seed 1 matched the first 8-fight run.
+
+### Baseline — median bot, raw bout table
+
+The bot walks into jab range, jabs on a 0.95 s pause, blocks or dodges a swing only after 0.18 s, and backs off below 28 stamina.
+
+| Bout | Win % | Median length | Empty stamina | Stalemates | Longest gap |
+| --- | --- | --- | --- | --- | --- |
+| Reyes | 100 | 16.2 s | 0% | 0 | 4.1 s |
+| Dag | 91 | 35.2 s | 0% | 0 | 5.8 s |
+| Pike | 0 | 20.6 s | 0% | 0 | 2.3 s |
+| Target | 85 / 65 / 45 | 25–60 s | under 20% | 0 | ≤ 40 s |
+
+Stamina and stalemates are inside the target. Reyes ends too fast and too clean. Pike wins none. Dag is long enough and too easy.

@@ -193,7 +193,17 @@ const B=BABYLON, V3=B.Vector3, C3=B.Color3;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const damp=(k,dt)=>1-Math.exp(-k*dt);
-const rand=(a,b)=>a+Math.random()*(b-a);
+let rng=Math.random;
+const rand=(a,b)=>a+rng()*(b-a);
+function mulberry32(seed){
+  let a=seed>>>0;
+  return function(){
+    a|=0; a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
 const ease=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 const angLerp=(a,b,t)=>{const d=((b-a+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI;return a+d*t;};
 
@@ -669,7 +679,7 @@ function makeFighter(L,isPlayer){
 }
 function resetFighter(f,x,yaw,hp){
   f.pos.set(x,0,0); f.yaw=yaw; f.root.rotation.y=yaw; f.vel.set(0,0,0); f.mv.set(0,0,0);
-  f.state='idle'; f.t=Math.random()*3; f.atk=null; f.stunT=0; f.stunMax=1; f.inv=0; f.cd=0; f.koT=0; f.phase=0; f.moveAmt=0;
+  f.state='idle'; f.t=rng()*3; f.atk=null; f.stunT=0; f.stunMax=1; f.inv=0; f.cd=0; f.koT=0; f.phase=0; f.moveAmt=0;
   f.stam=100; f.stamDelay=0; f.hp=hp; f.maxHp=hp; f.hitSide=1; f.dodgeT=0; f.dodgeSide=1; f.started=null; f.echoIdx=0;
   f.ai.cd=1.2; f.ai.tick=.5; f.ai.blockT=0; f.ai.atk=null; f.ai.dodgeNow=false; f.hist.length=0;
 }
@@ -765,7 +775,7 @@ function strike(a,d,D){
   }
   const counter=d.state==='attack';
   d.hp=Math.max(0,d.hp-D.dmg*a.dmgMul*(counter?1.25:1));
-  d.state='hit'; d.atk=null; d.stunT=d.stunMax=D.stun*(counter?1.15:1); d.vel.addInPlace(dir.scale(D.kb*9)); d.hitSide=Math.random()<.5?-1:1; d.stamDelay=.8;
+  d.state='hit'; d.atk=null; d.stunT=d.stunMax=D.stun*(counter?1.15:1); d.vel.addInPlace(dir.scale(D.kb*9)); d.hitSide=rng()<.5?-1:1; d.stamDelay=.8;
   hitPS.emitter.copyFrom(mid); hitPS.manualEmitCount=D.dmg>10?26:14;
   if(a.isPlayer) rumble(.3,.6,90); if(d.isPlayer) rumble(D.dmg>10?1:.6,.5,D.dmg>10?240:130);
   fxWord(D.word,mid); SFX[a.atk?a.atk.type:'jab'](); G.shake=Math.max(G.shake,D.dmg>10?.9:.45); G.hitstop=D.dmg>10?.09:.05; G.cheer=1;
@@ -829,14 +839,14 @@ function aiIntent(e,p,dt){
     A.tick=c.react*rand(.7,1.3);
     const threat=p.state==='attack'&&p.atk&&p.atk.t<p.atk.def.a1&&dist<2.7;
     if(threat){
-      const r=Math.random();
+      const r=rng();
       if(r<c.dodge&&e.stam>=16) A.dodgeNow=true; else if(r<c.dodge+c.block) A.blockT=.55;
     } else if(A.blockT<=0&&e.state==='idle'){
       if(dist>2.6*e.reach) A.move='in';
       else if(A.cd<=0&&e.stam>14){
-        A.atk=(c.echo&&p.hist.length)?p.hist[e.echoIdx++%p.hist.length]:(Math.random()<c.heavy?'heavy':'jab');
+        A.atk=(c.echo&&p.hist.length)?p.hist[e.echoIdx++%p.hist.length]:(rng()<c.heavy?'heavy':'jab');
         A.cd=c.cd*rand(.8,1.4);
-      } else { A.move=Math.random()<.55?'side':'out'; A.side=Math.random()<.5?1:-1; A.moveT=rand(.4,.9); }
+      } else { A.move=rng()<.55?'side':'out'; A.side=rng()<.5?1:-1; A.moveT=rand(.4,.9); }
     }
   }
   if(A.blockT>0) I.block=true;
@@ -1195,6 +1205,82 @@ if(document.fonts&&document.fonts.load){
   Promise.all([document.fonts.load('800 40px "Big Shoulders Stencil Display"'),document.fonts.load('600 20px "IBM Plex Mono"')]).then(fontsDone).catch(()=>{});
 }
 titleCard();
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar};
+const SKILL={easy:1.45,normal:1,hard:.72};
+function botIntent(p,e,dt,skill){
+  const m=SKILL[skill]||1;
+  const I={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
+  if(!p.bot) p.bot={hold:.4,seen:null,t:0};
+  const B=p.bot; B.hold-=dt;
+  const to=e.pos.subtract(p.pos); to.y=0; const dist=to.length();
+  const dir=dist>1e-4?to.scale(1/dist):new V3(1,0,0);
+  const threat=e.state==='attack'&&e.atk;
+  if(threat&&B.seen!==e.atk){ B.seen=e.atk; B.t=0; }
+  if(!threat) B.seen=null;
+  if(threat) B.t+=dt;
+  if(threat&&B.t>=.18*m&&e.atk.t<e.atk.def.a0){
+    if(e.atk.type==='heavy'&&p.stam>=20&&p.cd<=0&&rng()<.8){ I.dodge=true; I.mx=-dir.z; I.mz=dir.x; return I; }
+    if(p.stam>8){ I.block=true; return I; }
+  }
+  if(p.stam<28){ I.mx=-dir.x; I.mz=-dir.z; return I; }
+  if(dist>1.62){ I.mx=dir.x; I.mz=dir.z; return I; }
+  if(B.hold<=0&&p.cd<=0&&!threat){
+    if(e.state==='hit'&&p.stam>36&&dist<2.05){ I.heavy=true; B.hold=.7*m; }
+    else { I.jab=true; B.hold=.95*m; }
+  }
+  return I;
+}
+function simMeet(opt){
+  opt=opt||{};
+  const n=opt.n||200, skill=opt.skill||'normal', seed0=opt.seed>>>0||1;
+  const bouts=opt.bouts||[0,1,2];
+  const prevRng=rng, prevState=G.state;
+  const dt=1/60, CAP=60, out=[];
+  for(let bi=0; bi<bouts.length; bi++){
+    const bout=bouts[bi], rows=[];
+    for(let i=0;i<n;i++){
+      rng=mulberry32((seed0+bout*10007+i*97)>>>0);
+      const cfg=BOUTS[bout];
+      E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
+      resetFighter(E,2.3,-Math.PI/2,cfg.hp);
+      resetFighter(P,-2.3,Math.PI/2,100); P.hp=100; P.speed0=4.4; P.reach=1; P.dmgMul=1;
+      P.bot={hold:.4,seen:null,t:0};
+      G.state='fight'; G.hitstop=0; G.winner=null; G.t=0; G.koTimer=0; G.shake=0;
+      let real=0, empty=0, gap=0, maxGap=0, hpP=P.hp, hpE=E.hp;
+      while(G.state==='fight'&&real<CAP){
+        let stepDt=dt;
+        if(G.hitstop>0){ G.hitstop-=stepDt; stepDt*=.12; }
+        G.t+=stepDt;
+        step(P,E,botIntent(P,E,stepDt,skill),stepDt);
+        step(E,P,aiIntent(E,P,stepDt),stepDt);
+        resolveBodies();
+        real+=dt;
+        if(P.stam<=0) empty+=dt;
+        if(P.hp!==hpP||E.hp!==hpE){ hpP=P.hp; hpE=E.hp; gap=0; }
+        else { gap+=dt; if(gap>maxGap) maxGap=gap; }
+        if(G.state!=='fight') break;
+      }
+      rows.push({win:G.winner===P,t:Math.round(real*10)/10,empty:real?empty/real:0,gap:Math.round(maxGap*10)/10,ko:G.state==='ko'});
+    }
+    const lens=rows.map(r=>r.t).sort((a,b)=>a-b);
+    const empty=rows.reduce((s,r)=>s+r.empty,0)/n;
+    out.push({
+      foe:BOUTS[bout].foe, skill, n,
+      win:Math.round(rows.filter(r=>r.win).length/n*1000)/10,
+      median:lens[Math.floor(n/2)],
+      p25:lens[Math.floor(n*.25)], p75:lens[Math.floor(n*.75)],
+      empty:Math.round(empty*1000)/10,
+      stale:rows.filter(r=>r.gap>40||!r.ko).length,
+      maxGap:Math.max.apply(null, rows.map(r=>r.gap))
+    });
+  }
+  rng=prevRng;
+  E.cfg=BOUTS[0]; E.speed0=BOUTS[0].speed; E.reach=BOUTS[0].reach; E.dmgMul=BOUTS[0].dmg;
+  resetFighter(P,-2.3,Math.PI/2,100);
+  resetFighter(E,2.3,-Math.PI/2,BOUTS[0].hp);
+  G.hitstop=0; G.winner=null; G.shake=0; G.state=prevState==='fight'||prevState==='ready'||prevState==='ko'?'card':prevState;
+  if(G.state==='card'||G.state==='title') titleCard();
+  return out;
+}
+window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet};
 })();
 </script>
