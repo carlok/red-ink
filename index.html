@@ -177,6 +177,8 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
               <button type="button" class="bind" data-diff="hard">Hard</button>
             </div>
             <label class="tuneRow rumble" for="rumble">Rumble <input id="rumble" type="range" min="0" max="100" value="100"></label>
+            <label class="tuneRow rumble" for="sfxVol">Hits <input id="sfxVol" type="range" min="0" max="100" value="100"></label>
+            <label class="tuneRow rumble" for="musVol">Music <input id="musVol" type="range" min="0" max="100" value="100"></label>
           </div>
           <small id="avHint">Export a cartoon avatar as GLB (MetaPerson or Avaturn), then pick it here or drop it anywhere on this page.</small>
         </div>
@@ -190,6 +192,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 </div>
 
 <script src="lib/babylon.js"></script>
+<script src="audio/samples.js"></script>
 <script>
 (function(){
 'use strict';
@@ -499,32 +502,162 @@ function updateFx(dt){
 }
 
 /* ---------- sound ---------- */
-let ac=null, muted=false, noiseBuf=null;
-function audioInit(){
+let ac=null, muted=false, unlock='';
+let volSfx=1, volMusic=1;
+let master=null, sfxGain=null, musicGain=null, duckGain=null, roomGain=null, crowdGain=null;
+const stemGain={calm:null,tense:null,finish:null};
+const stemNow={calm:1,tense:0,finish:0};
+let duck=1, duckT=0, bufs={}, gains={}, audioP=null;
+const PEAK={jab:.5012,heavy:.5012,block:.5012,ko:.5012,whoosh:.1995,ui:.2512,room:.02512,crowd:.0631,calm:.1259,tense:.1259,finish:.1259};
+function loadAudioPrefs(){
+  try{
+    const m=localStorage.getItem('sublevel-mute');
+    if(m==='1') muted=true;
+    const s=localStorage.getItem('sublevel-sfx');
+    if(s!==null&&s!=='') volSfx=clamp(Number(s),0,1);
+    const u=localStorage.getItem('sublevel-music');
+    if(u!==null&&u!=='') volMusic=clamp(Number(u),0,1);
+  }catch(e){}
+}
+function saveAudioPrefs(){
+  try{
+    localStorage.setItem('sublevel-mute', muted?'1':'0');
+    localStorage.setItem('sublevel-sfx', String(volSfx));
+    localStorage.setItem('sublevel-music', String(volMusic));
+  }catch(e){}
+}
+function paintAudio(){
+  const s=$('sfxVol'), m=$('musVol'), b=$('snd');
+  if(s) s.value=String(Math.round(volSfx*100));
+  if(m) m.value=String(Math.round(volMusic*100));
+  if(b) b.textContent=muted?'Sound off':'Sound on';
+}
+function applyBus(){
+  if(sfxGain) sfxGain.gain.value=volSfx;
+  if(musicGain) musicGain.gain.value=volMusic;
+  if(master) master.gain.value=muted?0:1;
+  if(duckGain) duckGain.gain.value=duck;
+}
+function audioInit(src){
+  if(src&&!unlock) unlock=src;
   if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ ac=null; } }
-  if(ac&&ac.state==='suspended') ac.resume();
+  if(!ac) return Promise.resolve();
+  if(ac.state==='suspended') ac.resume();
+  if(!master){
+    master=ac.createGain(); master.connect(ac.destination);
+    sfxGain=ac.createGain(); sfxGain.connect(master);
+    musicGain=ac.createGain(); duckGain=ac.createGain();
+    musicGain.connect(duckGain); duckGain.connect(master);
+    roomGain=ac.createGain(); roomGain.connect(master);
+    crowdGain=ac.createGain(); crowdGain.connect(master);
+    stemGain.calm=ac.createGain(); stemGain.tense=ac.createGain(); stemGain.finish=ac.createGain();
+    stemGain.calm.connect(musicGain); stemGain.tense.connect(musicGain); stemGain.finish.connect(musicGain);
+    applyBus();
+  }
+  if(!audioP) audioP=loadSamples();
+  return audioP;
 }
-function tone(f0,f1,dur,gain,type){
-  if(!ac||muted) return;
-  const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
-  o.type=type||'sine'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);
-  g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
-  o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+dur+.02);
+function wavBytes(b64){
+  const bin=atob(b64), bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  return bytes.buffer;
 }
-function noise(dur,gain,hp){
-  if(!ac||muted) return;
-  if(!noiseBuf){ noiseBuf=ac.createBuffer(1,Math.floor(ac.sampleRate*.4),ac.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; }
-  const t=ac.currentTime,s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();
-  s.buffer=noiseBuf; f.type='highpass'; f.frequency.value=hp; g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
-  s.connect(f); f.connect(g); g.connect(ac.destination); s.start(t); s.stop(t+dur+.02);
+function loadSamples(){
+  const pack=window.SUBLEVEL_AUDIO;
+  if(!ac||!pack||!pack.clips) return Promise.resolve();
+  return Promise.all(Object.keys(pack.clips).map(name=>{
+    return ac.decodeAudioData(wavBytes(pack.clips[name]).slice(0)).then(buf=>{
+      bufs[name]=buf; gains[name]=(PEAK[name]||1)/Math.max(bufPeak(buf),1e-8);
+    });
+  })).then(()=>{
+    startLoop('room', roomGain);
+    startLoop('crowd', crowdGain);
+    startLoop('calm', stemGain.calm);
+    startLoop('tense', stemGain.tense);
+    startLoop('finish', stemGain.finish);
+  });
+}
+function bufPeak(buf){
+  const d=buf.getChannelData(0); let m=0;
+  for(let i=0;i<d.length;i++) if(Math.abs(d[i])>m) m=Math.abs(d[i]);
+  return m;
+}
+function startLoop(name, dest){
+  if(!bufs[name]||!dest) return;
+  const s=ac.createBufferSource(), g=ac.createGain();
+  g.gain.value=gains[name]||1;
+  s.buffer=bufs[name]; s.loop=true; s.connect(g); g.connect(dest);
+  try{ s.start(); }catch(e){}
+}
+function playSample(name){
+  if(!ac||muted||!bufs[name]||!sfxGain) return;
+  const s=ac.createBufferSource(), g=ac.createGain();
+  g.gain.value=gains[name]||1;
+  s.buffer=bufs[name]; s.connect(g); g.connect(sfxGain);
+  try{ s.start(); }catch(e){}
+}
+function duckHit(){
+  duck=.35; duckT=.4;
+  if(duckGain) duckGain.gain.value=duck;
+}
+function audioTick(dt){
+  if(duckT>0){
+    duckT=Math.max(0, duckT-dt);
+    duck=duckT<=0?1:lerp(.35,1,1-duckT/.4);
+    if(duckGain) duckGain.gain.value=duck;
+  }
+  let calm=1, tense=0, finish=0;
+  if(G.state==='ko'){ calm=0; finish=1; }
+  else if(G.state==='fight'){
+    const low=P&&E&&(P.hp/P.maxHp<.4||E.hp/E.maxHp<.4);
+    if(low||G.cheer>.7){ calm=0; tense=1; }
+    else { calm=.25; tense=.75; }
+  }
+  const k=Math.min(1, dt*3);
+  stemNow.calm=lerp(stemNow.calm, calm, k);
+  stemNow.tense=lerp(stemNow.tense, tense, k);
+  stemNow.finish=lerp(stemNow.finish, finish, k);
+  if(stemGain.calm){
+    stemGain.calm.gain.value=stemNow.calm;
+    stemGain.tense.gain.value=stemNow.tense;
+    stemGain.finish.gain.value=stemNow.finish;
+  }
+  if(crowdGain) crowdGain.gain.value=.4+1.1*clamp(G.cheer||0,0,1.4)/1.4;
+}
+function peakDb(name){
+  const buf=bufs[name]; if(!buf) return null;
+  const m=bufPeak(buf)*(gains[name]||1);
+  return Math.round(20*Math.log10(m||1e-8)*100)/100;
+}
+function audioState(){
+  return {
+    unlock, muted, volSfx, volMusic, duck,
+    stems:{calm:Math.round(stemNow.calm*100)/100, tense:Math.round(stemNow.tense*100)/100, finish:Math.round(stemNow.finish*100)/100},
+    crowd:crowdGain?Math.round(crowdGain.gain.value*100)/100:null,
+    peaks:{jab:peakDb('jab'),heavy:peakDb('heavy'),block:peakDb('block'),ko:peakDb('ko'),calm:peakDb('calm'),tense:peakDb('tense'),finish:peakDb('finish')},
+    store:readAudioStore()
+  };
+}
+function readAudioStore(){
+  try{ return {mute:localStorage.getItem('sublevel-mute'), sfx:localStorage.getItem('sublevel-sfx'), music:localStorage.getItem('sublevel-music')}; }
+  catch(e){ return {error:String(e&&e.message||e)}; }
+}
+function setAudio(o){
+  if(!o) return;
+  if(o.sfx!=null) volSfx=clamp(Number(o.sfx),0,1);
+  if(o.music!=null) volMusic=clamp(Number(o.music),0,1);
+  if(o.mute!=null) muted=!!o.mute;
+  saveAudioPrefs(); applyBus(); paintAudio();
 }
 const SFX={
-  jab:()=>{tone(180,60,.14,.5);noise(.07,.35,1800);},
-  heavy:()=>{tone(120,38,.28,.8);noise(.14,.5,900);},
-  block:()=>{tone(520,260,.1,.25,'triangle');noise(.05,.2,3000);},
-  whoosh:()=>noise(.12,.1,2500),
-  ko:()=>{tone(90,30,.7,.7,'sawtooth');}
+  jab:()=>{ playSample('jab'); duckHit(); },
+  heavy:()=>{ playSample('heavy'); duckHit(); },
+  block:()=>{ playSample('block'); duckHit(); },
+  whoosh:()=>playSample('whoosh'),
+  ko:()=>{ playSample('ko'); duckHit(); },
+  ui:()=>playSample('ui')
 };
+loadAudioPrefs();
 
 /* ---------- fighters ---------- */
 /* semi-realistic materials: skin / cloth / leather / hair / eye, with fine procedural bump */
@@ -1047,6 +1180,7 @@ loadBinds();
 loadRumble();
 function keyName(e){ return e.key===' '?'space':e.key.toLowerCase(); }
 window.addEventListener('keydown',e=>{
+  audioInit('key');
   const k=keyName(e);
   if(listenAct){
     e.preventDefault();
@@ -1090,6 +1224,13 @@ if(rumbleEl){
   rumbleEl.value=String(Math.round(rumbleAmt*100));
   rumbleEl.addEventListener('input',()=>{ rumbleAmt=clamp(Number(rumbleEl.value)/100,0,1); saveRumble(); });
 }
+function wireVol(id, set){
+  const el=$(id); if(!el) return;
+  el.addEventListener('input',()=>{ set(clamp(Number(el.value)/100,0,1)); saveAudioPrefs(); applyBus(); });
+}
+wireVol('sfxVol', v=>{ volSfx=v; });
+wireVol('musVol', v=>{ volMusic=v; });
+paintAudio();
 function rumble(strong,weak,ms){
   if(rumbleAmt<=0||padIdx<0||!navigator.getGamepads) return;
   const gp=navigator.getGamepads()[padIdx], v=gp&&gp.vibrationActuator;
@@ -1100,6 +1241,7 @@ function pollPad(){
   for(let i=0;i<list.length;i++){ if(list[i]&&list[i].connected){ gp=list[i]; padIdx=i; break; } }
   if(!gp){ padVec={x:0,y:0}; padBlock=false; padPrev=[]; padIdx=-1; if(padOn){ padOn=false; $('keys').innerHTML=keysHtml; } return; }
   if(!padOn){ padOn=true; $('keys').innerHTML=PAD_HTML; }
+  for(let i=0;i<gp.buttons.length;i++) if(gp.buttons[i]&&gp.buttons[i].pressed){ audioInit('pad'); break; }
   const pr=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed), dn=i=>pr(i)&&!padPrev[i];
   let x=gp.axes[0]||0, y=-(gp.axes[1]||0); const m=Math.hypot(x,y);
   if(m<.2){ x=y=0; } else { const s=(Math.min(m,1)-.2)/.8/m; x*=s; y*=s; }
@@ -1176,7 +1318,7 @@ function showCard(c){
   $('cRows').innerHTML=(c.rows||[]).map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('');
   $('cRows').hidden=!(c.rows&&c.rows.length);
   $('avatarBox').hidden=!c.avatar; $('goTxt').textContent=c.btn;
-  $('go').onclick=()=>{ audioInit(); wrapEl.hidden=true; c.go(); };
+  $('go').onclick=()=>{ audioInit('click'); SFX.ui(); wrapEl.hidden=true; c.go(); };
   G.state='card'; wrapEl.hidden=false; hudEl.hidden=true; $('touch').hidden=true; wrapEl.scrollTop=0;
   setTimeout(()=>{ try{ $('go').focus({preventScroll:true}); }catch(e){} },30);
 }
@@ -1246,6 +1388,7 @@ function frame(){
   const real=dt;
   if(G.hitstop>0){ G.hitstop-=real; dt*=.12; }
   G.t+=dt;
+  audioTick(real);
   buf.jab=Math.max(0,buf.jab-dt); buf.heavy=Math.max(0,buf.heavy-dt); buf.dodge=Math.max(0,buf.dodge-dt);
   pollPad();
   const live=G.state==='fight';
@@ -1316,7 +1459,7 @@ window.addEventListener('dragover',e=>e.preventDefault());
 window.addEventListener('drop',e=>{ e.preventDefault(); dragDepth=0; $('dropHint').hidden=true; const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) useAvatar(f); });
 
 /* ---------- boot ---------- */
-$('snd').addEventListener('click',()=>{ muted=!muted; $('snd').textContent=muted?'Sound off':'Sound on'; audioInit(); });
+$('snd').addEventListener('click',()=>{ muted=!muted; saveAudioPrefs(); paintAudio(); audioInit('click'); if(!muted) SFX.ui(); });
 buildWorld(); buildCrowd(); buildParticles(); buildWords();
 P=makeFighter(LOOKS.auditor,true); P.cfg={foe:'Auditor'}; P.speed0=4.4; P.reach=1; P.dmgMul=1; resetFighter(P,-2.3,Math.PI/2,100);
 E=makeFighter(LOOKS.reyes,false); E.cfg=BOUTS[0]; E.speed0=2.7; E.reach=1; E.dmgMul=.8; resetFighter(E,2.3,-Math.PI/2,70);
@@ -1764,6 +1907,6 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill};
+window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab()};
 })();
 </script>

@@ -1,0 +1,2 @@
+The sounds in samples.js were generated for Sublevel Three and are released under CC0 1.0.
+https://creativecommons.org/publicdomain/zero/1.0/
