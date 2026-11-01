@@ -534,7 +534,105 @@ Hypothesis: a sticky start button on short screens, a striped enemy bar, and a p
 
 Verdict: **keep**. `tuning/s10-pause.jpg` is the pause card over the bout. Esc and the pad Start button both pause. The strip does not come back after Got it, or after the 12 seconds.
 
+## Sprint 9 — Story and structure
 
+Goal: tighten the campaign into six named bouts with a between-fight hub (rule board), a loading-dock sabotage beat, bilingual copy from one string table (≤55 words per card), and outfit/arena unlocks that persist through throwing `localStorage`.
 
+Backlog: (1) baseline card word counts and balance for bouts 1–3, (2) `STR` table + EN/IT toggle, (3) rename and tighten bouts 1–3 plus add 4–6 through `scaleCfg`, (4) hub + dock mission flow, (5) progression save + safe storage reads/writes, (6) re-measure words, save round-trip, draw calls, and balance.
 
+Probe: headless Chrome `/usr/local/bin/google-chrome`, `node tools/balance-run.mjs` (via `tools/.tmp-br.mjs` with Linux Chrome path), card words via `window.__sublevel.storyMetrics()`, save via `window.__sublevel.saveProbe()`.
+
+### Baseline (master, before edits)
+
+| Metric | Value |
+| --- | --- |
+| Balance seed 1, normal, n=200 — Reyes win / median s | 90.5% / 32.3 |
+| Dag win / median s | 67.5% / 34.0 |
+| Pike win / median s | 44.0% / 43.9 |
+| Bout count | 3 |
+| Longest card body (EN, inline strings) | 41 words (title) |
+| EN/IT shared keys | no (inline English only) |
+| Progress save round-trip | none |
+| Hub between fights | none |
+| Fight draw calls (S1 merge baseline, headless) | ~145–157 |
+| Active meshes (fight) | ~119–131 |
+
+### Change 1 — bilingual `STR` table
+
+Hypothesis: one keyed table for EN and IT keeps card copy aligned and under 55 words.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Card strings | inline English | 92 keys × 2 langs |
+| Max card words EN | 41 | 31 |
+| Max card words IT | — | 27 |
+| Over 55 words | — | 0 |
+| Lang toggle | none | `sublevel-lang`, title card refresh |
+
+Verdict: **keep**. `window.__sublevel.storyMetrics()` and `setLang('it')` render `Livello Tre` from the same keys as English.
+
+### Change 2 — six-bout campaign (combat rows 1–3 unchanged)
+
+Hypothesis: add Voss, Chen, and Halvorsen with their own `BOUTS` rows through `scaleCfg` without touching Reyes/Dag/Pike numbers.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Bout count | 3 | 6 |
+| Reyes win / median (200, seed 1, normal) | 90.5% / 32.3 s | 90.5% / 32.3 s |
+| Dag win / median | 67.5% / 34.0 s | 67.5% / 34.0 s |
+| Pike win / median | 44.0% / 43.9 s | 44.0% / 43.9 s |
+| Renamed places | Cellar / Loading Dock / Floor Plan | Sump / Dock Four / Blind Map |
+
+Verdict: **keep**. New foes reuse teach / punish / echo styles only.
+
+### Change 3 — hub rule board between wins
+
+Hypothesis: a break-room card with yard rules reduces rushing straight into the next intro.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| After win flow | next intro or final | win card → hub → intro |
+| Rule text on hub | — | three yard rules (EN/IT) |
+| Reach bout 4 from hub | — | `hubProbe()` → `Bacheca regole` |
+
+Verdict: **keep**. Demo: `tuning/s9-hub.jpg`.
+
+### Change 4 — loading-dock sabotage beat
+
+Hypothesis: a short post–Dock Four card sells the sabotage thread without a new game mode.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| After bout 2 win | straight to next bout | dock mission → hub |
+| `progress.dock` flag | — | persisted in save |
+| Card words | — | ≤31 EN |
+
+Verdict: **keep**. Skips on replay when `dock` already set.
+
+### Change 5 — outfit / arena unlocks + safe save
+
+Hypothesis: `sublevel-progress` JSON round-trips unlocks; try/catch on read/write survives throwing storage.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Save key | none | `sublevel-progress` |
+| Round-trip unlock | — | `saveProbe()` pass |
+| Throw on `setItem` | — | `saveProbe({throwWrites:true})` survived |
+| Outfit apply | auditor only | cap / stripe / tie via `OUTFITS` |
+| Arena apply | fixed lighting | sodium / cold key / exposure steps |
+
+Verdict: **keep**. Audio, binds, rumble, motion, tut, diff, lang already wrapped.
+
+### Checked after sprint
+
+| Metric | Value |
+| --- | --- |
+| Fight draw calls (headless, 1920×1080) | 149 |
+| Active meshes (fight) | 127 |
+| Portrait 390×844 | touch on, 487×1055 render |
+| Budget | draw <400, meshes <250 |
+
+Retro: **moved** — shared `STR` keys made EN/IT verification one probe; hub+dock reused `showCard` without new UI chrome. **Did not move** — balance on bouts 1–3 (no combat edits); draw calls rose ~4 vs prior headless sample from three new procedural foes, still under budget. **Next sprint (S11, not started)** — photo/GLB avatar paths per CONTINUE.md.
+
+Questions: (1) Should dock mission grant a gameplay perk beyond narrative, or stay story-only? (2) Should IT use formal *lei* or informal *tu* on cards (currently *tu*)? (3) After campaign clear, should hub allow picking any bout, or stay linear replay from bout 1?
 
