@@ -1,3 +1,7 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
 <title>Sublevel Three</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -128,8 +132,10 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .drop{position:absolute;inset:12px;display:grid;place-items:center;border:3px dashed var(--tape);background:rgba(8,8,9,.7);font:800 clamp(28px,6vw,48px)/1 var(--f-display);text-transform:uppercase;color:var(--tape);text-align:center;padding:16px;pointer-events:none}
 .fail{position:absolute;inset:0;display:grid;place-items:center;margin:0;padding:24px;text-align:center;font-size:18px}
 </style>
+</head>
+<body>
 
-<div id="app">
+<div id="app" role="main">
   <canvas id="view" tabindex="0" aria-label="Fight arena, 3D view"></canvas>
 
   <div class="hud" id="hud" hidden>
@@ -2258,3 +2264,5 @@ function poseStill(kind){
 window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress};
 })();
 </script>
+</body>
+</html>
