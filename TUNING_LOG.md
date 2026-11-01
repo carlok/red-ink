@@ -636,3 +636,25 @@ Retro: **moved** — shared `STR` keys made EN/IT verification one probe; hub+do
 
 Questions: (1) Should dock mission grant a gameplay perk beyond narrative, or stay story-only? (2) Should IT use formal *lei* or informal *tu* on cards (currently *tu*)? (3) After campaign clear, should hub allow picking any bout, or stay linear replay from bout 1?
 
+## Sprint 12 — Release and QA
+
+Goal: ship an automated regression suite, documented device matrix, Lighthouse and axe accessibility scores, an offline zip script, and a CHANGELOG, without retuning combat.
+
+Backlog: (1) baseline QA gaps and bout 4–6 balance, (2) shared Chrome probe path, (3) headless regression (`file://` + hub/dock), (4) Lighthouse + axe with cheap fixes, (5) offline zip script + CHANGELOG, (6) re-run full regression and record pass/fail.
+
+Probe: `node tools/regression.mjs`, `node tools/lighthouse-a11y.mjs`, `node tools/offline-zip.mjs`, `node tools/balance-run.mjs 200 normal 1 0-5`.
+
+### Baseline (master after S9, before S12 edits)
+
+| Metric | Value |
+| --- | --- |
+| Automated regression script | none |
+| `CHANGELOG.md` | none |
+| Offline zip script | none |
+| Lighthouse / axe recorded | none |
+| Device matrix doc | none |
+| Balance bouts 1–3 (200, seed 1, normal) | Reyes 90.5% / 32.3 s, Dag 67.5% / 34.0 s, Pike 44.0% / 43.9 s |
+| Balance bouts 4–6 | not logged |
+| `npm run` QA scripts | `build:engine`, `measure` only |
+
+
