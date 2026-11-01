@@ -224,6 +224,26 @@ const DESK = String.raw`
   await tap("j");
   await sleep(300);
   const rumble = { calls: calls.slice(), hp: S.E.hp, dhp: Math.round((hp0 - S.E.hp) * 10) / 10 };
+  let rumbleScaled = null;
+  const slider = document.getElementById("rumble");
+  if (slider) {
+    const hit = async () => {
+      calls.length = 0;
+      await waitIdle();
+      S.E.hp = 70; S.E.state = "idle"; S.E.stunT = 0;
+      S.P.pos.set(-0.45, 0, 0); S.E.pos.set(0.45, 0, 0); S.P.yaw = Math.PI / 2;
+      await tap("j");
+      await sleep(300);
+      return calls.slice();
+    };
+    slider.value = "50";
+    slider.dispatchEvent(new Event("input", { bubbles: true }));
+    const half = await hit();
+    slider.value = "0";
+    slider.dispatchEvent(new Event("input", { bubbles: true }));
+    const off = await hit();
+    rumbleScaled = { half, off: off.length };
+  }
 
   if (desc) Object.defineProperty(navigator, "getGamepads", desc);
   let remap = null;
@@ -248,7 +268,7 @@ const DESK = String.raw`
     heavyIdle, bufferEarly, bufferLate,
     dodge: { cd0, cdMid, dodgeBlocked, dodgeAgain },
     turnIdle, turnAtk,
-    rumble,
+    rumble, rumbleScaled,
     hasBinds: !!document.querySelector("[data-bind]"),
     hasRumble: !!document.getElementById("rumble"),
     remap,

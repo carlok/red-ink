@@ -174,3 +174,16 @@ Hypothesis: the four fight keys can be rewritten from the title card, the new ke
 | After a new page load | no stored bind | label U, `sublevel-binds` jab `u` |
 
 Verdict: **keep**. Gamepad X still jabs in 17 ms.
+
+### Change 4 — rumble slider
+
+Hypothesis: a 0–100 slider on the title card scales both rumble magnitudes, 0 sends nothing, and the value is still there after a reload. Storage is wrapped in try/catch.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Jab hit, slider 100 | strong 0.3, weak 0.6 | strong 0.3, weak 0.6 |
+| Slider 50 | full strength | strong 0.15, weak 0.3 |
+| Slider 0 | a call at full strength | 0 calls |
+| After a new page load | no stored value | `sublevel-rumble` `0` |
+
+Verdict: **keep**. The hit still lands. Only the actuator call changes.

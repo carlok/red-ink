@@ -90,6 +90,8 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .bind{font:600 11px var(--f-data);letter-spacing:.06em;text-transform:uppercase;background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:5px 8px;cursor:pointer}
 .bind.listen{background:var(--tape)}
 .bind kbd{font:inherit}
+.rumble{font:600 11px var(--f-data);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);gap:8px}
+#rumble{width:140px;accent-color:#111}
 .avatar small.err{color:#a02a18}
 .go{width:calc(100% - 40px);margin:4px 20px 0;font:800 clamp(22px,6.4vw,28px)/1 var(--f-display);letter-spacing:.05em;text-transform:uppercase;background:var(--ink);color:var(--tape);border:0;padding:14px 18px;cursor:pointer;text-align:left;display:flex;justify-content:space-between;gap:12px}
 .go:hover{background:#000}
@@ -168,6 +170,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
               <button type="button" class="bind" data-bind="block">Block <kbd>L</kbd></button>
               <button type="button" class="bind" data-bind="dodge">Dodge <kbd>Space</kbd></button>
             </div>
+            <label class="tuneRow rumble" for="rumble">Rumble <input id="rumble" type="range" min="0" max="100" value="100"></label>
           </div>
           <small id="avHint">Export a cartoon avatar as GLB (MetaPerson or Avaturn), then pick it here or drop it anywhere on this page.</small>
         </div>
@@ -854,7 +857,7 @@ const isTouch=window.matchMedia&&window.matchMedia('(pointer: coarse)').matches;
 if(isTouch) $('app').classList.add('is-touch');
 const DEFAULT_BINDS={jab:'j',heavy:'k',block:'l',dodge:'space'};
 let binds={jab:'j',heavy:'k',block:'l',dodge:'space'};
-let listenAct=null, keysHtml='';
+let listenAct=null, keysHtml='', rumbleAmt=1;
 const RESERVED=new Set(['enter','escape','tab','w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']);
 function loadBinds(){
   try{
@@ -866,6 +869,13 @@ function loadBinds(){
   }catch(e){}
 }
 function saveBinds(){ try{ localStorage.setItem('sublevel-binds', JSON.stringify(binds)); }catch(e){} }
+function loadRumble(){
+  try{
+    const r=localStorage.getItem('sublevel-rumble');
+    if(r!==null&&r!=='') rumbleAmt=clamp(Number(r),0,1);
+  }catch(e){}
+}
+function saveRumble(){ try{ localStorage.setItem('sublevel-rumble', String(rumbleAmt)); }catch(e){} }
 function keyLabel(k){ return k==='space'?'Space':k.length===1?k.toUpperCase():k; }
 function paintBinds(){
   document.querySelectorAll('[data-bind]').forEach(el=>{
@@ -888,6 +898,7 @@ function actionFor(k){
   return null;
 }
 loadBinds();
+loadRumble();
 function keyName(e){ return e.key===' '?'space':e.key.toLowerCase(); }
 window.addEventListener('keydown',e=>{
   const k=keyName(e);
@@ -928,10 +939,15 @@ paintBinds();
 document.querySelectorAll('[data-bind]').forEach(el=>{
   el.addEventListener('click',()=>{ listenAct=el.dataset.bind; paintBinds(); });
 });
+const rumbleEl=$('rumble');
+if(rumbleEl){
+  rumbleEl.value=String(Math.round(rumbleAmt*100));
+  rumbleEl.addEventListener('input',()=>{ rumbleAmt=clamp(Number(rumbleEl.value)/100,0,1); saveRumble(); });
+}
 function rumble(strong,weak,ms){
-  if(padIdx<0||!navigator.getGamepads) return;
+  if(rumbleAmt<=0||padIdx<0||!navigator.getGamepads) return;
   const gp=navigator.getGamepads()[padIdx], v=gp&&gp.vibrationActuator;
-  if(v&&v.playEffect){ try{ const p=v.playEffect('dual-rumble',{startDelay:0,duration:ms,strongMagnitude:strong,weakMagnitude:weak}); if(p&&p.catch) p.catch(()=>{}); }catch(e){} }
+  if(v&&v.playEffect){ try{ const p=v.playEffect('dual-rumble',{startDelay:0,duration:ms,strongMagnitude:strong*rumbleAmt,weakMagnitude:weak*rumbleAmt}); if(p&&p.catch) p.catch(()=>{}); }catch(e){} }
 }
 function pollPad(){
   const list=navigator.getGamepads?navigator.getGamepads():[]; let gp=null;
