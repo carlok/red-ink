@@ -597,10 +597,10 @@ function makeFighter(L,isPlayer){
     pp(sph(.15),pants,knee,0,0,0);
     pp(cyl(.47,.15,.108),pants,knee,0,-.255,0);
     pp(sph(.12),pants,knee,0,-.16,-.02,{sy:1.7,sz:1.1});           /* calf */
-    pp(cyl(.03,.12,.12),rmat(shade(L.pants,.7),'cloth'),knee,0,-.49,0,{cast:false}); /* hem */
+    const hem=pp(cyl(.03,.12,.12),rmat(shade(L.pants,.7),'cloth'),knee,0,-.49,0,{cast:false}); /* pant cuff */
     pp(B.MeshBuilder.CreateCapsule('sh',{height:.36,radius:.062,tessellation:14,subdivisions:2},scene),shoe,knee,0,-.538,.075,{rx:Math.PI/2,sx:1.15,sy:1,sz:1});
     pp(box(.125,.018,.335),sole,knee,0,-.592,.07);
-    return {hip,knee};
+    return {hip,knee,hem};
   };
   /* torso */
   const spine=new B.TransformNode('spine',scene); spine.parent=hips; spine.position.y=.1;
@@ -612,13 +612,18 @@ function makeFighter(L,isPlayer){
   /* collar, tie */
   pp(B.MeshBuilder.CreateTorus('co',{diameter:.17,thickness:.045,tessellation:20},scene),shirt,spine,0,.72,.0,{sz:.9,sy:1.3});
   if(L.tie){
+    const tieN=new B.TransformNode('tie',scene); tieN.parent=spine; tieN.position.set(0,.5,.16);
     const tie=rmat(L.tie,'cloth');
-    pp(sph(.058),tie,spine,0,.665,.15,{sz:.8,sy:.9});
-    pp(box(.045,.12,.012),tie,spine,0,.6,.166,{rx:.12});
-    pp(box(.052,.14,.012),tie,spine,0,.49,.172,{});
-    pp(box(.06,.14,.012),tie,spine,0,.365,.162,{rx:-.1});
-    pp(box(.07,.07,.012),tie,spine,0,.27,.152,{rx:-.1});
+    pp(sph(.058),tie,tieN,0,.165,-.01,{sz:.8,sy:.9});
+    pp(box(.045,.12,.012),tie,tieN,0,.1,.006,{rx:.12});
+    pp(box(.052,.14,.012),tie,tieN,0,-.01,.012);
+    pp(box(.06,.14,.012),tie,tieN,0,-.135,.002,{rx:-.1});
+    pp(box(.07,.07,.012),tie,tieN,0,-.23,-.008,{rx:-.1});
+    f.swing=f.swing||{}; f.swing.tie=tieN;
   }
+  const shem=new B.TransformNode('shem',scene); shem.parent=spine; shem.position.set(0,.06,.145);
+  pp(box(.22,.045,.012),shirt,shem,0,0,0,{cast:false});
+  f.swing=f.swing||{}; f.swing.shirt=shem;
   /* neck */
   pp(cyl(.2,.108,.125),skin,spine,0,.78,.005);
   /* arms */
@@ -632,6 +637,10 @@ function makeFighter(L,isPlayer){
     pp(cyl(.34,.098,.074),skin,el,0,-.19,0);
     pp(cyl(.14,.092,.092,16),wrap,el,0,-.36,0);
     pp(sph(.125,14),wrap,el,0,-.43,.01,{sy:.95,sz:1.1,sx:1.0});
+    pp(sph(.034,8),wrap,el,.03,-.47,.04);
+    pp(sph(.03,8),wrap,el,0,-.478,.046);
+    pp(sph(.028,8),wrap,el,-.028,-.468,.038);
+    f.knuckles=(f.knuckles||0)+3;
     return {sh,el};
   };
   /* head */
@@ -656,21 +665,31 @@ function makeFighter(L,isPlayer){
   pp(sph(.022,8),skinDark,head,-.02,.118,.158,{cast:false}); pp(sph(.022,8),skinDark,head,.02,.118,.158,{cast:false});
   const lip=rmat(mixHex(L.skin,'#8a3b38',.42),'skin');
   f.face.mouth=pp(box(.06,.012,.01),rmat('#2a0f0d','matte'),head,0,.06,.112,{cast:false,keep:true});
+  f.face.bruise=pp(box(.055,.04,.01),rmat('#6e2434','skin'),head,.055,.11,.125,{cast:false,keep:true});
+  f.face.sweat=pp(sph(.028,8),rmat('#e7eef2','eye'),head,-.04,.2,.105,{cast:false,keep:true});
+  f.face.bruise.setEnabled(false); f.face.sweat.setEnabled(false); f.marks=0;
   pp(sph(.06,10),lip,head,0,.077,.108,{sy:.3,sz:.4,cast:false});
   pp(sph(.058,10),lip,head,0,.045,.108,{sy:.33,sz:.4,cast:false});
   /* hair / cap / moustache */
-  if(L.hair){
-    const hm=rmat(L.hair,'hair');
-    pp(B.MeshBuilder.CreateSphere('h',{diameter:1,segments:20,slice:.46,sideOrientation:B.Mesh.DOUBLESIDE},scene),hm,head,0,.16,-.012,{sx:.262,sy:.325,sz:.29,rx:-.3});
-    pp(box(.012,.07,.03),hm,head,-.119,.19,.03,{cast:false}); pp(box(.012,.07,.03),hm,head,.119,.19,.03,{cast:false});
-  }
-  if(L.cap){
-    const cm=rmat(L.cap,'cloth');
-    pp(B.MeshBuilder.CreateSphere('h',{diameter:1,segments:20,slice:.4,sideOrientation:B.Mesh.DOUBLESIDE},scene),cm,head,0,.15,-.012,{sx:.268,sy:.31,sz:.292,rx:-.14});
-    pp(box(.2,.01,.12),cm,head,0,.222,.165,{rx:.1});
+  if(L.hair||L.cap){
+    const top=new B.TransformNode('top',scene); top.parent=head;
+    f.swing=f.swing||{}; f.swing.hair=top;
+    if(L.hair){
+      const hm=rmat(L.hair,'hair');
+      pp(B.MeshBuilder.CreateSphere('h',{diameter:1,segments:20,slice:.46,sideOrientation:B.Mesh.DOUBLESIDE},scene),hm,top,0,.16,-.012,{sx:.262,sy:.325,sz:.29,rx:-.3});
+      pp(box(.012,.07,.03),hm,top,-.119,.19,.03,{cast:false}); pp(box(.012,.07,.03),hm,top,.119,.19,.03,{cast:false});
+    }
+    if(L.cap){
+      const cm=rmat(L.cap,'cloth');
+      pp(B.MeshBuilder.CreateSphere('h',{diameter:1,segments:20,slice:.4,sideOrientation:B.Mesh.DOUBLESIDE},scene),cm,top,0,.15,-.012,{sx:.268,sy:.31,sz:.292,rx:-.14});
+      pp(box(.2,.01,.12),cm,top,0,.222,.165,{rx:.1});
+    }
   }
   if(L.stache) pp(box(.1,.02,.022),rmat(L.stache,'hair'),head,0,.093,.118,{cast:false});
-  f.j={spine,head,legR:leg(1),legL:leg(-1),armR:arm(1),armL:arm(-1)};
+  const legL=leg(-1), legR=leg(1);
+  f.j={spine,head,legR,legL,armR:arm(1),armL:arm(-1)};
+  f.swing=f.swing||{}; f.swing.hemL=legL.hem; f.swing.hemR=legR.hem;
+  f.lag={tie:0,hair:0,shirt:0,hem:0};
   mergeJoints(f.root);
   if(!isPlayer){
     f.alert=new B.TransformNode('alert',scene); f.alert.parent=head; f.alert.position.y=.62;
@@ -687,6 +706,8 @@ function resetFighter(f,x,yaw,hp){
   f.pos.set(x,0,0); f.yaw=yaw; f.root.rotation.y=yaw; f.vel.set(0,0,0); f.mv.set(0,0,0);
   f.state='idle'; f.t=rng()*3; f.atk=null; f.stunT=0; f.stunMax=1; f.inv=0; f.cd=0; f.koT=0; f.phase=0; f.moveAmt=0;
   f.stam=100; f.stamDelay=0; f.hp=hp; f.maxHp=hp; f.hitSide=1; f.dodgeT=0; f.dodgeSide=1; f.started=null; f.echoIdx=0;
+  f.marks=0; f.koKind=0;
+  if(f.lag){ f.lag.tie=0; f.lag.hair=0; f.lag.shirt=0; f.lag.hem=0; }
   f.ai.cd=1.2; f.ai.tick=.5; f.ai.blockT=0; f.ai.atk=null; f.ai.dodgeNow=false; f.ai.move='in'; f.ai.moveT=.2; f.ai.side=1;
   f.ai.tell=0; f.ai.pending=null; f.ai.feint=false; f.ai.watch=null; f.ai.waited=0; f.ai.answered=false; f.ai.punish=0; f.ai.punishFresh=0; f.ai.feintN=0; f.ai.rolled=0;
   f.ai.echoKey=''; f.ai.echoQ=null; f.ai.echoIdx=0;
@@ -701,13 +722,19 @@ function disposeFighter(f){
 
 function poseTargets(f){
   const T={shR:-.95,elR:-1.6,shL:-1.0,elL:-1.6,shRz:.16,shLz:-.16,twist:0,lean:.07,crouch:-.03,jump:0,roll:0,fwd:0,
-           hipL:-.28,hipR:.22,kL:.32,kR:.22,head:0,mouth:.35,eyes:1};
-  const s=f.moveAmt, bob=Math.sin(f.t*4.2);
+           hipL:-.28,hipR:.22,kL:.32,kR:.22,head:0,headY:0,mouth:.35,eyes:1};
+  const s=f.moveAmt, bob=Math.sin(f.t*2.2), w=Math.sin(f.phase);
   if(s>.08){
-    const w=Math.sin(f.phase),w2=Math.cos(f.phase);
+    const w2=Math.cos(f.phase);
     T.hipL=-w*.62*s-.1; T.hipR=w*.62*s+.1; T.kL=Math.max(0,w2)*.7*s+.2; T.kR=Math.max(0,-w2)*.7*s+.2;
     T.crouch=-.03+Math.abs(w)*.03*s; T.lean=.1+s*.06;
-  } else { T.jump=bob*.012; T.shR+=bob*.04; T.shL-=bob*.04; }
+    T.shR=-.95-w*.45*s; T.shL=-1.0+w*.45*s;
+  } else {
+    T.jump=bob*.012;
+    const shift=Math.sin(f.t*1.6);
+    T.hipL=-.28+shift*.22; T.hipR=.22-shift*.22;
+    if((f.t%3.4)<.12) T.eyes=.12;
+  }
   switch(f.state){
     case 'attack':{
       const A=f.atk,p=A.t/A.def.dur;
@@ -724,15 +751,26 @@ function poseTargets(f){
       T.shR=T.shL=-1.25; T.elR=T.elL=-2.15; T.shRz=.05; T.shLz=-.05; T.crouch=-.1; T.lean=.18;
       T.hipL=-.4; T.hipR=.35; T.kL=.6; T.kR=.5; T.eyes=.6; break;
     case 'hit':{
-      const k=clamp(f.stunT/f.stunMax,0,1);
-      T.lean=-.55*k; T.head=-.5*k; T.shR=-.25; T.shL=-.35; T.elR=-.3; T.elL=-.2; T.shRz=.55; T.shLz=-.55;
-      T.mouth=1; T.eyes=.25; T.twist=.3*k*f.hitSide; break; }
+      const k=clamp(f.stunT/f.stunMax,0,1), hs=f.hitSide||1;
+      T.lean=-.45*k; T.head=-.4*k; T.headY=.42*k*hs; T.roll=.3*k*hs; T.twist=.5*k*hs;
+      T.shR=hs>0?-.15:-.9; T.shL=hs>0?-.9:-.15; T.elR=-.35; T.elL=-.3;
+      T.mouth=1; T.eyes=.2; break; }
     case 'dodge':
       T.lean=.25; T.crouch=-.14; T.roll=.35*f.dodgeSide; T.shR=T.shL=-1.2; T.elR=T.elL=-2; T.hipL=-.6; T.hipR=.5; T.kL=.7; T.kR=.5; break;
     case 'ko':{
-      const q=ease(f.koT/.5);
-      T.lean=-1.45*q; T.jump=.24*q; T.fwd=-.1*q; T.shR=.35; T.elR=-.2; T.shL=.45; T.elL=-.1; T.shRz=.9; T.shLz=-.9;
-      T.hipL=-.1; T.hipR=.2; T.kL=.1; T.kR=.1; T.mouth=.8; T.eyes=.1; T.crouch=0; break; }
+      const q=ease(Math.min(1,f.koT/.5)), kind=f.koKind||0, hs=f.hitSide||1;
+      T.mouth=.85; T.eyes=.08;
+      if(kind===1){
+        T.lean=-.5*q; T.crouch=-.62*q; T.kL=1.15*q+.1; T.kR=1.2*q+.1; T.hipL=.35*q; T.hipR=-.15*q;
+        T.shR=.25; T.shL=.35; T.elR=-.45; T.elL=-.35; T.jump=.04*q; T.head=.3*q;
+      } else if(kind===2){
+        T.lean=-.65*q; T.roll=1.15*q*hs; T.jump=.18*q; T.fwd=-.06*q; T.headY=.3*q*hs;
+        T.shR=.45; T.shL=-.15; T.elR=-.25; T.elL=-.55; T.kL=.45; T.kR=.2; T.hipL=-.05; T.hipR=.15;
+      } else {
+        T.lean=-1.45*q; T.jump=.24*q; T.fwd=-.1*q; T.shR=.35; T.elR=-.2; T.shL=.45; T.elL=-.1; T.shRz=.9; T.shLz=-.9;
+        T.hipL=-.1; T.hipR=.2; T.kL=.1; T.kR=.1; T.crouch=0;
+      }
+      break; }
     case 'win':
       T.shR=T.shL=-2.9; T.elR=T.elL=-.15; T.shRz=.3; T.shLz=-.3; T.jump=Math.abs(Math.sin(f.t*5))*.12; T.mouth=1; T.lean=0; break;
   }
@@ -746,11 +784,33 @@ function applyPose(f,dt){
   j.armL.sh.rotation.set(P.shL,0,P.shLz); j.armL.el.rotation.x=P.elL;
   j.legL.hip.rotation.x=P.hipL; j.legL.knee.rotation.x=P.kL;
   j.legR.hip.rotation.x=P.hipR; j.legR.knee.rotation.x=P.kR;
-  j.spine.rotation.y=P.twist; j.head.rotation.x=P.head;
+  j.spine.rotation.y=P.twist; j.head.rotation.set(P.head, P.headY||0, 0);
   f.body.rotation.set(P.lean,0,P.roll); f.body.position.set(0,P.jump,P.fwd);
   f.vis.position.y=P.crouch;
   f.face.eyes.forEach(e=>{e.scaling.y=P.eyes;});
   f.face.mouth.scaling.y=.5+P.mouth*2;
+  const sway=(node,key,target,axis)=>{
+    if(!node||!f.lag) return;
+    f.lag[key]=lerp(f.lag[key]||0, target, damp(7,dt));
+    node.rotation[axis]=f.lag[key];
+  };
+  sway(f.swing&&f.swing.tie,'tie',-(P.twist||0)*.7,'z');
+  sway(f.swing&&f.swing.hair,'hair',-(P.headY||0)*.8-(P.twist||0)*.25,'z');
+  sway(f.swing&&f.swing.shirt,'shirt',-(P.lean||0)*.45,'x');
+  if(f.swing&&f.swing.hemL){
+    f.lag.hem=lerp(f.lag.hem||0,(f.mv.z+f.vel.z)*.05,damp(8,dt));
+    f.swing.hemL.rotation.x=f.lag.hem; f.swing.hemR.rotation.x=-f.lag.hem*.6;
+  }
+  const mk=f.marks||0;
+  if(f.face.bruise){
+    f.face.bruise.setEnabled(mk>.05);
+    f.face.bruise.scaling.set(.45+mk*1.7,.4+mk*1.2,1);
+    f.face.bruise.position.x=.055*(f.hitSide||1);
+  }
+  if(f.face.sweat){
+    f.face.sweat.setEnabled(mk>.2);
+    f.face.sweat.scaling.setAll(.35+mk*1.1);
+  }
   if(f.avatar) f.avatar.anchor.rotation.y=P.twist*.5;
   if(f.alert) f.alert.setEnabled((f.ai&&f.ai.tell>0)||(f.state==='attack'&&f.atk&&f.atk.type==='heavy'&&f.atk.t<f.atk.def.a0));
 }
@@ -792,7 +852,12 @@ function strike(a,d,D){
   }
   const counter=d.state==='attack';
   d.hp=Math.max(0,d.hp-D.dmg*a.dmgMul*(counter?1.25:1));
-  d.state='hit'; d.atk=null; d.stunT=d.stunMax=D.stun*(counter?1.15:1); d.vel.addInPlace(dir.scale(D.kb*9)); d.hitSide=rng()<.5?-1:1; d.stamDelay=.8;
+  d.state='hit'; d.atk=null; d.stunT=d.stunMax=D.stun*(counter?1.15:1); d.vel.addInPlace(dir.scale(D.kb*9));
+  rng();
+  const lateral=-(dir.x*Math.cos(d.yaw)-dir.z*Math.sin(d.yaw));
+  d.hitSide=lateral>=0?1:-1; d.stamDelay=.8;
+  d.marks=Math.min(1,(d.marks||0)+(D.dmg>10?.28:.14));
+  d.koKind=D.dmg>10?1:(d.hitSide>0?2:0);
   hitPS.emitter.copyFrom(mid); hitPS.manualEmitCount=D.dmg>10?26:14;
   if(a.isPlayer) rumble(.3,.6,90); if(d.isPlayer) rumble(D.dmg>10?1:.6,.5,D.dmg>10?240:130);
   fxWord(D.word,mid); SFX[a.atk?a.atk.type:'jab'](); G.shake=Math.max(G.shake,D.dmg>10?.9:.45); G.hitstop=D.dmg>10?.09:.05; G.cheer=1;
@@ -1581,6 +1646,110 @@ function probeAI(){
     return {react,wind,marks,farm:{feintN,rolled,seen},echo,adapt,punish:{whiff:whiffs.length,n:punish.length,onTime:onTime.length,early:early.length,med:med(whiffs.filter(p=>p.delay!==null).map(p=>p.delay))},corner,habits};
   } finally { restore(); }
 }
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI};
+function poseProbe(){
+  const prevRng=rng, prevState=G.state, prevDiff=diff;
+  const dt=1/60, round=v=>Math.round(v*1000)/1000;
+  function pearson(a,b){
+    const n=a.length, ma=a.reduce((s,v)=>s+v,0)/n, mb=b.reduce((s,v)=>s+v,0)/n;
+    let num=0, da=0, db=0;
+    for(let i=0;i<n;i++){ const x=a[i]-ma, y=b[i]-mb; num+=x*y; da+=x*x; db+=y*y; }
+    return da&&db?num/Math.sqrt(da*db):0;
+  }
+  function restore(){
+    rng=prevRng; diff=prevDiff;
+    E.cfg=BOUTS[0]; E.speed0=BOUTS[0].speed; E.reach=BOUTS[0].reach; E.dmgMul=BOUTS[0].dmg;
+    resetFighter(P,-2.3,Math.PI/2,100); P.speed0=4.4; P.reach=1; P.dmgMul=1;
+    resetFighter(E,2.3,-Math.PI/2,BOUTS[0].hp);
+    G.hitstop=0; G.winner=null; G.shake=0;
+    G.state=prevState==='fight'||prevState==='ready'||prevState==='ko'?'card':prevState;
+    if(G.state==='card'||G.state==='title') titleCard();
+  }
+  try{
+    diff='normal'; rng=mulberry32(3);
+    resetFighter(P,0,0,200); P.speed0=4.4; P.dmgMul=1; P.pos.set(0,0,0); P.yaw=0;
+    resetFighter(E,.8,0,200); E.dmgMul=1;
+    P.P={shR:0}; P.state='idle'; P.moveAmt=0; P.t=0; P.atk=null;
+    applyPose(P,dt);
+    const dampStep=P.P.shR/poseTargets(P).shR;
+    const ys=[]; let eyeMin=1;
+    P.P={};
+    for(let i=0;i<240;i++){
+      P.t+=dt; P.state='idle'; P.moveAmt=0; P.atk=null;
+      applyPose(P,dt);
+      ys.push(P.body.position.y);
+      eyeMin=Math.min(eyeMin, P.face.eyes[0].scaling.y);
+    }
+    const peaks=[];
+    for(let i=1;i<ys.length-1;i++) if(ys[i]>ys[i-1]&&ys[i]>=ys[i+1]&&ys[i]>0.004) peaks.push(i*dt);
+    let period=null;
+    if(peaks.length>1){
+      let s=0; for(let i=1;i<peaks.length;i++) s+=peaks[i]-peaks[i-1];
+      period=s/(peaks.length-1);
+    }
+    const amp=(Math.max.apply(null,ys)-Math.min.apply(null,ys))/2;
+    const sh=[], hip=[];
+    for(let i=0;i<16;i++){
+      P.phase=i/16*Math.PI*2; P.moveAmt=1; P.state='idle'; P.t=0; P.atk=null;
+      const T=poseTargets(P); sh.push(T.shL); hip.push(T.hipL);
+    }
+    P.moveAmt=0; P.state='idle'; P.atk=null; P.t=0;
+    const elIdle=poseTargets(P).elR;
+    P.t=Math.PI/3.2; const hipA=poseTargets(P).hipL;
+    P.t=Math.PI/3.2+Math.PI/1.6; const hipB=poseTargets(P).hipL;
+    P.t=1; P.state='attack'; P.atk={type:'jab',def:ATK.jab,t:.05,done:false};
+    const elAnt=poseTargets(P).elR;
+    P.atk.t=.2; const elPeak=poseTargets(P).elR;
+    P.atk.t=.3; const elAfter=poseTargets(P).elR;
+    function hitsFrom(side){
+      const got=[];
+      for(let trial=0;trial<8;trial++){
+        rng=mulberry32((400+side*50+trial)>>>0);
+        resetFighter(P,0,0,200); P.pos.set(0,0,0); P.yaw=0; P.root.rotation.y=0; P.hp=200; P.P={};
+        resetFighter(E,side,0,200); E.pos.set(side*.75,0,.2); E.dmgMul=1; E.yaw=Math.PI;
+        strike(E,P,ATK.jab);
+        got.push(P.hitSide);
+      }
+      const same=got.every(v=>v===got[0]);
+      return {side:got[0], same, n:got.length};
+    }
+    const fromRight=hitsFrom(1), fromLeft=hitsFrom(-1);
+    function koPose(kind){
+      resetFighter(P,0,0,200); P.P={}; P.state='ko'; P.koKind=kind; P.koT=.45; P.hitSide=1; P.moveAmt=0;
+      for(let i=0;i<24;i++) applyPose(P,dt);
+      return {lean:round(P.body.rotation.x), roll:round(P.body.rotation.z), crouch:round(P.vis.position.y), knee:round(P.j.legL.knee.rotation.x)};
+    }
+    const ko=[0,1,2].map(koPose);
+    let tie=null;
+    if(P.swing&&P.swing.tie){
+      resetFighter(P,0,0,200); P.P={}; P.state='hit'; P.hitSide=1; P.stunT=.3; P.stunMax=.4; P.moveAmt=0;
+      applyPose(P,dt); const early=P.swing.tie.rotation.z;
+      for(let i=0;i<30;i++) applyPose(P,dt);
+      tie={early:round(early), late:round(P.swing.tie.rotation.z), spine:round(P.j.spine.rotation.y)};
+    }
+    resetFighter(P,0,0,200); P.hp=200; P.marks=P.marks||0;
+    const mark0=P.marks||0;
+    E.dmgMul=1; E.pos.set(.6,0,.2);
+    for(let i=0;i<4;i++){ P.hp=200; P.state='idle'; strike(E,P,ATK.jab); }
+    const mark1=P.marks||0;
+    return {
+      damp:round(dampStep), breath:{amp:round(amp), period:period?round(period):null}, eyeMin:round(eyeMin),
+      weight:round(Math.abs(hipA-hipB)), walk:round(pearson(sh,hip)),
+      jab:{ant:round(elIdle-elAnt), peak:round(elPeak-elIdle), follow:round(elAfter-elIdle)},
+      hit:{right:fromRight, left:fromLeft, opposed:fromRight.same&&fromLeft.same&&fromRight.side!==fromLeft.side},
+      ko, tie, marks:{before:mark0, after4:round(mark1)}, knuckles:P.knuckles||0,
+      meshes:scene.meshes.length, verts:scene.meshes.reduce((s,m)=>s+(m.getTotalVertices?m.getTotalVertices():0),0)
+    };
+  } finally { restore(); }
+}
+function poseStill(kind){
+  $('wrap').hidden=true; $('hud').hidden=false;
+  G.state='fight'; G.hitstop=0; G.winner=null;
+  resetFighter(P,-.9,Math.PI/2,100); resetFighter(E,.9,-Math.PI/2,100);
+  P.pos.set(-.9,0,0); E.pos.set(.9,0,0);
+  if(kind==='ko'){ E.state='ko'; E.koT=.15; E.koKind=2; E.hitSide=1; E.P={}; }
+  else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
+  return kind;
+}
+window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill};
 })();
 </script>

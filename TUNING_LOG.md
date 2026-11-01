@@ -371,3 +371,55 @@ Verdict: **keep**. A jab is still 7 damage, a block chip is still 0.7, a counter
 
 `tuning/s5-tell.jpg` is Reyes with the mark up, arm cocked, before the jab.
 
+## Sprint 6 — Animation and characters
+
+Goal: the damp-24 rig should breathe, shift weight, swing the arms in a walk, turn a hit toward the side it came from, and fall in three different ways. Tie, hair, and the shirt hem lag the body. Bruises build.
+
+Probe: `node tools/pose-probe.mjs`. Joint numbers are radians.
+
+### Baseline
+
+| | Value |
+| --- | --- |
+| Smoothing step at 1/60 s | 0.33 of the way to the pose (damp 24) |
+| Idle bob | 12 mm, period 1.50 s |
+| Blink | eyes stay at 1 |
+| Idle hip shift | 0 |
+| Walk, left arm vs left hip | correlation 0 |
+| Jab cock at 0.05 s | 0.279 |
+| Jab still extended 0.10 s after the active frame | 0.75 |
+| Hit side, 8 from the right and 8 from the left | not stable |
+| Three knockdown poses | identical, lean −1.409 |
+| Tie lag | no separate tie |
+| Marks after 4 jabs | 0 |
+| Knuckles | 0 |
+| Meshes | 175 |
+
+The jab already cocks and follows through. Those curves stayed.
+
+### Change 1 — breath, weight, walk, hits, knockdowns, lag, marks
+
+Hypothesis: slowing the idle bob to a breath, opposing the arms to the hips, and choosing the hit side from the punch direction makes the rig readable without touching attack timing or the fight seed.
+
+| | Before | After |
+| --- | --- | --- |
+| Breath period | 1.50 s | 2.85 s, still 12 mm |
+| Lowest open eye over 4 s | 1 | 0.12 |
+| Idle hip shift | 0 | 0.44 |
+| Walk correlation | 0 | −1 |
+| Jab cock / follow-through | 0.279 / 0.75 | 0.279 / 0.75 |
+| Hits from the right | mixed | 8/8 side +1 |
+| Hits from the left | mixed | 8/8 side −1 |
+| Knockdown lean | −1.409, −1.409, −1.409 | −1.409, −0.486, −0.632 |
+| Knockdown roll | 0, 0, 0 | 0, 0, 1.118 |
+| Crumple knee | 0.10 | 1.218 on the heavy fall |
+| Tie after one frame, then half a second | — | −0.029, then −0.255, while the spine is at 0.375 |
+| Marks after 4 jabs | 0 | 0.56 |
+| Knuckles | 0 | 6, merged into the hand |
+| Meshes | 175 | 182 |
+
+A jab from the left still falls backward. A jab from the right drops sideways. A heavy crumples. The random draw that used to pick the hit side is still consumed, so the seeded bouts do not move: 200 fights, seed 1, stay at 90.5% / 32.3 s, 67.5% / 34.0 s, 44.0% / 43.9 s.
+
+Verdict: **keep**. Damp stays 24. `tuning/s6-ko-before.jpg` is the old flat fall. `tuning/s6-ko-after.jpg` is the side drop.
+
+
