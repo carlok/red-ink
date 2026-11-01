@@ -28,7 +28,7 @@ jobs:
       - name: Assemble the site
         run: |
           mkdir -p _site
-          cp index.html README.txt LICENSE NOTICE .nojekyll _site/
+          cp index.html README.md LICENSE NOTICE .nojekyll _site/
           cp -R lib audio _site/
       - uses: actions/upload-pages-artifact@v3
         with:
