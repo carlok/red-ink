@@ -55,3 +55,22 @@ Hypothesis: an esbuild bundle of only the Babylon 9.30 modules this game imports
 Verdict: **keep**.
 
 The first bundle left `Camera` off the global, so `updateCamera` threw on `FOVMODE_HORIZONTAL_FIXED` and the view stayed black. Exporting `Camera` fixed it. The numbers above are from that build. `lib/babylonjs.loaders.min.js` is gone; glTF 2.0 and the material extensions the avatar path needs are inside `lib/babylon.js`. Draco still expects a decoder fetch, which the old UMD build did not embed either.
+
+### Change 2 — merge static world meshes
+
+Hypothesis: walls, tape, pipes, pillars, hazard bands, crates, cords and bulbs are static and share a material per group. Merging each group, and using one bulb material instead of five, drops draw calls and mesh count without changing the vertex count.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Fight draw calls | 157 | 145 |
+| Active meshes | 133 | 119 |
+| Meshes | 211 | 175 |
+| Materials | 90 | 86 |
+| Geometries | 143 | 107 |
+| Vertices | 57,178 | 57,178 |
+| Shadow casters | 45 | 45 |
+| Keyboard jab | pass | idle → attack |
+| Gamepad / GLB clear | pass | pass |
+| Geometries over 40 restarts | flat | 107 → 107 |
+
+Verdict: **keep**. Most of the merged meshes were already outside the view, so draw calls fell by 12 rather than by the full mesh drop of 36. The picture still shows the walls, pipes, striped pillars, crates, cords and bulbs.

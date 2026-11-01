@@ -318,29 +318,43 @@ function buildWorld(){
   floor.material=fm; floor.receiveShadows=true; floor.isPickable=false;
 
   const wm=toon('#383a3c',{e:.14});
-  const slab=(w,h,d,x,y,z,mat)=>{ const m=box(w,h,d); m.position.set(x,y,z); m.material=mat||wm; m.isPickable=false; return m; };
+  const groups=new Map();
+  const add=(mat,mesh)=>{
+    mesh.material=mat; mesh.isPickable=false;
+    let list=groups.get(mat); if(!list) groups.set(mat,list=[]);
+    list.push(mesh); return mesh;
+  };
+  const slab=(w,h,d,x,y,z,mat)=>{ const m=box(w,h,d); m.position.set(x,y,z); return add(mat||wm,m); };
   slab(36.8,9,.5,0,4.5,17.2); slab(36.8,9,.5,0,4.5,-17.2); slab(.5,9,36.8,17.2,4.5,0); slab(.5,9,36.8,-17.2,4.5,0);
   slab(36.8,.4,36.8,0,9.2,0,toon('#1b1c1e',{e:.1}));
   const tapeM=toon('#e6bd00',{e:.5});
   slab(36.8,.14,.06,0,1.1,16.9,tapeM); slab(36.8,.14,.06,0,1.1,-16.9,tapeM); slab(.06,.14,36.8,16.9,1.1,0,tapeM); slab(.06,.14,36.8,-16.9,1.1,0,tapeM);
 
   const pm=toon('#44484d',{e:.18});
-  [-9,-2,6,12].forEach(z=>{ const p=B.MeshBuilder.CreateCylinder('pipe',{height:36,diameter:.5,tessellation:14},scene); p.rotation.z=Math.PI/2; p.position.set(0,8.5,z); p.material=pm; p.isPickable=false; });
+  [-9,-2,6,12].forEach(z=>{ const p=B.MeshBuilder.CreateCylinder('pipe',{height:36,diameter:.5,tessellation:14},scene); p.rotation.z=Math.PI/2; p.position.set(0,8.5,z); add(pm,p); });
 
   const hz=new B.StandardMaterial('hazM',scene); hz.diffuseTexture=hazardTex(); hz.specularColor=new C3(0,0,0); hz.emissiveColor=new C3(.25,.22,.05);
+  const pilM=toon('#4b4f54',{e:.16});
   for(let i=0;i<8;i++){
     const a=i/8*Math.PI*2+.39, x=Math.sin(a)*13.6, z=Math.cos(a)*13.6;
-    const c=B.MeshBuilder.CreateCylinder('pil',{height:9,diameter:.9,tessellation:14},scene); c.position.set(x,4.5,z); c.material=toon('#4b4f54',{e:.16}); c.isPickable=false;
-    const b=B.MeshBuilder.CreateCylinder('pilb',{height:1.2,diameter:.96,tessellation:14},scene); b.position.set(x,.6,z); b.material=hz; b.isPickable=false;
+    const c=B.MeshBuilder.CreateCylinder('pil',{height:9,diameter:.9,tessellation:14},scene); c.position.set(x,4.5,z); add(pilM,c);
+    const b=B.MeshBuilder.CreateCylinder('pilb',{height:1.2,diameter:.96,tessellation:14},scene); b.position.set(x,.6,z); add(hz,b);
   }
   const wood=toon('#6a4d33',{e:.2});
   [[-14,-9,1.6],[14.5,-5,1.3],[-13,8,1.8],[12.5,10,1.4],[0,15,1.7],[-6,-15,1.5]].forEach(c=>{
-    const m=box(c[2],c[2],c[2]); m.position.set(c[0],c[2]/2,c[1]); m.rotation.y=rand(0,1); m.material=wood; m.isPickable=false;
+    const m=box(c[2],c[2],c[2]); m.position.set(c[0],c[2]/2,c[1]); m.rotation.y=rand(0,1); add(wood,m);
   });
-  [[-5,-3],[5.5,3.5],[0,-9],[-8,7],[8,-7]].forEach((p,i)=>{
-    const cord=B.MeshBuilder.CreateCylinder('cord',{height:2.2,diameter:.04},scene); cord.position.set(p[0],8,p[1]); cord.material=toon('#111',{e:0}); cord.isPickable=false;
-    const bulb=sphere(.36); bulb.position.set(p[0],6.8,p[1]); bulb.isPickable=false;
-    const bm=new B.StandardMaterial('bulbM'+i,scene); bm.emissiveColor=new C3(1,.82,.5); bm.disableLighting=true; bulb.material=bm;
+  const bulbM=new B.StandardMaterial('bulbM',scene); bulbM.emissiveColor=new C3(1,.82,.5); bulbM.disableLighting=true;
+  const cordM=toon('#111',{e:0});
+  [[-5,-3],[5.5,3.5],[0,-9],[-8,7],[8,-7]].forEach(p=>{
+    const cord=B.MeshBuilder.CreateCylinder('cord',{height:2.2,diameter:.04},scene); cord.position.set(p[0],8,p[1]); add(cordM,cord);
+    const bulb=sphere(.36); bulb.position.set(p[0],6.8,p[1]); add(bulbM,bulb);
+  });
+  groups.forEach(list=>{
+    if(list.length<2) return;
+    list.forEach(m=>m.computeWorldMatrix(true));
+    const merged=B.Mesh.MergeMeshes(list,true,true);
+    if(merged) merged.isPickable=false;
   });
 
   makeSign('signBack',9,3.4,6.5,3.1,16.9,0,(g,W,H,D,M)=>{
