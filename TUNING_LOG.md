@@ -657,4 +657,17 @@ Probe: `node tools/regression.mjs`, `node tools/lighthouse-a11y.mjs`, `node tool
 | Balance bouts 4–6 | not logged |
 | `npm run` QA scripts | `build:engine`, `measure` only |
 
+### Change 2 — measure balance for bouts 4–6 (no retune)
+
+Hypothesis: logging Voss, Chen, and Halvorsen win rates completes the S9 gap without changing combat rows.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Voss win / median (200, seed 1, normal) | not logged | 95.0% / 26.0 s |
+| Chen win / median | not logged | 75.0% / 36.4 s |
+| Halvorsen win / median | not logged | 2.0% / 39.5 s |
+| Reyes / Dag / Pike | 90.5 / 67.5 / 44.0% | unchanged |
+
+Verdict: **keep** (measure only). Halvorsen is intentionally brutal; retune deferred.
+
 
