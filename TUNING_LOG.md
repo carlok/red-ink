@@ -103,3 +103,46 @@ Freeze world matrices. Active-mesh evaluation is 0.40–0.58 ms and the run-to-r
 Quality ladder. Threshold is already 44 fps and the window is already 1,800 ms. The floor is already hardware scaling 2 (half of the 1080p view, 960×540). Isolated GPU times were taken in one pass and drifted down even after settings were restored, so they are not clean enough to reorder the steps. Poisson off, measured next to the full-quality sample, saved about 0.11 ms. Verdict: **keep** the current order and floor.
 
 Input check, not a tune: a jab key reached `attack` inside two frames at 16.7 ms, which is inside the 80 ms budget.
+
+## Sprint 2 — Input feel
+
+Goal: keep input-to-pose under 80 ms, and put the buffer, dodge cooldown, dead zone, triggers, d-pad and turn rate on the backlog numbers. Add remappable action keys and a rumble slider. Put Jab under the right thumb on a 6-inch phone without scroll or zoom.
+
+Probe: headless Chrome. Latency is wall time from the event to `P.state === "attack"` and to the right shoulder rotating by more than 0.02 rad. Phone layout is 390×844, device pixel ratio 2.
+
+### Baseline
+
+| Metric | Value |
+| --- | --- |
+| Keyboard state / pose | 17 ms / 34 ms |
+| Touch button state / pose | 17 ms / 34 ms |
+| Pad X state / pose | 17 ms / 34 ms |
+| Buffer | heavy pressed at jab t=0.291 chained; constant is 0.22 s |
+| Dodge cooldown at start | 0.55 s |
+| Dodge again before cooldown | blocked |
+| Dodge after cooldown | starts |
+| Stick 0.19 radial | 0 movement |
+| Stick 0.45 radial | 0.101 m |
+| D-pad right | 0.39 m |
+| Turn damp, idle / attacking | 14.1 / 5.1 |
+| Trigger value 0.2, pressed | state block |
+| Trigger value 0.8 | state block |
+| Rumble on a jab hit | strong 0.3, weak 0.6 |
+| Jab distance to the bottom-right corner | 163 px (Dodge is 49 px, the nearest) |
+| Button size | 70×70, 72 px clear of the stick |
+| Scroll after a drag, pinch scale | 0, 1 |
+
+Buffer, cooldown, dead zone, d-pad and turn rate are already the backlog numbers. Verdict on those: **keep**, no code change. Latency is inside 80 ms.
+
+### Change 1 — trigger threshold 0.5
+
+Hypothesis: a trigger value of 0.2 with `pressed` true is a resting finger. Blocking only at value ≥ 0.5 removes that without dropping a full pull.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Value 0.2, pressed true | block | idle |
+| Value 0.8 | block | block |
+| Keyboard pose | 34 ms | 33 ms |
+| D-pad move | 0.39 m | 0.39 m |
+
+Verdict: **keep**. LB, RB and B still use the digital pressed flag.
