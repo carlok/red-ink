@@ -45,7 +45,7 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .round{font:600 11px/1 var(--f-data);letter-spacing:.18em;padding:3px;background:repeating-linear-gradient(-45deg,var(--tape) 0 8px,#111 8px 16px)}
 .round span{display:block;padding:5px 10px;background:#111;color:var(--tape);white-space:nowrap}
 .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
-.keys{font:500 11px/1.7 var(--f-data);color:var(--mute);text-align:right}
+.keys{font:500 11px/1.7 var(--f-data);color:var(--paper);text-align:right;background:#0a0a0b;padding:6px 8px}
 .keys kbd{font:inherit;color:var(--paper);border:1px solid var(--mute);padding:0 5px;margin:0 2px}
 .snd{pointer-events:auto;font:600 11px var(--f-data);letter-spacing:.12em;text-transform:uppercase;background:rgba(10,10,11,.55);color:var(--paper);border:1px solid var(--mute);padding:7px 10px;cursor:pointer}
 .is-touch .keys{display:none}
@@ -62,6 +62,7 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
   100%{opacity:0;transform:translate(-50%,-50%) rotate(-3deg) scale(.96)}
 }
 @keyframes fadeq{0%{opacity:0}15%{opacity:1}80%{opacity:1}100%{opacity:0}}
+.reduce-motion .banner.show{animation:fadeq .95s both}
 @media (prefers-reduced-motion:reduce){.banner.show{animation:fadeq .95s both}}
 
 /* Manifest cards */
@@ -96,6 +97,21 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .avatar small.err{color:#a02a18}
 .go{width:calc(100% - 40px);margin:4px 20px 0;font:800 clamp(22px,6.4vw,28px)/1 var(--f-display);letter-spacing:.05em;text-transform:uppercase;background:var(--ink);color:var(--tape);border:0;padding:14px 18px;cursor:pointer;text-align:left;display:flex;justify-content:space-between;gap:12px}
 .go:hover{background:#000}
+#eHp{background-color:var(--stain);background-image:repeating-linear-gradient(-45deg,#d0432b 0 5px,#f0c400 5px 8px)}
+.tutor{position:absolute;left:50%;bottom:max(24px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(460px,calc(100% - 32px));background:#0a0a0b;color:var(--paper);border:2px solid var(--tape);padding:10px 12px;display:flex;gap:12px;align-items:center;justify-content:space-between;pointer-events:auto;z-index:4}
+.tutor p{margin:0;font:600 14px/1.35 var(--f-data)}
+.tutor button{font:800 14px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:var(--tape);color:#111;border:0;padding:10px 12px;cursor:pointer}
+.pause{position:absolute;inset:0;display:grid;place-items:center;background:rgba(8,8,9,.55);z-index:5}
+.pauseCard{width:min(360px,calc(100% - 32px));background:var(--paper);color:var(--ink);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:8px 8px 0 var(--tape)}
+.pauseCard h2{margin:0;font:800 36px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
+.pauseCard button,.pauseCard label{font:600 13px/1 var(--f-data);letter-spacing:.06em;text-transform:uppercase}
+.pauseCard button{background:#111;color:var(--tape);border:0;padding:12px 14px;cursor:pointer;text-align:left}
+@media (max-height:500px){
+  .card{max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px);display:flex;flex-direction:column}
+  .card .in{overflow:auto;min-height:0;padding:10px 14px;gap:8px}
+  .card h2{font-size:32px}
+  .go{flex:none;padding:10px 14px}
+}
 
 /* Touch controls */
 .touch{position:absolute;inset:0;pointer-events:none}
@@ -136,6 +152,18 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
   </div>
 
   <div class="banner" id="banner" aria-live="polite"></div>
+  <div class="tutor" id="tutor" hidden>
+    <p id="tutorText"></p>
+    <button id="tutorGo" type="button">Got it</button>
+  </div>
+  <div class="pause" id="pause" hidden>
+    <div class="pauseCard">
+      <h2>Paused</h2>
+      <button id="resume" type="button">Resume</button>
+      <button id="restart" type="button">Restart bout</button>
+      <label for="lessMotion2"><input id="lessMotion2" type="checkbox"> Less motion</label>
+    </div>
+  </div>
 
   <div class="touch" id="touch" hidden>
     <div class="stick" id="stick"><i id="knob"></i></div>
@@ -179,6 +207,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
             <label class="tuneRow rumble" for="rumble">Rumble <input id="rumble" type="range" min="0" max="100" value="100"></label>
             <label class="tuneRow rumble" for="sfxVol">Hits <input id="sfxVol" type="range" min="0" max="100" value="100"></label>
             <label class="tuneRow rumble" for="musVol">Music <input id="musVol" type="range" min="0" max="100" value="100"></label>
+            <label class="tuneRow rumble" for="lessMotion"><input id="lessMotion" type="checkbox"> Less motion</label>
           </div>
           <small id="avHint">Export a cartoon avatar as GLB (MetaPerson or Avaturn), then pick it here or drop it anywhere on this page.</small>
         </div>
@@ -1191,6 +1220,12 @@ window.addEventListener('keydown',e=>{
     }
     listenAct=null; paintBinds(); return;
   }
+  if(k==='escape'){
+    e.preventDefault();
+    if(G.state==='fight'||G.state==='ready') pauseFight();
+    else if(G.state==='pause') resumeFight();
+    return;
+  }
   if(k==='enter'&&!$('wrap').hidden){ e.preventDefault(); $('go').click(); return; }
   if(['space','arrowup','arrowdown','arrowleft','arrowright'].includes(k)&&$('wrap').hidden) e.preventDefault();
   if(e.repeat) return;
@@ -1249,8 +1284,12 @@ function pollPad(){
   padVec={x,y};
   const analog=i=>{ const b=gp.buttons[i]; return !!(b&&(b.value||0)>=.5); };
   padBlock=analog(6)||analog(7)||pr(4)||pr(5)||pr(1);
-  if(!$('wrap').hidden){ if(dn(0)||dn(9)) $('go').click(); }
-  else { if(dn(2)) buf.jab=.22; if(dn(3)) buf.heavy=.22; if(dn(0)) buf.dodge=.22; }
+  if(G.state==='pause'){ if(dn(9)||dn(0)) resumeFight(); }
+  else if(!$('wrap').hidden){ if(dn(0)||dn(9)) $('go').click(); }
+  else {
+    if(dn(9)) pauseFight();
+    if(dn(2)) buf.jab=.22; if(dn(3)) buf.heavy=.22; if(dn(0)) buf.dodge=.22;
+  }
   padPrev=gp.buttons.map(b=>b.pressed);
 }
 /* touch */
@@ -1275,6 +1314,64 @@ function pollPad(){
 
 /* ---------- camera ---------- */
 const camPos=new V3(0,5,-11.5), camTgt=new V3(0,1.2,0);
+let reduceMotion=false;
+const TUTOR_S=12;
+const TUTOR_TEXT='WASD moves. J jabs, K is heavy. Hold L to block. Space dodges. Esc pauses.';
+let tutorLeft=0;
+function loadMotion(){
+  try{
+    const v=localStorage.getItem('sublevel-motion');
+    if(v==='1') reduceMotion=true;
+    else if(v==='0') reduceMotion=false;
+    else if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches) reduceMotion=true;
+  }catch(e){}
+}
+function saveMotion(){ try{ localStorage.setItem('sublevel-motion', reduceMotion?'1':'0'); }catch(e){} }
+function paintMotion(){
+  document.documentElement.classList.toggle('reduce-motion', reduceMotion);
+  const a=$('lessMotion'), b=$('lessMotion2');
+  if(a) a.checked=reduceMotion;
+  if(b) b.checked=reduceMotion;
+}
+function setLessMotion(on){ reduceMotion=!!on; saveMotion(); paintMotion(); }
+function shakeMul(){ return reduceMotion?0:1; }
+function tutorSeen(){ try{ return localStorage.getItem('sublevel-tut')==='1'; }catch(e){ return false; } }
+function showTutor(){
+  if(tutorSeen()||!$('tutor')) return;
+  $('tutorText').textContent=TUTOR_TEXT;
+  $('tutor').hidden=false;
+  tutorLeft=TUTOR_S;
+}
+function hideTutor(){
+  if($('tutor')) $('tutor').hidden=true;
+  tutorLeft=0;
+  try{ localStorage.setItem('sublevel-tut','1'); }catch(e){}
+}
+function tutorInfo(){
+  const words=TUTOR_TEXT.split(/\s+/).filter(Boolean).length;
+  return {words, seconds:TUTOR_S, shown:$('tutor')?!$('tutor').hidden:false};
+}
+function pauseFight(){
+  if(G.state!=='fight'&&G.state!=='ready') return;
+  G.pauseFrom=G.state;
+  G.state='pause';
+  if($('pause')) $('pause').hidden=false;
+}
+function resumeFight(){
+  if(G.state!=='pause') return;
+  G.state=G.pauseFrom||'fight';
+  if($('pause')) $('pause').hidden=true;
+}
+function restartBout(){
+  if($('pause')) $('pause').hidden=true;
+  startBout(G.bout||0);
+}
+loadMotion(); paintMotion();
+if($('lessMotion')) $('lessMotion').addEventListener('change',()=>setLessMotion($('lessMotion').checked));
+if($('lessMotion2')) $('lessMotion2').addEventListener('change',()=>setLessMotion($('lessMotion2').checked));
+if($('tutorGo')) $('tutorGo').addEventListener('click',hideTutor);
+if($('resume')) $('resume').addEventListener('click',resumeFight);
+if($('restart')) $('restart').addEventListener('click',restartBout);
 function updateCamera(dt){
   let dp,dt2;
   if(G.state==='title'||G.state==='card'){
@@ -1293,7 +1390,8 @@ function updateCamera(dt){
   camPos.x=lerp(camPos.x,dp.x,k); camPos.y=lerp(camPos.y,dp.y,k); camPos.z=lerp(camPos.z,dp.z,k);
   camTgt.x=lerp(camTgt.x,dt2.x,k); camTgt.y=lerp(camTgt.y,dt2.y,k); camTgt.z=lerp(camTgt.z,dt2.z,k);
   G.shake=Math.max(0,G.shake-dt*6);
-  cam.position.set(camPos.x+rand(-1,1)*G.shake*.12,camPos.y+rand(-1,1)*G.shake*.12,camPos.z+rand(-1,1)*G.shake*.12);
+  const sh=G.shake*(reduceMotion?0:1);
+  cam.position.set(camPos.x+rand(-1,1)*sh*.12,camPos.y+rand(-1,1)*sh*.12,camPos.z+rand(-1,1)*sh*.12);
   cam.setTarget(camTgt);
   const f=camTgt.subtract(camPos); f.y=0; f.normalize(); G.camF.copyFrom(f); G.camR.set(f.z,0,-f.x);
 }
@@ -1344,7 +1442,8 @@ function startBout(i){
   resetFighter(P,-2.3,Math.PI/2,100); P.hp=php;
   $('eName').textContent=cfg.foe; $('roundLbl').textContent='BOUT '+(i+1)+' / '+BOUTS.length;
   Object.keys(cache).forEach(k=>delete cache[k]);
-  G.state='ready'; G.readyT=0; G.winner=null; hudEl.hidden=false; $('touch').hidden=!isTouch;
+  G.state='ready'; G.readyT=0; G.winner=null; hudEl.hidden=false; $('touch').hidden=!isTouch; $('pause').hidden=true;
+  showTutor();
   keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
   banner('BOUT '+(i+1));
 }
@@ -1386,9 +1485,11 @@ function updateAmbient(dt){
 function frame(){
   let dt=Math.min(engine.getDeltaTime()/1000,.05);
   const real=dt;
+  if(G.state==='pause'){ pollPad(); updateHud(); return; }
   if(G.hitstop>0){ G.hitstop-=real; dt*=.12; }
   G.t+=dt;
   audioTick(real);
+  if(tutorLeft>0){ tutorLeft-=real; if(tutorLeft<=0) hideTutor(); }
   buf.jab=Math.max(0,buf.jab-dt); buf.heavy=Math.max(0,buf.heavy-dt); buf.dodge=Math.max(0,buf.dodge-dt);
   pollPad();
   const live=G.state==='fight';
@@ -1907,6 +2008,6 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab()};
+window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo};
 })();
 </script>

@@ -20,6 +20,7 @@ Reyes shows a mark before a jab. Dag answers a miss with a marked heavy. Pike re
 A hit turns the head toward that side. Knockdowns fall back, crumple, or drop sideways. Bruises and sweat build during the bout.
 The overhead light is cold. The hanging bulbs are sodium orange. The crowd around the ring is built from shoulders, arms, and legs, and they sway while they stand.
 Hits, blocks, and the K.O. are samples. A room tone and three music loops sit under them, and the music ducks when a hit lands. The Hits and Music sliders and the mute button are saved with the other settings.
+Esc pauses a bout. The first fight shows a 12-second control strip. Less motion turns the camera shake off and is saved with the other settings.
 
 Touch: move stick on the left, Jab in the bottom-right of the button cluster. The view does not scroll or zoom.
 
