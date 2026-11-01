@@ -1092,7 +1092,8 @@ function updateAmbient(dt){
 /* ---------- main loop ---------- */
 function frame(){
   let dt=Math.min(engine.getDeltaTime()/1000,.05);
-  if(G.hitstop>0){ G.hitstop-=dt; dt*=.12; }
+  const real=dt;
+  if(G.hitstop>0){ G.hitstop-=real; dt*=.12; }
   G.t+=dt;
   buf.jab=Math.max(0,buf.jab-dt); buf.heavy=Math.max(0,buf.heavy-dt); buf.dodge=Math.max(0,buf.dodge-dt);
   pollPad();
@@ -1103,7 +1104,7 @@ function frame(){
   step(E,P,Ie,dt);
   resolveBodies();
   if(G.state==='ko'){ G.koTimer-=dt; if(G.koTimer<=0){ G.state='card'; afterKO(); } }
-  updateFx(dt); updateAmbient(dt); updateCamera(dt); updateHud();
+  updateFx(real); updateAmbient(dt); updateCamera(dt); updateHud();
 }
 
 /* ---------- custom avatar (GLB) ---------- */

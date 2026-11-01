@@ -187,3 +187,49 @@ Hypothesis: a 0–100 slider on the title card scales both rumble magnitudes, 0 
 | After a new page load | no stored value | `sublevel-rumble` `0` |
 
 Verdict: **keep**. The hit still lands. Only the actuator call changes.
+
+## Sprint 3 — Combat feel
+
+Goal: keep the attack table, the block math, and the counter on the backlog numbers, and make a hit readable inside 100 ms without covering the next swing.
+
+Probe: headless Chrome. Fighters are placed in range. "Word" time is wall time from the hp drop until the comic plane's scale reaches 0.45. Flinch time is the same clock until the victim's lean has moved by 0.08 rad.
+
+### Baseline
+
+| Metric | Value |
+| --- | --- |
+| Jab duration / stamina / damage / first active t | 383 ms / 10 / 7 / 0.116 s |
+| Heavy duration / stamina / damage / first active t | 817 ms / 24 / 16 / 0.349 s |
+| Jab stun / heavy stun | 0.30 s / 0.55 s |
+| Hitstop at the hit, jab / heavy / KO | 0.05 / 0.09 / 0.14 s |
+| Block chip on a jab | 0.7 (10 percent) |
+| Block stamina drain | 6.65 (0.95 × 7) |
+| Guard-break stun | 0.7 s |
+| Counter jab damage | 8.75 (1.25 × 7) |
+| Jab word readable | 100 ms |
+| Heavy word readable | 133 ms |
+| Word scale at 100 ms, jab / heavy | 0.492 / 0.321 |
+| Flinch | same frame as the hit |
+| FOV through the hit | 0.85, no punch |
+| KO pose clock at 100 ms | 0.029 s, hitstop still 0.039 s |
+
+The table, the block math, the counter, and the three hitstop values already match the backlog. Verdict on those: **keep**. A heavy's word was the miss. Hitstop scales the whole frame, including the comic word, so the burst sat under the readable size until the freeze ended.
+
+### Change 1 — comic words use real time
+
+Hypothesis: advancing the word on unscaled time, while the fighters stay on the slowed clock, gets a heavy's burst to scale 0.45 inside 100 ms. Hitstop length stays put, so the next swing is not pulled forward into the freeze.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Jab word readable | 100 ms | 50 ms |
+| Heavy word readable | 133 ms | 34 ms |
+| Word scale at 100 ms, jab / heavy | 0.492 / 0.321 | 0.753 / 0.757 |
+| Jab / heavy damage | 7 / 16 | 7 / 16 |
+| Hitstop jab / heavy / KO | 0.05 / 0.09 / 0.14 | 0.05 / 0.09 / 0.14 |
+| Block chip / drain / guard stun | 0.7 / 6.65 / 0.7 | 0.7 / 6.65 / 0.7 |
+| Counter damage | 8.75 | 8.75 |
+| Heavy hitstop left at 100 ms | gone | 0.006 s |
+
+Verdict: **keep**. The burst is up while the fighters are still in the freeze, and the freeze is over before a jab has recovered (0.40 s) enough to swing again.
+
+Camera punch-in was not added. FOV stays 0.85; the distance change is the follow camera. Spark counts stay 14 on a jab and 26 on a heavy. KO slow motion stays the 0.14 s hitstop: the K.O. word is readable at 16 ms, and the fall is still the 0.9 s pose. Those three did not miss the read once the word was on real time.
