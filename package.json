@@ -1,0 +1,16 @@
+{
+  "name": "sublevel-three",
+  "private": true,
+  "type": "module",
+  "description": "Build tooling for the tree-shaken Babylon bundle. The game itself is index.html.",
+  "scripts": {
+    "build:engine": "node tools/build-engine.mjs",
+    "measure": "node tools/measure.mjs"
+  },
+  "devDependencies": {
+    "@babylonjs/core": "9.30.0",
+    "@babylonjs/loaders": "9.30.0",
+    "esbuild": "0.25.12"
+  },
+  "license": "Apache-2.0"
+}
