@@ -139,7 +139,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
         <div class="bar" role="img" aria-label="Your health"><b id="pGhost"></b><i id="pHp"></i></div>
         <div class="bar thin" role="img" aria-label="Your stamina"><i class="st" id="pSt"></i></div>
       </div>
-      <div class="round"><span id="roundLbl">BOUT 1 / 3</span></div>
+      <div class="round"><span id="roundLbl">BOUT 1 / 6</span></div>
       <div class="fighter right">
         <div class="name" id="eName">Reyes</div>
         <div class="bar" role="img" aria-label="Opponent health"><b id="eGhost"></b><i id="eHp"></i></div>
@@ -199,6 +199,10 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
               <button type="button" class="bind" data-bind="block">Block <kbd>L</kbd></button>
               <button type="button" class="bind" data-bind="dodge">Dodge <kbd>Space</kbd></button>
             </div>
+            <div class="tuneRow" id="langRow">
+              <button type="button" class="bind on" data-lang="en">English</button>
+              <button type="button" class="bind" data-lang="it">Italiano</button>
+            </div>
             <div class="tuneRow" id="diffRow">
               <button type="button" class="bind" data-diff="easy">Easy</button>
               <button type="button" class="bind on" data-diff="normal">Normal</button>
@@ -255,21 +259,147 @@ const LOOKS={
   auditor:{skin:'#d9a679',shirt:'#f6f6f3',pants:'#0e0e10',shoes:'#17181b',tie:'#0e0e10',hair:'#2b1d15',wrap:'#ebe8dc',iris:'#4b3426',sx:1,sy:1},
   reyes:  {skin:'#8c5b3d',shirt:'#33608c',pants:'#2e5780',shoes:'#1a1a1c',cap:'#d7b11b',wrap:'#c9ceca',pocket:true,iris:'#2a1a10',sx:.98,sy:.98},
   dag:    {skin:'#d3a487',shirt:'#e27a14',pants:'#3a3b40',shoes:'#1d1d1f',hair:'#8f5b2a',stache:'#8f5b2a',wrap:'#c9ceca',stripe:true,pocket:true,iris:'#4f6f86',sx:1.28,sy:1.14},
-  pike:   {iris:'#7d8a93',skin:'#b7bcc0',shirt:'#4d535a',pants:'#1a1c20',shoes:'#0f1012',tie:'#0e0e10',hair:'#2b1d15',wrap:'#b9bdbf',sx:1,sy:1}
+  pike:   {iris:'#7d8a93',skin:'#b7bcc0',shirt:'#4d535a',pants:'#1a1c20',shoes:'#0f1012',tie:'#0e0e10',hair:'#2b1d15',wrap:'#b9bdbf',sx:1,sy:1},
+  voss:   {skin:'#c4a88a',shirt:'#3d6b4f',pants:'#2a4034',shoes:'#141516',hair:'#3a2a1c',wrap:'#b8c4bc',pocket:true,iris:'#3d5248',sx:1.02,sy:1},
+  chen:   {skin:'#b8927a',shirt:'#1c2228',pants:'#121418',shoes:'#0a0a0b',hair:'#1a1a1c',wrap:'#6a7078',stripe:true,iris:'#5a6878',sx:1.12,sy:1.05},
+  halvor: {skin:'#d9a679',shirt:'#eceae4',pants:'#1a1c20',shoes:'#17181b',tie:'#8f1a1a',hair:'#2b1d15',wrap:'#d9dbd3',pocket:true,iris:'#4b3426',sx:1.05,sy:1.02}
 };
+const OUTFITS={
+  auditor:LOOKS.auditor,
+  sanitation:Object.assign({},LOOKS.auditor,{cap:'#d7b11b',shirt:'#33608c',pocket:true}),
+  stripe:Object.assign({},LOOKS.auditor,{stripe:true,shirt:'#e27a14',pocket:true}),
+  exec:Object.assign({},LOOKS.auditor,{tie:'#0e0e10',shirt:'#f6f6f3'})
+};
+let lang='en';
+const STR={
+  company_kick:{en:'Halvorsen Freight · Sublevel 3',it:'Halvorsen Freight · Livello 3'},
+  company_form:{en:'Halvorsen Freight · Form 7-B',it:'Halvorsen Freight · Modulo 7-B'},
+  card_title_stamp:{en:'Night shift',it:'Turno di notte'},
+  card_title_name:{en:'Sublevel Three',it:'Livello Tre'},
+  card_title_body:{en:'You audit pallet counts from ten to six. Totals always reconcile. You have not slept in eleven months. Pike slides you a keycard toward a door missing from the floor plan.',it:'Controlli i pallet dalle dieci alle sei. I totali tornano sempre. Non dormi da undici mesi. Pike ti passa una tessera verso una porta assente dalla pianta.'},
+  card_title_btn:{en:'Take the stairs',it:'Scendi le scale'},
+  row_move:{en:'Move',it:'Movimento'},
+  row_strike:{en:'Strike',it:'Colpi'},
+  row_defend:{en:'Defend',it:'Difesa'},
+  row_bout:{en:'Bout',it:'Match'},
+  row_opp:{en:'Opponent',it:'Avversario'},
+  row_tip:{en:'Tip',it:'Consiglio'},
+  row_next:{en:'Next',it:'Prossimo'},
+  row_you:{en:'You',it:'Tu'},
+  row_retry:{en:'Retry',it:'Riprova'},
+  row_unlock:{en:'Unlocked',it:'Sbloccato'},
+  row_rules:{en:'Rules',it:'Regole'},
+  row_hub_next:{en:'Up next',it:'Prossimo match'},
+  move_touch:{en:'left stick',it:'leva sinistra'},
+  move_keys:{en:'W A S D or arrows',it:'W A S D o frecce'},
+  strike_touch:{en:'Jab, Heavy',it:'Diretto, Potente'},
+  defend_touch:{en:'Block (hold), Dodge',it:'Parata (tieni), Schivata'},
+  pad_row:{en:'Gamepad',it:'Controller'},
+  pad_hint:{en:'L stick move, X jab, Y heavy, LT block, A dodge',it:'Leva sinistra, X diretto, Y potente, LT parata, A schivata'},
+  bout_stamp:{en:'Bout',it:'Match'},
+  bout_btn:{en:'Step in',it:'Entra'},
+  win_stamp:{en:'Reconciled',it:'Quadrato'},
+  win_kick:{en:'Bout complete',it:'Match chiuso'},
+  win_btn_hub:{en:'Break room',it:'Sala pausa'},
+  win_btn_next:{en:'Next bout',it:'Prossimo match'},
+  lose_stamp:{en:'Void',it:'Vuoto'},
+  lose_title:{en:'Get up',it:'Alzati'},
+  lose_body:{en:'Nobody counts. You lie on cold concrete until the room stops tilting, then stand. It is the only rule anyone honors down here.',it:'Nessuno conta. Resti sul cemento finché la stanza smette di oscillare, poi ti alzi. È l\'unica regola rispettata qui sotto.'},
+  lose_btn:{en:'Get up',it:'Alzati'},
+  final_stamp:{en:'Balanced',it:'Quadratura'},
+  final_kick:{en:'Campaign complete',it:'Campagna finita'},
+  final_title:{en:'Ledger balanced',it:'Libro quadrato'},
+  final_body:{en:'Halvorsen falls the way you would have fallen. One figure crosses the corridor camera toward the stairs. For the first time in a year the totals agree.',it:'Halvorsen cade come saresti caduto tu. Una figura attraversa il corridoio verso le scale. Per la prima volta in un anno i totali coincidono.'},
+  final_next:{en:'Free play: replay any bout from the hub.',it:'Gioco libero: ripeti un match dal hub.'},
+  final_btn:{en:'Play again',it:'Gioca ancora'},
+  hub_stamp:{en:'Break',it:'Pausa'},
+  hub_title:{en:'Rule board',it:'Bacheca regole'},
+  hub_body:{en:'Break room off the corridor. Yard rules are taped above the urn. Read them before you step back into the circle.',it:'Sala pausa lungo il corridoio. Le regole del cortile sono sopra l\'urna. Leggile prima di rientrare nel cerchio.'},
+  hub_btn:{en:'Next bout',it:'Prossimo match'},
+  rule_1:{en:'1. NO COUNTING',it:'1. NIENTE CONTEGGI'},
+  rule_2:{en:'2. NO WEAPONS',it:'2. NIENTE ARMI'},
+  rule_3:{en:'3. NOBODY LEAVES UNTIL IT IS OVER',it:'3. NESSUNO ESCE FINCHÉ NON FINISCE'},
+  dock_stamp:{en:'Dock',it:'Banchina'},
+  dock_title:{en:'Loading dock — after hours',it:'Banchina — dopo chiusura'},
+  dock_body:{en:'Lanes are empty. Cameras pan every twelve seconds. A pallet jack hides the scanner closet. You have one minute before the next crew lands.',it:'Corsie vuote. Le telecamere girano ogni dodici secondi. Un transpallet copre l\'armadio scanner. Hai un minuto prima del turno successivo.'},
+  dock_btn:{en:'Cut the feed',it:'Taglia il segnale'},
+  dock_ok_title:{en:'Relay pulled',it:'Relè tolto'},
+  dock_ok_body:{en:'The fuse drops on the manifest scanner. Monday will list forty ghost pallets. The hub door clicks unlocked.',it:'Saltano i fusibili dello scanner. Lunedì compariranno quaranta pallet fantasma. La porta del hub scatta aperta.'},
+  dock_ok_btn:{en:'To the hub',it:'Al hub'},
+  tutor:{en:'WASD moves. J jabs, K heavy. Hold L to block. Space dodges. Esc pauses.',it:'WASD muove. J diretto, K potente. Tieni L per parare. Spazio schiva. Esc pausa.'},
+  unlock_outfit_san:{en:'Sanitation cap (wear in fights)',it:'Cappello sanificazione (nei match)'},
+  unlock_arena_dock:{en:'Dock sodium lights (arena)',it:'Luci sodio banchina (arena)'},
+  unlock_outfit_stripe:{en:'Safety stripe shirt',it:'Maglia strisce sicurezza'},
+  unlock_arena_cold:{en:'Cold-storage key light (arena)',it:'Luce fredda cella (arena)'},
+  unlock_outfit_exec:{en:'Audit tie and collar',it:'Cravatta audit'},
+  unlock_arena_finale:{en:'Full yard exposure (arena)',it:'Esposizione piena cortile (arena)'},
+  role_reyes:{en:'Sanitation',it:'Sanificazione'},
+  role_dag:{en:'Forklift',it:'Muletto'},
+  role_pike:{en:'Unlisted',it:'Non in lista'},
+  role_voss:{en:'Cold chain',it:'Catena fredda'},
+  role_chen:{en:'Gate security',it:'Portineria'},
+  role_halvor:{en:'Owner',it:'Titolare'},
+  place_b1:{en:'The Sump',it:'La Vasca'},
+  place_b2:{en:'Dock Four',it:'Banchina Quattro'},
+  place_b3:{en:'The Blind Map',it:'La Mappa Cieca'},
+  place_b4:{en:'Cold Storage',it:'Cella Frigorifera'},
+  place_b5:{en:'The Gatehouse',it:'La Portineria'},
+  place_b6:{en:'The Reconciler',it:'Il Riconciliatore'},
+  tip_b1:{en:'Jab to open him. When he winds back, block, then answer.',it:'Diretto per aprirlo. Quando carica, parata e risposta.'},
+  tip_b2:{en:'Slow and heavy. Red mark means a big swing: dodge, then punish.',it:'Lento e pesante. Segno rosso: schiva il potente, poi punisci.'},
+  tip_b3:{en:'He replays your last three punches. Break rhythm.',it:'Ripete i tuoi ultimi tre colpi. Rompi il ritmo.'},
+  tip_b4:{en:'Patient jabs with feints. Block the tell, then trade.',it:'Diretti pazienti con finte. Parata sul segnale, poi scambia.'},
+  tip_b5:{en:'He waits for whiffs. Do not overcommit on heavies.',it:'Aspetta i tuoi errori. Non esagerare con i potenti.'},
+  tip_b6:{en:'Mirror rhythm, then change tempo before the echo lands.',it:'Specchia il ritmo, cambia tempo prima dell\'eco.'},
+  intro_b1:{en:'Concrete rings the sump under Sublevel Three. Reyes mops at three a.m. Work clothes, one bulb swinging. Tonight he wants you inside the tape.',it:'Il cemento cinge la vasca sotto il Livello Tre. Reyes lava alle tre. Tute, una lampada che oscilla. Stanotte vuole te nel cerchio.'},
+  intro_b2:{en:'Sodium lanes, no bell. Dag signs your rotation sheets and knows what you let slide. He steps into the circle before you finish counting.',it:'Corsie al sodio, nessuna campana. Dag firma i turni e sa cosa lasci passare. Entra nel cerchio prima che finisca il conteggio.'},
+  intro_b3:{en:'A door missing from the posted map. Pike drops his jacket and mirrors your stance. Throw anything; he stores your last three swings.',it:'Una porta assente dalla pianta. Pike lascia la giacca e copia la tua guardia. Colpisci: ricorda le ultime tre azioni.'},
+  intro_b4:{en:'Fans rattle the cold-storage racks. Voss keeps the chill units alive. He teaches with patient jabs until you stop guessing.',it:'Ventole scuotono le rack frigorifere. Voss mantiene il freddo. Insegna con diretti pazienti finché smetti di indovinare.'},
+  intro_b5:{en:'Chen watches the gate feeds until someone blinks. He punishes every overcommit with a slow heavy swing.',it:'Chen guarda le telecamere finché qualcuno sbaglia. Punisce ogni esagerazione con un potente lento.'},
+  intro_b6:{en:'Halvorsen owns the numbers you audit upstairs. He echoes your rhythm, then bends the ledger. Last circle before totals match.',it:'Halvorsen possiede i numeri che controlli sopra. Ripete il tuo ritmo e piega il libro. Ultimo cerchio prima che i totali coincidano.'},
+  after_b1:{en:'You expected to feel sick. Instead the numbers in your head go quiet for eleven months. Pike claps once from the stairs.',it:'Pensavi di sentirti male. I numeri in testa tacciono per undici mesi. Pike batte un applauso dalle scale.'},
+  after_b2:{en:'On Monday you reroute forty trucks with no paper defense. Lines appear in your ledger in handwriting like yours.',it:'Lunedì devii quaranta camion senza copertura. Righe compaiono sul libro con la tua calligrafia.'},
+  after_b3:{en:'The map redraws itself in the break room. Pike nods toward Dock Four. Someone already cut the camera feed.',it:'La mappa si ridisegna in pausa. Pike indica Banchina Quattro. Qualcuno ha già tagliato le telecamere.'},
+  after_b4:{en:'Frost melts off your sleeves. Voss tosses you a stripe shirt from a locker. The gatehouse camera blinks offline.',it:'Il ghiaccio cade dalle maniche. Voss ti lancia una maglia a strisce. La telecamera della portineria lampeggia offline.'},
+  after_b5:{en:'Chen slides his badge across the concrete. Security feeds go dark. Halvorsen waits in the reconciler ring.',it:'Chen fa scorrere il badge sul cemento. Le telecamere si spengono. Halvorsen attende nel cerchio finale.'},
+  after_b6:{en:'The yard rules peel off the wall. You walk upstairs without counting steps. The shift ends balanced.',it:'Le regole del cortile cadono dal muro. Salite senza contare i passi. Il turno chiude in pari.'},
+  win_down:{en:' is down',it:' a terra'}
+};
+function L(id){ const o=STR[id]; return o?(o[lang]||o.en):id; }
+function wordCount(s){ return String(s).trim().split(/\s+/).filter(Boolean).length; }
+function storyMetrics(){
+  let maxEn=0,maxIt=0,bad=[];
+  Object.keys(STR).forEach(k=>{
+    const e=wordCount(STR[k].en), i=wordCount(STR[k].it);
+    if(e>55||i>55) bad.push({k,e,i});
+    if(e>maxEn) maxEn=e; if(i>maxIt) maxIt=i;
+  });
+  return {keys:Object.keys(STR).length,maxEn,maxIt,bad,lang};
+}
+function loadLang(){ try{ const v=localStorage.getItem('sublevel-lang'); if(v==='en'||v==='it') lang=v; }catch(e){} }
+function saveLang(){ try{ localStorage.setItem('sublevel-lang', lang); }catch(e){} }
+function paintLang(){ document.querySelectorAll('[data-lang]').forEach(b=>b.classList.toggle('on', b.dataset.lang===lang)); }
+function boutPlace(c){ return L(c.placeKey); }
+function boutRole(c){ return L(c.roleKey); }
+function boutTip(c){ return L(c.tipKey); }
 const BOUTS=[
-  {foe:'Reyes',role:'Sanitation',place:'The Cellar',look:'reyes',hp:70,speed:2.7,react:.08,cd:1.7,heavy:.18,block:.28,dodge:.04,dmg:.85,reach:1,style:'teach',
-   tip:'Jab to open him up. When he winds back, block (L), then answer.',
-   intro:'A taped circle on bare concrete, a dozen people in work clothes, one bulb swinging. Reyes cleans these floors at three in the morning. Tonight he wants you in the middle of them.',
-   after:'You expected to feel sick. Instead the numbers in your head go quiet for the first time in eleven months. Pike claps once from the stairs. "Again," he says.'},
-  {foe:'Dag',role:'Forklift operator',place:'The Loading Dock',look:'dag',hp:115,speed:2.5,react:.38,cd:1.4,heavy:.42,block:.18,dodge:.06,dmg:1.15,reach:1.12,style:'punish',
-   tip:'Slow and heavy. A red mark over his head means a big swing: dodge (Space), then punish.',
-   intro:'Dag drives the forklift you sign off every Thursday. He knows exactly which rotation you cut. He does not wait for a bell, because there is no bell.',
-   after:'On Monday you reroute forty trucks for no reason you could defend on paper. Someone has added lines to your ledger in handwriting that looks like yours.'},
-  {foe:'Pike',role:'Unlisted',place:'The Floor Plan',look:'pike',hp:120,speed:3.7,react:.24,cd:1.05,heavy:.3,block:.18,dodge:.14,dmg:.49,reach:1,echo:true,style:'echo',
-   tip:'He answers with your own last three punches. Break your rhythm.',
-   intro:'The door that is not on the floor plan. Pike takes his jacket off and stands the way you stand. Whatever you throw, he remembers.'}
+  {foe:'Reyes',roleKey:'role_reyes',placeKey:'place_b1',introKey:'intro_b1',afterKey:'after_b1',tipKey:'tip_b1',look:'reyes',hp:70,speed:2.7,react:.08,cd:1.7,heavy:.18,block:.28,dodge:.04,dmg:.85,reach:1,style:'teach'},
+  {foe:'Dag',roleKey:'role_dag',placeKey:'place_b2',introKey:'intro_b2',afterKey:'after_b2',tipKey:'tip_b2',look:'dag',hp:115,speed:2.5,react:.38,cd:1.4,heavy:.42,block:.18,dodge:.06,dmg:1.15,reach:1.12,style:'punish'},
+  {foe:'Pike',roleKey:'role_pike',placeKey:'place_b3',introKey:'intro_b3',afterKey:'after_b3',tipKey:'tip_b3',look:'pike',hp:120,speed:3.7,react:.24,cd:1.05,heavy:.3,block:.18,dodge:.14,dmg:.49,reach:1,echo:true,style:'echo'},
+  {foe:'Voss',roleKey:'role_voss',placeKey:'place_b4',introKey:'intro_b4',afterKey:'after_b4',tipKey:'tip_b4',look:'voss',hp:95,speed:2.6,react:.12,cd:1.55,heavy:.22,block:.32,dodge:.05,dmg:.92,reach:1.05,style:'teach'},
+  {foe:'Chen',roleKey:'role_chen',placeKey:'place_b5',introKey:'intro_b5',afterKey:'after_b5',tipKey:'tip_b5',look:'chen',hp:125,speed:2.4,react:.35,cd:1.35,heavy:.45,block:.2,dodge:.08,dmg:1.08,reach:1.1,style:'punish'},
+  {foe:'Halvorsen',roleKey:'role_halvor',placeKey:'place_b6',introKey:'intro_b6',afterKey:'after_b6',tipKey:'tip_b6',look:'halvor',hp:130,speed:3.5,react:.22,cd:1.0,heavy:.32,block:.2,dodge:.12,dmg:.55,reach:1,echo:true,style:'echo'}
 ];
+const UNLOCK_CHAIN=[
+  {type:'outfit',id:'sanitation',labelKey:'unlock_outfit_san'},
+  {type:'arena',id:1,labelKey:'unlock_arena_dock'},
+  {type:'outfit',id:'stripe',labelKey:'unlock_outfit_stripe'},
+  {type:'arena',id:2,labelKey:'unlock_arena_cold'},
+  {type:'outfit',id:'exec',labelKey:'unlock_outfit_exec'},
+  {type:'arena',id:3,labelKey:'unlock_arena_finale'}
+];
+const SAVE_KEY='sublevel-progress';
+let progress={wins:0,outfit:'auditor',arena:0,dock:0};
 
 /* ---------- engine, scene ---------- */
 const canvas=$('view');
@@ -438,6 +568,45 @@ function buildWorld(){
     g.textAlign='center'; g.fillStyle='#d9dbd3'; g.font='800 96px "Big Shoulders Stencil Display",Impact,sans-serif'; g.fillText('MAINTENANCE',W/2,H*.48);
     g.fillStyle='#9a9d95'; g.font='600 32px "IBM Plex Mono",monospace'; g.fillText('AUTHORISED STAFF ONLY',W/2,H*.8);
   });
+}
+const ARENA_BASE={exp:1.35,key:[.62,.78,1],bulbA:[1,.62,.28],bulbB:[1,.64,.3]};
+function applyArena(id){
+  id=id||0;
+  ipc.exposure=ARENA_BASE.exp+(id>=1?.07:0)+(id>=3?.05:0);
+  const kc=ARENA_BASE.key.slice();
+  if(id>=2){ kc[0]=.48; kc[1]=.62; kc[2]=.95; }
+  key.diffuse.set(kc[0],kc[1],kc[2]);
+  const ba=id>=1?[1,.72,.35]:ARENA_BASE.bulbA, bb=id>=1?[1,.75,.38]:ARENA_BASE.bulbB;
+  bulbA.diffuse.set(ba[0],ba[1],ba[2]); bulbB.diffuse.set(bb[0],bb[1],bb[2]);
+}
+function loadProgress(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    if(raw){ const p=JSON.parse(raw); if(p&&typeof p==='object') progress=Object.assign({wins:0,outfit:'auditor',arena:0,dock:0},p); }
+  }catch(e){}
+  applyArena(progress.arena);
+}
+function saveProgressData(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); return true; }catch(e){ return false; }
+}
+function grantWin(boutIdx){
+  if(boutIdx+1>progress.wins) progress.wins=boutIdx+1;
+  const u=UNLOCK_CHAIN[boutIdx];
+  if(u){
+    if(u.type==='outfit') progress.outfit=u.id;
+    if(u.type==='arena'){ progress.arena=u.id; applyArena(u.id); }
+  }
+  return saveProgressData();
+}
+function unlockLabel(boutIdx){ const u=UNLOCK_CHAIN[boutIdx]; return u?L(u.labelKey):''; }
+function syncPlayerOutfit(){
+  if(!P||P.avatar) return;
+  const id=progress.outfit||'auditor';
+  if(P._outfitId===id) return;
+  const look=OUTFITS[id]||OUTFITS.auditor;
+  disposeFighter(P);
+  P=makeFighter(look,true); P._outfitId=id; P.cfg={foe:'Auditor'}; P.speed0=4.4; P.reach=1; P.dmgMul=1;
+  resetFighter(P,-2.3,Math.PI/2,100);
 }
 
 /* crowd */
@@ -1316,7 +1485,7 @@ function pollPad(){
 const camPos=new V3(0,5,-11.5), camTgt=new V3(0,1.2,0);
 let reduceMotion=false;
 const TUTOR_S=12;
-const TUTOR_TEXT='WASD moves. J jabs, K is heavy. Hold L to block. Space dodges. Esc pauses.';
+function tutorLine(){ return L('tutor'); }
 let tutorLeft=0;
 function loadMotion(){
   try{
@@ -1338,7 +1507,7 @@ function shakeMul(){ return reduceMotion?0:1; }
 function tutorSeen(){ try{ return localStorage.getItem('sublevel-tut')==='1'; }catch(e){ return false; } }
 function showTutor(){
   if(tutorSeen()||!$('tutor')) return;
-  $('tutorText').textContent=TUTOR_TEXT;
+  $('tutorText').textContent=tutorLine();
   $('tutor').hidden=false;
   tutorLeft=TUTOR_S;
 }
@@ -1348,7 +1517,7 @@ function hideTutor(){
   try{ localStorage.setItem('sublevel-tut','1'); }catch(e){}
 }
 function tutorInfo(){
-  const words=TUTOR_TEXT.split(/\s+/).filter(Boolean).length;
+  const words=tutorLine().split(/\s+/).filter(Boolean).length;
   return {words, seconds:TUTOR_S, shown:$('tutor')?!$('tutor').hidden:false};
 }
 function pauseFight(){
@@ -1420,21 +1589,56 @@ function showCard(c){
   G.state='card'; wrapEl.hidden=false; hudEl.hidden=true; $('touch').hidden=true; wrapEl.scrollTop=0;
   setTimeout(()=>{ try{ $('go').focus({preventScroll:true}); }catch(e){} },30);
 }
+function boutRows(i){
+  const c=BOUTS[i];
+  return [[L('row_bout'),(i+1)+' / '+BOUTS.length],[L('row_opp'),c.foe+' · '+boutRole(c)],[L('row_tip'),boutTip(c)]];
+}
+function titleRows(){
+  if(isTouch) return [[L('row_move'),L('move_touch')],[L('row_strike'),L('strike_touch')],[L('row_defend'),L('defend_touch')]];
+  return [[L('row_move'),L('move_keys')],[L('row_strike'),keyLabel(binds.jab)+' jab, '+keyLabel(binds.heavy)+' heavy'],[L('row_defend'),keyLabel(binds.block)+' block (hold), '+keyLabel(binds.dodge)+' dodge'],[L('pad_row'),L('pad_hint')]];
+}
 function introCard(i,lead){
   const c=BOUTS[i];
-  showCard({stamp:'Bout '+(i+1),kick:(lead||'Halvorsen Freight · Sublevel 3'),title:c.place,body:c.intro,
-    rows:[['Bout',(i+1)+' of '+BOUTS.length],['Opponent',c.foe+' · '+c.role],['Tip',c.tip]],btn:'Step in',go:()=>startBout(i)});
+  showCard({stamp:L('bout_stamp')+' '+(i+1),kick:lead||L('company_kick'),title:boutPlace(c),body:L(c.introKey),
+    rows:boutRows(i),btn:L('bout_btn'),go:()=>startBout(i)});
 }
 function titleCard(){
-  showCard({stamp:'Night shift',kick:'Halvorsen Freight · Form 7-B',title:'Sublevel Three',
-    body:'You audit pallet counts from ten to six. The totals always reconcile. You have not slept properly in eleven months. Tonight a man called Pike hands you a keycard and points at a door that is not on the floor plan.',
-    rows:isTouch?[['Move','left stick'],['Strike','Jab, Heavy'],['Defend','Block (hold), Dodge']]:[['Move','W A S D or arrows'],['Strike',keyLabel(binds.jab)+' jab, '+keyLabel(binds.heavy)+' heavy'],['Defend',keyLabel(binds.block)+' block (hold), '+keyLabel(binds.dodge)+' dodge'],['Gamepad','L stick move, X jab, Y heavy, LT block, A dodge']],
-    avatar:true,btn:'Take the stairs',go:()=>introCard(0)});
+  showCard({stamp:L('card_title_stamp'),kick:L('company_form'),title:L('card_title_name'),
+    body:L('card_title_body'),rows:titleRows(),avatar:true,btn:L('card_title_btn'),go:()=>introCard(0)});
+}
+function hubCard(nextIdx){
+  const n=BOUTS[nextIdx];
+  showCard({stamp:L('hub_stamp'),kick:L('company_kick'),title:L('hub_title'),body:L('hub_body'),
+    rows:[[L('row_rules'),L('rule_1')+' · '+L('rule_2')+' · '+L('rule_3')],[L('row_hub_next'),boutPlace(n)+' · '+n.foe],[L('row_opp'),n.foe+' · '+boutRole(n)],[L('row_tip'),boutTip(n)]],
+    btn:L('hub_btn'),go:()=>introCard(nextIdx)});
+}
+function dockMission(next){
+  if(progress.dock){ next(); return; }
+  showCard({stamp:L('dock_stamp'),kick:L('company_kick'),title:L('dock_title'),body:L('dock_body'),btn:L('dock_btn'),
+    go:()=>{ progress.dock=1; saveProgressData(); showCard({stamp:L('dock_stamp'),kick:L('company_kick'),title:L('dock_ok_title'),body:L('dock_ok_body'),btn:L('dock_ok_btn'),go:next}); }});
+}
+function showFinalCard(){
+  showCard({stamp:L('final_stamp'),kick:L('final_kick'),title:L('final_title'),body:L('final_body'),
+    rows:[[L('row_next'),L('final_next')],[L('row_you'),fightLine()]],btn:L('final_btn'),go:()=>{ G.bout=0; titleCard(); }});
+}
+function winCard(){
+  const i=G.bout, next=i+1, uLabel=unlockLabel(i);
+  grantWin(i);
+  const rows=[[L('row_you'),fightLine()]];
+  if(uLabel) rows.unshift([L('row_unlock'),uLabel]);
+  if(next<BOUTS.length) rows.unshift([L('row_next'),boutPlace(BOUTS[next])]);
+  const goNext=()=>{
+    if(i===1) dockMission(()=>hubCard(next));
+    else if(next<BOUTS.length) hubCard(next);
+    else showFinalCard();
+  };
+  showCard({stamp:L('win_stamp'),kick:L('bout_stamp')+' '+(i+1)+' · '+L('win_kick'),title:BOUTS[i].foe+L('win_down'),body:L(BOUTS[i].afterKey),
+    rows,btn:L('win_btn_hub'),go:goNext});
 }
 
 /* ---------- flow ---------- */
 function startBout(i){
-  G.bout=i; resetLog(); const cfg=scaleCfg(BOUTS[i]);
+  G.bout=i; resetLog(); syncPlayerOutfit(); const cfg=scaleCfg(BOUTS[i]);
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
   resetFighter(E,2.3,-Math.PI/2,cfg.hp);
@@ -1452,20 +1656,10 @@ function fightLine(){
   return L.hits+' hits, '+L.blocks+' blocks, '+L.dodges+' dodges, '+(Math.round(L.corner*10)/10)+' s in the corner';
 }
 function afterKO(){
-  if(G.winner===P){
-    if(G.bout<BOUTS.length-1){
-      const n=BOUTS[G.bout+1];
-      showCard({stamp:'Reconciled',kick:'Bout '+(G.bout+1)+' complete',title:BOUTS[G.bout].foe+' is down',body:BOUTS[G.bout].after,
-        rows:[['Next',n.place],['Opponent',n.foe+' · '+n.role],['Tip',n.tip],['You',fightLine()]],btn:'Next bout',go:()=>startBout(G.bout+1)});
-    } else {
-      showCard({stamp:'Balanced',kick:'Prototype complete',title:'Ledger balanced',
-        body:'Pike goes down the way you would have gone down. In the corridor camera, one man walks to the stairs. For the first time in a year the totals add up.',
-        rows:[['Next','The sabotage nights: the club starts erasing the company that pays you.'],['You',fightLine()]],btn:'Play again',go:()=>{ G.bout=0; introCard(0); }});
-    }
-  } else {
-    showCard({stamp:'Void',kick:'Down in bout '+(G.bout+1),title:'Get up',
-      body:'Nobody counts. You lie on the cold concrete until the room stops tilting, then you get up. It is the only rule anyone follows down here.',
-      rows:[['Retry',BOUTS[G.bout].foe+', same floor, full health'],['You',fightLine()]],btn:'Get up',go:()=>{ G.retry=true; startBout(G.bout); }});
+  if(G.winner===P) winCard();
+  else {
+    showCard({stamp:L('lose_stamp'),kick:L('bout_stamp')+' '+(G.bout+1),title:L('lose_title'),body:L('lose_body'),
+      rows:[[L('row_retry'),BOUTS[G.bout].foe+', '+boutPlace(BOUTS[G.bout])],[L('row_you'),fightLine()]],btn:L('lose_btn'),go:()=>{ G.retry=true; startBout(G.bout); }});
   }
 }
 
@@ -1622,6 +1816,41 @@ paintDiff();
 document.querySelectorAll('[data-diff]').forEach(b=>{
   b.addEventListener('click',()=>{ diff=b.dataset.diff; saveDiff(); paintDiff(); });
 });
+loadProgress();
+loadLang();
+paintLang();
+document.querySelectorAll('[data-lang]').forEach(b=>{
+  b.addEventListener('click',()=>{ lang=b.dataset.lang; saveLang(); paintLang(); if(G.state==='card'&&!wrapEl.hidden) titleCard(); });
+});
+function setLang(code){
+  if(code==='en'||code==='it'){ lang=code; saveLang(); paintLang(); if(G.state==='card'&&!wrapEl.hidden) titleCard(); }
+  return lang;
+}
+function saveProbe(opt){
+  opt=opt||{};
+  const snap=JSON.parse(JSON.stringify(progress));
+  progress={wins:6,outfit:'exec',arena:3,dock:1};
+  let roundTrip=false, survivedThrow=false;
+  if(opt.throwWrites){
+    const prior=Storage.prototype.setItem;
+    Storage.prototype.setItem=function(){ throw new DOMException('quota'); };
+    try{ survivedThrow=!saveProgressData(); }finally{ Storage.prototype.setItem=prior; }
+    progress=snap;
+  }else{
+    roundTrip=!!saveProgressData();
+    try{
+      const raw=localStorage.getItem(SAVE_KEY);
+      const p=raw?JSON.parse(raw):null;
+      roundTrip=roundTrip&&!!(p&&p.outfit==='exec'&&p.wins===6&&p.dock===1);
+    }catch(e){ roundTrip=false; }
+    progress=snap; saveProgressData();
+  }
+  return {key:SAVE_KEY,roundTrip,survivedThrow};
+}
+function hubProbe(){
+  hubCard(Math.min(progress.wins,BOUTS.length-1));
+  return {state:G.state,title:$('cTitle').textContent,rules:L('rule_1')};
+}
 function botIntent(p,e,dt,skill){
   const m=SKILL[skill]||1;
   const I={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
@@ -2008,6 +2237,6 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo};
+window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;}};
 })();
 </script>
