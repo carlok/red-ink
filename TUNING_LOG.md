@@ -534,7 +534,28 @@ Hypothesis: a sticky start button on short screens, a striped enemy bar, and a p
 
 Verdict: **keep**. `tuning/s10-pause.jpg` is the pause card over the bout. Esc and the pad Start button both pause. The strip does not come back after Got it, or after the 12 seconds.
 
+## Sprint 9 — Story and structure
 
+Goal: tighten the campaign into six named bouts with a between-fight hub (rule board), a loading-dock sabotage beat, bilingual copy from one string table (≤55 words per card), and outfit/arena unlocks that persist through throwing `localStorage`.
+
+Backlog: (1) baseline card word counts and balance for bouts 1–3, (2) `STR` table + EN/IT toggle, (3) rename and tighten bouts 1–3 plus add 4–6 through `scaleCfg`, (4) hub + dock mission flow, (5) progression save + safe storage reads/writes, (6) re-measure words, save round-trip, draw calls, and balance.
+
+Probe: headless Chrome `/usr/local/bin/google-chrome`, `node tools/balance-run.mjs` (via `tools/.tmp-br.mjs` with Linux Chrome path), card words via `window.__sublevel.storyMetrics()`, save via `window.__sublevel.saveProbe()`.
+
+### Baseline (master, before edits)
+
+| Metric | Value |
+| --- | --- |
+| Balance seed 1, normal, n=200 — Reyes win / median s | 90.5% / 32.3 |
+| Dag win / median s | 67.5% / 34.0 |
+| Pike win / median s | 44.0% / 43.9 |
+| Bout count | 3 |
+| Longest card body (EN, inline strings) | 41 words (title) |
+| EN/IT shared keys | no (inline English only) |
+| Progress save round-trip | none |
+| Hub between fights | none |
+| Fight draw calls (S1 merge baseline, headless) | ~145–157 |
+| Active meshes (fight) | ~119–131 |
 
 
 
