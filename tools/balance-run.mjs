@@ -105,5 +105,5 @@ try {
 } finally {
   chrome.kill("SIGKILL");
   server.close();
-  rmSync(userData, { recursive: true, force: true });
+  rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 80 });
 }

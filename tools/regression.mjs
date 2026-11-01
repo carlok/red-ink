@@ -235,6 +235,18 @@ async function runHttpSuite(cdp) {
     return go;
   });
 
+  await test("audio_variants", async () => {
+    const v = await cdp.eval(
+      `(async () => {
+      await window.__sublevel.audioReady();
+      return window.__sublevel.audioMetrics();
+    })()`,
+      true,
+    );
+    if (!v || v.clipCount < 18 || v.hitPoolJab !== 3 || v.hitPoolHeavy !== 2) throw new Error(JSON.stringify(v));
+    return v;
+  });
+
   await test("avatar_glb", async () => {
     await cdp.eval(`document.getElementById("wrap").hidden = false`);
     const v = await cdp.eval(
@@ -291,6 +303,14 @@ async function runFileSuite(cdp) {
       href: location.protocol
     })`);
     if (!v.sub || v.href !== "file:") throw new Error(JSON.stringify(v));
+    return v;
+  });
+  await test("fullscreen_opt_out_reload", async () => {
+    await cdp.eval(`localStorage.setItem('sublevel-fs','0')`);
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await bootSublevel(cdp);
+    const v = await cdp.eval(`window.__sublevel.fullscreenProbe()`);
+    if (v.autoFs !== false) throw new Error(JSON.stringify(v));
     return v;
   });
   await test("offline_file_bout", async () => {

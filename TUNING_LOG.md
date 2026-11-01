@@ -714,3 +714,93 @@ Retro: **moved** — regression caught touch UI needing CDP touch emulation + re
 
 Questions: (1) Should Halvorsen be tuned before a public “1.0” tag? (2) Should `npm run regression` gate GitHub Actions on every push? (3) Ship the offline zip on GitHub Releases?
 
+## Sprint 13 — Curve, fullscreen, audio
+
+Goal: continue a monotonic normal-difficulty win curve through bouts 4–6, request mobile fullscreen on the first bout-start gesture, and make fight audio less repetitive without touching combat RNG or bouts 1–3.
+
+Backlog: (1) baseline balance 4–6 and audio proxy, (2) tune Voss, (3) tune Chen, (4) tune Halvorsen and verify 1–3 unchanged, (5) auto fullscreen + persisted opt-out, (6) CC0 audio variants + regression 22/22.
+
+Probe: `node tools/balance-run.mjs 200 normal 1 normal 0-5`, `window.__sublevel.audioMetrics()`, `node tools/regression.mjs`.
+
+**Branch note:** PR targets `master`; built from `cursor/s12-release-qa-bd45` until S12 PR #2 merges.
+
+### Baseline (S12 branch, before S13 edits)
+
+| Metric | Value |
+| --- | --- |
+| Balance bouts 1–3 (200, seed 1, normal) | Reyes 90.5% / Dag 67.5% / Pike 44.0% |
+| Balance bouts 4–6 | Voss 95.0% / Chen 75.0% / Halvorsen 2.0% |
+| `audio/samples.js` bytes | 453,278 |
+| Distinct clips (`SUBLEVEL_AUDIO.clips`) | 11 |
+| Hit sample pool | 1 jab / 1 heavy / 1 block (no rotation) |
+| Regression | 20/20 (S12) |
+
+**Proposed bout 4–6 targets (monotonic after Pike 44%):** Voss ~38%, Chen ~30%, Halvorsen ~22–24%. Example 55/38/25 was rejected (55% > Pike). Halvorsen echo style is steep; aim just below Chen.
+
+### Change 1 — Voss `BOUTS[3]` row
+
+Hypothesis: higher teach-style guard, react, and HP pull 95% player win toward ~38% without `scaleCfg` or combat-path `rng()` changes.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Voss win (200, seed 1, normal) | 95.0% | 36.0% |
+| Reyes / Dag / Pike | 90.5 / 67.5 / 44.0% | unchanged |
+
+Verdict: **keep**.
+
+### Change 2 — Chen `BOUTS[4]` row
+
+Hypothesis: punish weights between Dag and finale bring 75% down near 30% while staying above Halvorsen.
+
+| Chen win | 75.0% | 30.0% |
+| Reyes / Dag / Pike / Voss | — | 90.5 / 67.5 / 44.0 / 36.0% (Voss from Change 1) |
+
+Verdict: **keep**.
+
+### Change 3 — Halvorsen `BOUTS[5]` row
+
+Hypothesis: echo stats near Pike but tuned for ~22% complete a decreasing curve (90.5 → 67.5 → 44 → 36 → 30 → 22).
+
+| Halvorsen win | 2.0% | 22.0% |
+| Full curve | not monotonic | monotonic ✓ |
+
+Verdict: **keep**. Log: `tuning/s13-balance-full.json`.
+
+### Change 4 — Mobile auto fullscreen
+
+Hypothesis: on coarse pointer / narrow viewport, first intro-card “start bout” calls `requestFullscreen` (with webkit fallback) and best-effort `screen.orientation.lock('landscape')`; opt-out via `sublevel-fs=0`; iOS no-op without throw; PWA-capable meta only.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Fullscreen on first bout start | none | `maybeAutoFullscreen()` on intro → `startBout` |
+| Opt-out | — | title card checkbox, persisted |
+| Desktop / `file://` / Esc pause | pass | pass (regression) |
+
+Verdict: **keep**.
+
+### Change 5 — Audio variation (CC0)
+
+Hypothesis: extra generated stems and hit pools (playback-rate rotation, no combat `rng()`) raise distinct clip count and shorten effective jab repeat interval while keeping S8 peaks and ducking.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| `samples.js` bytes | 453,278 | 832,806 (+379,528) |
+| Clip count | 11 | 19 |
+| Jab pool / min repeat proxy | 1 / every hit | 3 / ~every 3rd jab |
+| Music | calm/tense/finish only | +calm2/tense2, hub/dock card beds, bout playbackRate, cheer→crowd rate |
+
+Verdict: **keep**. Regenerate: `node tools/make-audio.mjs`.
+
+### Change 6 — Regression + QA cleanup
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Automated regression | 20/20 | 22/22 (+`audio_variants`, +`fullscreen_opt_out_reload`) |
+| Chrome tmp teardown | occasional `ENOTEMPTY` | `rmSync` retries |
+
+Verdict: **keep**. Demo: `tuning/s13-regression.jpg`.
+
+Retro: **moved** — Halvorsen echo win% is very sensitive to HP; small steps + full 0–5 runs avoided breaking monotonicity. **Did not move** — real-device fullscreen/listening tests (hand-check). **Next (out of scope)** — S11 skipped.
+
+Questions: (1) Lock landscape only after fullscreen succeeds on Android? (2) Add a hub-only music mute separate from fight stems? (3) Tighten Halvorsen toward 18% if finale should feel harsher than 22%?
+
