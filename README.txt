@@ -1,8 +1,23 @@
 SUBLEVEL THREE - browser fighting game (Babylon.js 9.30, Apache-2.0)
 
-Run: open index.html in Chrome/Firefox/Edge. Everything except the Google Fonts is local (works offline; the fonts fall back to system ones).
-The file lib/babylon.js is a tree-shaken build. Regenerate it with: npm install && npm run build:engine
-Controls: WASD move, J jab, K heavy, L block (hold), Space dodge. Gamepad: L stick move, X jab, Y heavy, LT block, A dodge.
-Drop a .glb character file on the title screen to use your own avatar.
-Source: index.html is a single file (HTML + CSS + one script). Fighter models are built in code (makeFighter), tuning constants are at the top (ATK, LOOKS, BOUTS).
-Quality: auto-lowers resolution/shadows when fps < ~45.
+Run: open index.html in Chrome, Firefox, or Edge. No build step and no account.
+The game files are local. Google Fonts load when you are online and fall back to system fonts when you are not.
+
+Engine: lib/babylon.js is a tree-shaken build of @babylonjs/core 9.30.0 plus the glTF 2.0 loader.
+License text: lib/babylon.Apache-2.0.txt. Regenerate the bundle with: npm install && npm run build:engine
+
+Controls
+  Move          W A S D or arrow keys
+  Jab           J, also Z
+  Heavy         K, also X
+  Block (hold)  L, also C or Shift
+  Dodge         Space, also V
+On the title card, click Jab, Heavy, Block, or Dodge and press a new key. Movement stays on WASD. The Z, X, C, V, and Shift aliases stay.
+
+Gamepad, standard mapping: left stick or d-pad moves, X jabs, Y is heavy, A dodges. LT and RT block once the trigger is past halfway. LB, RB, and B block as buttons.
+The title card has a rumble slider. 0 is off. Key bindings and rumble are saved in local storage when the browser allows it.
+
+Touch: move stick on the left, Jab in the bottom-right of the button cluster. The view does not scroll or zoom.
+
+Drop a .glb on the title screen to replace the auditor. Fighters are otherwise built in code (makeFighter). Tuning constants are at the top of the script: ATK, LOOKS, BOUTS.
+Quality steps down resolution, then shadow filtering, then shadows, when the frame rate stays under 44 for 1.8 seconds. The floor is half the starting resolution.
