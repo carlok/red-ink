@@ -226,15 +226,15 @@ const LOOKS={
   pike:   {iris:'#7d8a93',skin:'#b7bcc0',shirt:'#4d535a',pants:'#1a1c20',shoes:'#0f1012',tie:'#0e0e10',hair:'#2b1d15',wrap:'#b9bdbf',sx:1,sy:1}
 };
 const BOUTS=[
-  {foe:'Reyes',role:'Sanitation',place:'The Cellar',look:'reyes',hp:70,speed:2.7,react:.08,cd:1.7,heavy:.18,block:.28,dodge:.04,dmg:.85,reach:1,
+  {foe:'Reyes',role:'Sanitation',place:'The Cellar',look:'reyes',hp:70,speed:2.7,react:.08,cd:1.7,heavy:.18,block:.28,dodge:.04,dmg:.85,reach:1,style:'teach',
    tip:'Jab to open him up. When he winds back, block (L), then answer.',
    intro:'A taped circle on bare concrete, a dozen people in work clothes, one bulb swinging. Reyes cleans these floors at three in the morning. Tonight he wants you in the middle of them.',
    after:'You expected to feel sick. Instead the numbers in your head go quiet for the first time in eleven months. Pike claps once from the stairs. "Again," he says.'},
-  {foe:'Dag',role:'Forklift operator',place:'The Loading Dock',look:'dag',hp:115,speed:2.5,react:.38,cd:1.4,heavy:.42,block:.18,dodge:.06,dmg:1.15,reach:1.12,
+  {foe:'Dag',role:'Forklift operator',place:'The Loading Dock',look:'dag',hp:115,speed:2.5,react:.38,cd:1.4,heavy:.42,block:.18,dodge:.06,dmg:1.15,reach:1.12,style:'punish',
    tip:'Slow and heavy. A red mark over his head means a big swing: dodge (Space), then punish.',
    intro:'Dag drives the forklift you sign off every Thursday. He knows exactly which rotation you cut. He does not wait for a bell, because there is no bell.',
    after:'On Monday you reroute forty trucks for no reason you could defend on paper. Someone has added lines to your ledger in handwriting that looks like yours.'},
-  {foe:'Pike',role:'Unlisted',place:'The Floor Plan',look:'pike',hp:120,speed:3.7,react:.24,cd:.95,heavy:.3,block:.18,dodge:.14,dmg:.49,reach:1,echo:true,
+  {foe:'Pike',role:'Unlisted',place:'The Floor Plan',look:'pike',hp:120,speed:3.7,react:.24,cd:1.05,heavy:.3,block:.18,dodge:.14,dmg:.49,reach:1,echo:true,style:'echo',
    tip:'He answers with your own last three punches. Break your rhythm.',
    intro:'The door that is not on the floor plan. Pike takes his jacket off and stands the way you stand. Whatever you throw, he remembers.'}
 ];
@@ -687,7 +687,10 @@ function resetFighter(f,x,yaw,hp){
   f.pos.set(x,0,0); f.yaw=yaw; f.root.rotation.y=yaw; f.vel.set(0,0,0); f.mv.set(0,0,0);
   f.state='idle'; f.t=rng()*3; f.atk=null; f.stunT=0; f.stunMax=1; f.inv=0; f.cd=0; f.koT=0; f.phase=0; f.moveAmt=0;
   f.stam=100; f.stamDelay=0; f.hp=hp; f.maxHp=hp; f.hitSide=1; f.dodgeT=0; f.dodgeSide=1; f.started=null; f.echoIdx=0;
-  f.ai.cd=1.2; f.ai.tick=.5; f.ai.blockT=0; f.ai.atk=null; f.ai.dodgeNow=false; f.hist.length=0;
+  f.ai.cd=1.2; f.ai.tick=.5; f.ai.blockT=0; f.ai.atk=null; f.ai.dodgeNow=false; f.ai.move='in'; f.ai.moveT=.2; f.ai.side=1;
+  f.ai.tell=0; f.ai.pending=null; f.ai.feint=false; f.ai.watch=null; f.ai.waited=0; f.ai.answered=false; f.ai.punish=0; f.ai.punishFresh=0; f.ai.feintN=0; f.ai.rolled=0;
+  f.ai.echoKey=''; f.ai.echoQ=null; f.ai.echoIdx=0;
+  f.hist.length=0;
 }
 function disposeFighter(f){
   if(!f) return;
@@ -733,6 +736,7 @@ function poseTargets(f){
     case 'win':
       T.shR=T.shL=-2.9; T.elR=T.elL=-.15; T.shRz=.3; T.shLz=-.3; T.jump=Math.abs(Math.sin(f.t*5))*.12; T.mouth=1; T.lean=0; break;
   }
+  if(f.ai&&f.ai.tell>0&&f.state==='idle'){ T.shR=-1.35; T.elR=-2.05; T.lean=.18; T.crouch=-.07; T.twist=-.22; }
   return T;
 }
 function applyPose(f,dt){
@@ -748,11 +752,16 @@ function applyPose(f,dt){
   f.face.eyes.forEach(e=>{e.scaling.y=P.eyes;});
   f.face.mouth.scaling.y=.5+P.mouth*2;
   if(f.avatar) f.avatar.anchor.rotation.y=P.twist*.5;
-  if(f.alert) f.alert.setEnabled(f.state==='attack'&&f.atk.type==='heavy'&&f.atk.t<f.atk.def.a0);
+  if(f.alert) f.alert.setEnabled((f.ai&&f.ai.tell>0)||(f.state==='attack'&&f.atk&&f.atk.type==='heavy'&&f.atk.t<f.atk.def.a0));
 }
 
 /* ---------- combat ---------- */
-const G={state:'title',bout:0,t:0,hitstop:0,shake:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0)};
+const G={state:'title',bout:0,t:0,hitstop:0,shake:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
+function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0}; }
+function noteCorner(dt){
+  if(G.state!=='fight'||!P) return;
+  if(Math.hypot(P.pos.x,P.pos.z)>R*.85) G.log.corner+=dt;
+}
 let P=null,E=null;
 const IDLE={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
 
@@ -766,6 +775,7 @@ function startDodge(f,I,dirO){
   let dx=I.mx,dz=I.mz; const l=Math.hypot(dx,dz);
   if(l>.1){dx/=l;dz/=l;} else {dx=-dirO.x;dz=-dirO.z;}
   f.state='dodge'; f.dodgeT=0; f.dodgeDir.set(dx,0,dz); f.stam-=16; f.stamDelay=.5; f.cd=.55; f.started='dodge';
+  if(f.isPlayer) G.log.dodges++;
   f.dodgeSide=(dirO.x*dz-dirO.z*dx)>0?1:-1; SFX.whoosh();
 }
 function strike(a,d,D){
@@ -773,6 +783,7 @@ function strike(a,d,D){
   const mid=a.pos.add(d.pos).scale(.5); mid.y=1.25;
   if(d.inv>0){ SFX.whoosh(); return; }
   const dir=d.pos.subtract(a.pos); dir.y=0; dir.normalize();
+  if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
   if(d.state==='block'){
     d.hp=Math.max(1,d.hp-D.dmg*.1); d.stam-=D.dmg*.95; d.vel.addInPlace(dir.scale(D.kb*3)); a.stam=Math.max(0,a.stam-4);
     fxWord('BLOK',mid); SFX.block(); G.shake=Math.max(G.shake,.25); G.hitstop=.035; G.cheer=Math.max(G.cheer,.4);
@@ -839,29 +850,70 @@ function resolveBodies(){
 /* ---------- AI ---------- */
 function aiIntent(e,p,dt){
   const A=e.ai,c=e.cfg,I={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
-  A.cd-=dt; A.tick-=dt; A.blockT-=dt; A.moveT-=dt;
-  const to=p.pos.subtract(e.pos); to.y=0; const dist=to.length(), dir=to.scale(1/(dist||1)), side=new V3(dir.z,0,-dir.x);
-  if(A.tick<=0){
-    A.tick=c.react*rand(.7,1.3);
-    const threat=p.state==='attack'&&p.atk&&p.atk.t<p.atk.def.a1&&dist<2.7;
-    if(threat){
-      const r=rng();
-      if(r<c.dodge&&e.stam>=16) A.dodgeNow=true; else if(r<c.dodge+c.block) A.blockT=.55;
-    } else if(A.blockT<=0&&e.state==='idle'){
-      if(dist>2.6*e.reach) A.move='in';
-      else if(A.cd<=0&&e.stam>14){
-        A.atk=(c.echo&&p.hist.length)?p.hist[e.echoIdx++%p.hist.length]:(rng()<c.heavy?'heavy':'jab');
-        A.cd=c.cd*rand(.8,1.4);
-      } else { A.move=rng()<.55?'side':'out'; A.side=rng()<.5?1:-1; A.moveT=rand(.4,.9); }
+  A.cd-=dt; A.blockT-=dt; A.moveT-=dt;
+  if(A.tell>0) A.tell-=dt;
+  if(e.state==='hit'||e.state==='ko'||e.state==='win'){ A.tell=0; A.pending=null; A.feint=false; }
+  const to=p.pos.subtract(e.pos); to.y=0; const dist=to.length();
+  const dir=dist>1e-4?to.scale(1/dist):new V3(1,0,0);
+  const side=new V3(dir.z,0,-dir.x);
+  const style=c.style||'teach';
+  const prefer=style==='teach'?1.5:style==='punish'?1.7:1.55;
+  const atk=p.state==='attack'&&p.atk?p.atk:null;
+  if(atk&&A.watch!==atk){
+    if(A.watch&&style==='punish'&&!A.watch.done&&A.punish<=0){ A.punish=c.react; A.punishFresh=1; }
+    A.watch=atk; A.waited=0; A.answered=false;
+  } else if(A.watch&&A.watch!==atk){
+    if(style==='punish'&&!A.watch.done&&A.punish<=0){ A.punish=c.react; A.punishFresh=1; }
+    A.watch=null;
+  }
+  if(atk&&A.watch===atk&&!A.answered){
+    if(A.waited>=c.react){
+      A.answered=true;
+      if(atk.t<atk.def.a1&&dist<2.7&&e.state!=='attack'){
+        A.tell=0; A.pending=null; A.feint=false;
+        const r=rng();
+        if(r<c.dodge&&e.stam>=16&&e.cd<=0) A.dodgeNow=true;
+        else if(r<c.dodge+c.block&&e.stam>1) A.blockT=Math.max(.25,atk.def.a1-atk.t);
+      }
+    }
+    A.waited+=dt;
+  }
+  if(style==='punish'&&A.punish>0){
+    if(A.punishFresh) A.punishFresh=0;
+    else A.punish-=dt;
+    if(A.punish<=0&&e.state==='idle'&&e.stam>=24&&A.blockT<=0&&!A.dodgeNow){
+      I.heavy=true; A.cd=c.cd; A.tell=0; A.pending=null; A.feint=false;
+    }
+  }
+  if(A.tell<=0&&A.pending){
+    if(!A.feint) I[A.pending]=true;
+    A.pending=null; A.feint=false;
+  }
+  if(!I.jab&&!I.heavy&&A.tell<=0&&A.blockT<=0&&!A.dodgeNow&&e.state==='idle'&&A.cd<=0&&e.stam>14&&dist<prefer+.5){
+    let type;
+    if(style==='echo'){
+      const key=p.hist.join(',');
+      if(key!==A.echoKey){ A.echoKey=key; A.echoQ=p.hist.slice(); A.echoIdx=0; }
+      type=(A.echoQ&&A.echoQ.length)?A.echoQ[A.echoIdx++%A.echoQ.length]:(rng()<c.heavy?'heavy':'jab');
+    } else type=rng()<c.heavy?'heavy':'jab';
+    const told=style==='teach'&&type==='jab';
+    if(told){
+      A.rolled=(A.rolled||0)+1; A.feint=rng()<.2; if(A.feint) A.feintN=(A.feintN||0)+1;
+      A.pending='jab'; A.tell=.28; A.cd=A.feint?1.05:c.cd*rand(.9,1.2);
+    } else {
+      I[type]=true; A.cd=c.cd*rand(.85,1.25);
     }
   }
   if(A.blockT>0) I.block=true;
   if(A.dodgeNow){ I.dodge=true; I.mx=side.x*A.side; I.mz=side.z*A.side; A.dodgeNow=false; }
-  if(A.atk){ I[A.atk]=true; A.atk=null; }
-  if(!I.block&&!I.dodge){
-    if(A.move==='in'){ I.mx=dir.x*.9+side.x*A.side*.2; I.mz=dir.z*.9+side.z*A.side*.2; if(dist<1.7*e.reach){ I.mx=I.mz=0; } }
-    else if(A.move==='side'&&A.moveT>0){ I.mx=side.x*A.side*.6; I.mz=side.z*A.side*.6; }
-    else if(A.move==='out'&&A.moveT>0){ I.mx=-dir.x*.7; I.mz=-dir.z*.7; }
+  if(A.moveT<=0){ A.moveT=Math.max(.25,c.react); A.side=rng()<.5?1:-1; }
+  if(!I.dodge){
+    const rad=Math.hypot(e.pos.x,e.pos.z), prad=Math.hypot(p.pos.x,p.pos.z);
+    if(rad>R*.82){ I.mx=-e.pos.x/(rad||1); I.mz=-e.pos.z/(rad||1); }
+    else if(prad>R*.85&&rad<prad-.35){ I.mx=side.x*A.side; I.mz=side.z*A.side; }
+    else if(dist>prefer+.25){ I.mx=dir.x; I.mz=dir.z; }
+    else if(dist<prefer-.2){ I.mx=-dir.x*.8; I.mz=-dir.z*.8; }
+    else { I.mx=side.x*A.side*.85; I.mz=side.z*A.side*.85; }
   }
   return I;
 }
@@ -1064,7 +1116,7 @@ function titleCard(){
 
 /* ---------- flow ---------- */
 function startBout(i){
-  G.bout=i; const cfg=scaleCfg(BOUTS[i]);
+  G.bout=i; resetLog(); const cfg=scaleCfg(BOUTS[i]);
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
   resetFighter(E,2.3,-Math.PI/2,cfg.hp);
@@ -1076,21 +1128,25 @@ function startBout(i){
   keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
   banner('BOUT '+(i+1));
 }
+function fightLine(){
+  const L=G.log||{hits:0,blocks:0,dodges:0,corner:0};
+  return L.hits+' hits, '+L.blocks+' blocks, '+L.dodges+' dodges, '+(Math.round(L.corner*10)/10)+' s in the corner';
+}
 function afterKO(){
   if(G.winner===P){
     if(G.bout<BOUTS.length-1){
       const n=BOUTS[G.bout+1];
       showCard({stamp:'Reconciled',kick:'Bout '+(G.bout+1)+' complete',title:BOUTS[G.bout].foe+' is down',body:BOUTS[G.bout].after,
-        rows:[['Next',n.place],['Opponent',n.foe+' · '+n.role],['Tip',n.tip]],btn:'Next bout',go:()=>startBout(G.bout+1)});
+        rows:[['Next',n.place],['Opponent',n.foe+' · '+n.role],['Tip',n.tip],['You',fightLine()]],btn:'Next bout',go:()=>startBout(G.bout+1)});
     } else {
       showCard({stamp:'Balanced',kick:'Prototype complete',title:'Ledger balanced',
         body:'Pike goes down the way you would have gone down. In the corridor camera, one man walks to the stairs. For the first time in a year the totals add up.',
-        rows:[['Next','The sabotage nights: the club starts erasing the company that pays you.']],btn:'Play again',go:()=>{ G.bout=0; introCard(0); }});
+        rows:[['Next','The sabotage nights: the club starts erasing the company that pays you.'],['You',fightLine()]],btn:'Play again',go:()=>{ G.bout=0; introCard(0); }});
     }
   } else {
     showCard({stamp:'Void',kick:'Down in bout '+(G.bout+1),title:'Get up',
       body:'Nobody counts. You lie on the cold concrete until the room stops tilting, then you get up. It is the only rule anyone follows down here.',
-      rows:[['Retry',BOUTS[G.bout].foe+', same floor, full health']],btn:'Get up',go:()=>{ G.retry=true; startBout(G.bout); }});
+      rows:[['Retry',BOUTS[G.bout].foe+', same floor, full health'],['You',fightLine()]],btn:'Get up',go:()=>{ G.retry=true; startBout(G.bout); }});
   }
 }
 
@@ -1119,6 +1175,7 @@ function frame(){
   step(P,E,Ip,dt); if(P.started&&buf[P.started]!==undefined) buf[P.started]=0;
   step(E,P,Ie,dt);
   resolveBodies();
+  if(live) noteCorner(real);
   if(G.state==='ko'){ G.koTimer-=dt; if(G.koTimer<=0){ G.state='card'; afterKO(); } }
   updateFx(real); updateAmbient(dt); updateCamera(dt); updateHud();
 }
@@ -1282,6 +1339,7 @@ function simMeet(opt){
       resetFighter(E,2.3,-Math.PI/2,cfg.hp);
       resetFighter(P,-2.3,Math.PI/2,100); P.hp=100; P.speed0=4.4; P.reach=1; P.dmgMul=1;
       P.bot={hold:.4,seen:null,t:0};
+      resetLog();
       G.state='fight'; G.hitstop=0; G.winner=null; G.t=0; G.koTimer=0; G.shake=0;
       let real=0, empty=0, gap=0, maxGap=0, hpP=P.hp, hpE=E.hp;
       while(G.state==='fight'&&real<CAP){
@@ -1291,13 +1349,15 @@ function simMeet(opt){
         step(P,E,botIntent(P,E,stepDt,skill),stepDt);
         step(E,P,aiIntent(E,P,stepDt),stepDt);
         resolveBodies();
+        noteCorner(dt);
         real+=dt;
         if(P.stam<=0) empty+=dt;
         if(P.hp!==hpP||E.hp!==hpE){ hpP=P.hp; hpE=E.hp; gap=0; }
         else { gap+=dt; if(gap>maxGap) maxGap=gap; }
         if(G.state!=='fight') break;
       }
-      rows.push({win:G.winner===P,t:Math.round(real*10)/10,empty:real?empty/real:0,gap:Math.round(maxGap*10)/10,ko:G.state==='ko',ehp:Math.max(0,Math.round(E.hp)),php:Math.max(0,Math.round(P.hp))});
+      rows.push({win:G.winner===P,t:Math.round(real*10)/10,empty:real?empty/real:0,gap:Math.round(maxGap*10)/10,ko:G.state==='ko',ehp:Math.max(0,Math.round(E.hp)),php:Math.max(0,Math.round(P.hp)),
+        hits:G.log.hits,blocks:G.log.blocks,dodges:G.log.dodges,corner:G.log.corner});
     }
     const lens=rows.map(r=>r.t).sort((a,b)=>a-b);
     const empty=rows.reduce((s,r)=>s+r.empty,0)/n;
@@ -1310,7 +1370,11 @@ function simMeet(opt){
       stale:rows.filter(r=>r.gap>40||!r.ko).length,
       maxGap:Math.max.apply(null, rows.map(r=>r.gap)),
       ehp:Math.round(rows.reduce((s,r)=>s+r.ehp,0)/n),
-      php:Math.round(rows.reduce((s,r)=>s+r.php,0)/n)
+      php:Math.round(rows.reduce((s,r)=>s+r.php,0)/n),
+      hits:Math.round(rows.reduce((s,r)=>s+r.hits,0)/n*10)/10,
+      blocks:Math.round(rows.reduce((s,r)=>s+r.blocks,0)/n*10)/10,
+      dodges:Math.round(rows.reduce((s,r)=>s+r.dodges,0)/n*10)/10,
+      corner:Math.round(rows.reduce((s,r)=>s+r.corner,0)/n*10)/10
     });
   }
   rng=prevRng; diff=prevDiff;
@@ -1321,6 +1385,202 @@ function simMeet(opt){
   if(G.state==='card'||G.state==='title') titleCard();
   return out;
 }
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet};
+function probeAI(){
+  const prevRng=rng, prevDiff=diff, prevState=G.state;
+  diff='normal';
+  const dt=1/60;
+  const IDLEI={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
+  const med=a=>{ if(!a.length) return null; const s=a.slice().sort((x,y)=>x-y); return Math.round(s[Math.floor(s.length/2)]*1000)/1000; };
+  const round3=v=>Math.round(v*1000)/1000;
+  function boot(bout, seed){
+    rng=mulberry32(seed>>>0);
+    const cfg=scaleCfg(BOUTS[bout]);
+    E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
+    resetFighter(E,2.3,-Math.PI/2,cfg.hp);
+    resetFighter(P,-2.3,Math.PI/2,100);
+    P.speed0=4.4; P.reach=1; P.dmgMul=1; P.bot={hold:.4,seen:null,t:0};
+    resetLog();
+    G.state='fight'; G.hitstop=0; G.winner=null; G.t=0; G.koTimer=0; G.shake=0;
+    return cfg;
+  }
+  function once(ipFn){
+    let stepDt=dt;
+    if(G.hitstop>0){ G.hitstop-=stepDt; stepDt*=.12; }
+    G.t+=stepDt;
+    step(P,E,typeof ipFn==='function'?ipFn(stepDt):ipFn,stepDt);
+    step(E,P,aiIntent(E,P,stepDt),stepDt);
+    resolveBodies();
+    noteCorner(dt);
+  }
+  function place(x1,x2){
+    P.pos.set(x1,0,0); E.pos.set(x2,0,0);
+    P.vel.set(0,0,0); E.vel.set(0,0,0); P.mv.set(0,0,0); E.mv.set(0,0,0);
+  }
+  function restore(){
+    rng=prevRng; diff=prevDiff;
+    E.cfg=BOUTS[0]; E.speed0=BOUTS[0].speed; E.reach=BOUTS[0].reach; E.dmgMul=BOUTS[0].dmg;
+    resetFighter(P,-2.3,Math.PI/2,100);
+    resetFighter(E,2.3,-Math.PI/2,BOUTS[0].hp);
+    G.hitstop=0; G.winner=null; G.shake=0;
+    G.state=prevState==='fight'||prevState==='ready'||prevState==='ko'?'card':prevState;
+    if(G.state==='card'||G.state==='title') titleCard();
+  }
+  try{
+    const react=[];
+    for(let b=0;b<3;b++){
+      const cfgReact=scaleCfg(BOUTS[b]).react, samples=[];
+      for(let trial=0;trial<40;trial++){
+        boot(b, 5000+b*100+trial);
+        E.ai.cd=5; E.ai.tick=0; P.stam=100; P.cd=0; P.state='idle';
+        let clock=0, jabAt=null, defAt=null;
+        for(let i=0;i<100 && G.state==='fight';i++){
+          once(jabAt===null?{mx:0,mz:0,jab:false,heavy:true,block:false,dodge:false}:IDLEI);
+          place(-.7,.7);
+          clock+=dt;
+          if(jabAt===null&&P.state==='attack') jabAt=clock;
+          if(jabAt!==null&&defAt===null&&(E.state==='block'||E.state==='dodge')) defAt=clock;
+        }
+        samples.push(defAt===null||jabAt===null?null:round3(defAt-jabAt));
+      }
+      const hit=samples.filter(s=>s!==null);
+      react.push({foe:BOUTS[b].foe,react:round3(cfgReact),answered:hit.length,min:hit.length?round3(Math.min.apply(null,hit)):null,med:med(hit),unfair:hit.filter(s=>s<cfgReact-.008).length});
+    }
+    function windup(type){
+      boot(0, 3); place(-.7,.7); E.stam=100; E.state='idle'; startAtk(E, type);
+      let lead=0;
+      for(let i=0;i<90&&E.state==='attack'&&E.atk;i++){
+        const before=E.atk.t;
+        once(IDLEI);
+        if(E.alert&&E.alert.isEnabled()&&before<ATK[type].a0) lead+=dt;
+        if(!E.atk||E.atk.t>=ATK[type].a0) break;
+      }
+      return round3(lead);
+    }
+    const wind={jab:windup('jab'),heavy:windup('heavy')};
+    function aiMarks(bout, seed, sec, cap){
+      boot(bout, seed); place(-.85,.85); E.ai.cd=0; E.stam=100; E.cd=0;
+      const jab=[], heavy=[];
+      let clock=0, mark=null, type=null, feints=0;
+      while(clock<(sec||10)&&G.state==='fight'&&jab.length+heavy.length<(cap||6)){
+        once(IDLEI); clock+=dt;
+        const on=!!(E.alert&&E.alert.isEnabled());
+        if(on) mark=(mark||0)+dt;
+        if(E.started==='jab'||E.started==='heavy') type=E.started;
+        if(type&&E.atk&&E.atk.t>=E.atk.def.a0){
+          (type==='heavy'?heavy:jab).push(round3(mark||0));
+          mark=null; type=null;
+        } else if(mark!==null&&!on&&!type){ feints++; mark=null; }
+      }
+      return {foe:BOUTS[bout].foe,jabMed:med(jab),heavyMed:med(heavy),jabN:jab.length,heavyN:heavy.length,feints,jab,heavy,rolled:E.ai.rolled||0,feintN:E.ai.feintN||0,rolls:E.ai.rolls||[]};
+    }
+    const marks=[0,1,2].map(b=>aiMarks(b, 70+b));
+    let feintN=0, rolled=0, seen=0;
+    for(let s=0;s<6;s++){ const f=aiMarks(0, 200+s, 16, 16); feintN+=f.feintN; rolled+=f.rolled; seen+=f.feints; }
+    function echoSeq(seq, seed){
+      boot(2, seed); place(-.8,.8);
+      const played=[];
+      for(const type of seq){
+        P.stam=100; P.cd=0; P.state='idle'; P.atk=null; E.stam=80; E.ai.cd=8;
+        let clock=0, armed=false;
+        while(clock<2.5&&G.state==='fight'){
+          once(!armed?{mx:0,mz:0,jab:type==='jab',heavy:type==='heavy',block:false,dodge:false}:IDLEI);
+          clock+=dt;
+          if(P.started===type){ armed=true; played.push(type); }
+          if(armed&&P.state==='idle') break;
+        }
+      }
+      E.ai.cd=0; E.stam=100; E.cd=0; if(E.state!=='ko'&&E.state!=='win') E.state='idle';
+      const got=[];
+      let clock=0;
+      while(got.length<3&&clock<8&&G.state==='fight'){
+        once(IDLEI); clock+=dt;
+        if(E.started==='jab'||E.started==='heavy') got.push(E.started);
+      }
+      let match=0; for(let i=0;i<Math.min(seq.length,got.length);i++) if(got[i]===seq[i]) match++;
+      return {asked:seq,player:played,pike:got,match};
+    }
+    const echo=[echoSeq(['jab','heavy','jab'], 11), echoSeq(['heavy','heavy','jab'], 29)];
+    function echoAdapt(){
+      boot(2, 44); place(-.8,.8);
+      function swing(type){
+        P.stam=100; P.cd=0; P.state='idle'; P.atk=null; E.ai.cd=8;
+        let clock=0, armed=false;
+        while(clock<2.5&&G.state==='fight'){
+          once(!armed?{mx:0,mz:0,jab:type==='jab',heavy:type==='heavy',block:false,dodge:false}:IDLEI);
+          clock+=dt;
+          if(P.started===type) armed=true;
+          if(armed&&P.state==='idle') break;
+        }
+      }
+      function take(k){
+        E.ai.cd=0; E.stam=100; E.cd=0; E.atk=null;
+        if(E.state!=='ko'&&E.state!=='win') E.state='idle';
+        const got=[]; let clock=0;
+        while(got.length<k&&clock<6&&G.state==='fight'){
+          once(IDLEI); clock+=dt;
+          if(E.started==='jab'||E.started==='heavy') got.push(E.started);
+        }
+        return got;
+      }
+      ['jab','heavy','jab'].forEach(swing);
+      const first=take(1);
+      ['heavy','heavy','jab'].forEach(swing);
+      const next=take(3);
+      return {first, next, adapt:next.join(',')==='heavy,heavy,jab'};
+    }
+    const adapt=echoAdapt();
+    const punish=[];
+    for(let trial=0;trial<30;trial++){
+      boot(1, 8000+trial);
+      P.stam=100; E.stam=100; E.ai.cd=0; E.cd=0; E.state='idle'; P.speed0=0; E.speed0=0;
+      let clock=0, jabAt=null, endAt=null, heavyAt=null, connected=false;
+      while(clock<3.2&&G.state==='fight'){
+        once(jabAt===null?{mx:0,mz:0,jab:true,heavy:false,block:false,dodge:false}:IDLEI);
+        place(-1.15,1.15);
+        clock+=dt;
+        if(P.state==='attack'&&P.atk&&P.atk.done) connected=true;
+        if(jabAt===null&&P.state==='attack') jabAt=clock;
+        if(jabAt!==null&&endAt===null&&P.state!=='attack') endAt=clock;
+        if(endAt!==null&&heavyAt===null&&E.started==='heavy') heavyAt=clock;
+      }
+      punish.push({whiff:jabAt!==null&&!connected,delay:heavyAt!==null&&endAt!==null?round3(heavyAt-endAt):null});
+    }
+    const whiffs=punish.filter(p=>p.whiff);
+    const onTime=whiffs.filter(p=>p.delay!==null&&p.delay>=.33&&p.delay<=.88);
+    const early=whiffs.filter(p=>p.delay!==null&&p.delay<.33);
+    const corner=[];
+    for(let b=0;b<3;b++){
+      const times=[];
+      for(let trial=0;trial<12;trial++){
+        boot(b, 9000+b*30+trial); place(4.7,6.5);
+        let clock=0, esc=null;
+        while(clock<3&&G.state==='fight'){
+          once(IDLEI); clock+=dt;
+          if(esc===null&&Math.hypot(E.pos.x,E.pos.z)<R*.82) esc=clock;
+        }
+        if(esc!==null) times.push(esc);
+      }
+      corner.push({foe:BOUTS[b].foe,escaped:times.length,n:12,med:med(times)});
+    }
+    const habits=[];
+    for(let b=0;b<3;b++){
+      boot(b, 42);
+      let side=0, band=0, clock=0; const dists=[];
+      while(clock<10&&G.state==='fight'){
+        const toX=P.pos.x-E.pos.x, toZ=P.pos.z-E.pos.z, dist=Math.hypot(toX,toZ)||1;
+        const ox=E.pos.x, oz=E.pos.z;
+        once(d=>botIntent(P,E,d,'normal'));
+        clock+=dt;
+        const mx=E.pos.x-ox, mz=E.pos.z-oz;
+        const lat=Math.abs(mx*toZ-mz*toX)/dist, fwd=Math.abs(mx*toX+mz*toZ)/dist;
+        dists.push(dist);
+        if(dist>1.15&&dist<2.4){ band+=dt; if(lat>fwd&&lat>0.004) side+=dt; }
+      }
+      habits.push({foe:BOUTS[b].foe,strafe:band?Math.round(side/band*1000)/10:0,band:round3(band),distMed:med(dists),hits:G.log.hits,blocks:G.log.blocks,dodges:G.log.dodges,corner:round3(G.log.corner)});
+    }
+    return {react,wind,marks,farm:{feintN,rolled,seen},echo,adapt,punish:{whiff:whiffs.length,n:punish.length,onTime:onTime.length,early:early.length,med:med(whiffs.filter(p=>p.delay!==null).map(p=>p.delay))},corner,habits};
+  } finally { restore(); }
+}
+window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI};
 })();
 </script>

@@ -304,3 +304,70 @@ Bot skill, normal difficulty:
 | Hard bot | 86.5% | 65% | 44.5% |
 
 Verdict: **keep**. Easy and hard difficulty move every bout the right way. Bot skill moves Reyes the right way. On Pike the three bots land in the same place, because none of them react inside a jab's 0.10 s startup.
+
+## Sprint 5 — Opponent AI
+
+Goal: Reyes teaches, Dag punishes, Pike repeats the last three attacks. A tell stays readable for 0.2–0.5 s. Nobody acts on an attack faster than their own react time. Log hits, blocks, dodges, and corner time.
+
+Probe: `node tools/ai-probe.mjs`. Corner means inside 85% of the 7 m ring. A defense is early when it lands more than half a frame before that fighter's react time.
+
+### Baseline
+
+The decision tick could fire at 0.7× react, and a tick that was already due answered on the same frame it saw the swing.
+
+| | React | Fastest answer |
+| --- | --- | --- |
+| Reyes | 0.08 s | 0.067 s |
+| Dag | 0.38 s | 0.300 s |
+| Pike | 0.24 s | 0.217 s |
+
+All three fastest answers were under that fighter's react. Jab mark time was 0 s. Heavy mark time was 0.333 s. Pike replayed a finished sequence, then kept his place in the old list when the sequence changed (`heavy, jab, heavy` instead of `heavy, heavy, jab`). A whiff drew a Dag heavy inside 1.2 s on 15 of 30 trials, median delay 0.10 s, none of them after his 0.38 s react. From the rim, escape within 3 s was 3 / 5 / 10 out of 12, median about 1.7 s.
+
+### Change 1 — habits, tells, and a fair react
+
+Hypothesis: one intent path can telegraph Reyes, punish with Dag, and replay Pike, if a defense or a punish waits out `react` and a jab mark is held for 0.28 s before the swing.
+
+Kept constants, old -> new:
+
+| Constant | Old | New |
+| --- | --- | --- |
+| Reyes jab mark | none | 0.28 s, then the jab |
+| Reyes feint | none | 20% of those marks, no swing |
+| Dag punish | none | heavy, `react` after a miss |
+| Pike memory | cycling index into a shifting list | the last three attacks, reset when they change |
+| Pike cooldown | 0.95 s | 1.05 s |
+| Corner | back up into the rim | step toward center past 82% of the ring |
+
+| | Before | After |
+| --- | --- | --- |
+| Reyes fastest answer | 0.067 s | 0.083 s |
+| Pike fastest answer | 0.217 s | 0.250 s |
+| Answers before react | yes | 0 |
+| Reyes jab mark | 0 s | 0.283 s |
+| Heavy mark | 0.333 s | 0.333 s |
+| Feints that became a swing | — | 0 of 11 |
+| Feint rolls | — | 11 / 50 (22%) |
+| Pike sequence match | drifted | 3 / 3, and the switch matched |
+| Dag punish on time | 0 / 30 | 30 / 30, median 0.383 s |
+| Rim escapes | 3, 5, 10 of 12 | 12, 12, 12 of 12 |
+| Escape median | ~1.7 s | 0.37 / 0.38 / 0.28 s |
+
+Dag does not answer the reaction heavy. It becomes active at 0.34 s and his react is 0.38 s, so a legal answer would be late. He does not swing early.
+
+Echoed jabs were landing, and at the old 0.95 s cooldown the median bot's win rate against Pike fell to 8% (200 fights). At 1.50 s it rose to 94%. 1.05 s puts it back.
+
+200 fights, seed 1, normal bot, normal difficulty:
+
+| Bout | Win % | Median | Empty | Stalemates | Corner |
+| --- | --- | --- | --- | --- | --- |
+| Before, Reyes | 84.5 | 33.1 s | 0% | 0 | — |
+| After, Reyes | 90.5 | 32.3 s | 0% | 0 | 1.7 s |
+| Before, Dag | 66.5 | 37.1 s | 0% | 0 | — |
+| After, Dag | 67.5 | 34.0 s | 0% | 0 | 5.1 s |
+| Before, Pike | 44.5 | 46.2 s | 0% | 0 | — |
+| After, Pike | 44.0 | 43.9 s | 0% | 0 | 0.0 s |
+
+Verdict: **keep**. A jab is still 7 damage, a block chip is still 0.7, a counter is still 8.75. The median bot's blocks stay at 0 because a jab is active at 0.10 s and the bot reacts at 0.18 s. Dag still holds that bot in the corner for about 5 s of a 34 s fight. The opponents themselves leave the rim in under half a second.
+
+`tuning/s5-tell.jpg` is Reyes with the mark up, arm cocked, before the jab.
+
