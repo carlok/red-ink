@@ -1,6 +1,6 @@
 # Sublevel Three
 
-![A jab lands inside the yellow tape. The auditor, in a white shirt, snaps Reyes back in his blue overalls, with a POW burst and orange sparks between them and the crowd dark behind.](tuning/s14-hero.jpg)
+![A jab lands inside the yellow tape. The auditor, in a white shirt, snaps Reyes back in a magenta sleeveless shirt, with a POW burst and orange sparks between them and the crowd dark behind.](tuning/s15-hero.jpg)
 
 Browser fighting game. One HTML file, no account, no build step to play.
 
@@ -63,8 +63,16 @@ Touch: move stick on the left, Jab in the bottom-right of the button cluster. Th
 
 Drop a `.glb` on the title screen to replace the auditor. Fighters are otherwise built in code (`makeFighter`). Tuning constants are at the top of the script: `ATK`, `LOOKS`, `BOUTS`, `CAM`.
 
+Fighters are skinned low-poly people (CC0, see Credits) animated by the fight state: each clip is scrubbed by sim time, so hitstop, pause, and the fixed step stay exact. Every opponent gets a random look each session: skin, hair, shirt, pants, and shoes are drawn so that neighbouring colours always differ clearly, and the height and build stay near the opponent's own. Add `?skin=0` to the address to play with the original procedural fighters, or `?skinseed=7` to repeat a set of looks. If the model cannot be loaded the game falls back to the procedural fighters by itself.
+
 The camera is sized from the frame: a fighter fills about a third of the screen height at close range, and both stay in view during a chase or a knockback. On a phone held upright the width limits it: only about 5 m of floor fits across, so the fighters fill about 18% of the height. `CAM` holds the numbers.
 
 The fight steps at a fixed 60 Hz and the view interpolates, so reaction times and hit windows run on the same clock on a 30, 60, or 144 Hz screen.
 
 Quality steps down resolution, then shadow filtering, then shadows, when the frame rate stays under 44 for 1.8 seconds. The floor is half the starting resolution.
+
+## Credits
+
+The fighters use one CC0 asset. Nothing here requires attribution, but it deserves it:
+
+- [Animated Human](https://opengameart.org/content/animated-human-low-poly) by [Quaternius](https://quaternius.com), CC0 1.0. `assets/quaternius-human/` says how the files were converted and which clips (Guard, HitA, HitB, HitHeavy, TellJab) were added in Blender with `tools/blender/author-clips.py`.

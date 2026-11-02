@@ -954,3 +954,157 @@ Hand check still open: 55 fps at 1080p on an iGPU, a real pad and phone, and how
 
 
 
+
+## Sprint 15 spike — a skinned CC0 fighter
+
+Goal: find out whether a free, skinned, animated human can replace the procedural body without breaking the fixed-step sim, and whether recolouring one model from `LOOKS` gives usable character variety. A spike on branch `s15-skinned-spike`, off by default (`__sublevel.skinOn(true)`), not for merging as it stands.
+
+Probes: `node tools/skin-probe.mjs` (budget, clip per state, frames), `node tools/skin-gallery.mjs` (one frame per opponent), `node tools/regression.mjs`, `node tools/step-probe.mjs`. The model loads with `fetch`, so the probes serve the repo over http; it will not load from `file://`.
+
+### The asset
+
+| | |
+| --- | --- |
+| Source | "Animated Human" by Quaternius, OpenGameArt, CC0 1.0 (`assets/quaternius-human/License.txt`) |
+| Zip | 5,010,069 bytes, sha256 `dcd72162…c24db3` |
+| Used | the FBX, converted to GLB in Blender 5.1.1 (`assets/quaternius-human/README.txt` lists the changes) |
+| GLB | 845,840 bytes, 346,384 gzipped; 48 bones; 791 vertices (4,492 after Babylon splits them) |
+| Actions | Death 85 frames, Idle 241, Jump 25, Punch 25, Run 16, Walk 25, Working 155, at 24 fps |
+| Skeleton | Mixamo-style bone names (`Hips`, `Spine1`, `LeftArm` …) |
+
+Two fixes were needed on the way. The FBX material has `Metallic = 1` and no texture, so it came out black; the zip's `ClothedLightSkin.png` was embedded and metallic set to 0. Even then Babylon's PBR material is black under this scene's lights, because PBR falls off with the inverse square of the distance and the key light is 8.4 m up. The skinned meshes get a `StandardMaterial` with an emissive base, the way the procedural bodies are lit.
+
+### How it is wired
+
+`updateSkin` runs once per drawn frame after `simShow`. It picks a clip from the fighter state and scrubs it with `goToFrame` from sim time, so hitstop, pause and the 1/60 s tick need nothing extra. The procedural body lean and roll still apply on top, which is all a hit reaction gets.
+
+| State | Clip | Mapping |
+| --- | --- | --- |
+| idle | Idle | `f.t` over the 10 s loop |
+| walking | Walk | `f.phase`, one cycle per 2π |
+| attack | Punch | piecewise on `atk.t`: the fist is fully out at 0.54 of the clip (frame 14 of 25, measured in Blender) and is pinned to the middle of the active window |
+| dodge | Run | stand-in, `dodgeT / 0.34` |
+| K.O. | Death | `koT / 2.2`, body lean and roll zeroed so the fall is not doubled |
+| block, hit, win | none | Idle plus the procedural lean |
+
+Punch retiming. The clip is 1.04 s and a left-hand punch. Jab (0.40 s, active 0.10–0.20): startup runs 3.6× faster than the clip and recovery 1.9×. Heavy (0.82 s, active 0.34–0.46): 1.4× and 1.1×. At `t = 0.158` the clip sits at 0.556, against 0.542 at full extension.
+
+### Variety from `LOOKS`
+
+The UVs point at flat bands of one 32×32 palette: skin rows 0–5, eyes 6–10, hair 11–16, shirt 17–22, pants 23–27, and shoes 28–31. The shoes band is new: the feet used the skin texels, so in Blender the 260 faces weighted to the Foot and ToeBase bones were re-pointed at row 29 (they reach 13% of the body height, so they read as high-tops). `skinPalette` paints the bands from the look's `skin`, `hair` (or `cap`), `shirt`, `pants` and `shoes`, and height and build come from the look's `sx`, `sy` on the fighter root. All six opponents load and read as different people (`tuning/s15-skin-variants.jpg`: Dag, bigger, in orange). The look's `tie`, `stripe`, `pocket`, `wrap` and cap have nowhere to go: the model has no accessories. Its `shoes` now show.
+
+### Numbers
+
+Bout 1, camera settled, same frame, skin off then on.
+
+| | Procedural | Skinned |
+| --- | --- | --- |
+| Draw calls | 150–152 | 27–29 |
+| Active meshes | 117–119 | 39–41 |
+| Meshes | 182 | 186 |
+| GPU frame | 1.75–2.20 ms | 1.69–1.82 ms |
+| Load | — | 38–47 ms per fighter, local |
+
+Draws fall by about 120 because each procedural fighter is about 35 meshes drawn twice, once for the shadow map. The GPU numbers move more between runs than between the two builds, so no GPU gain is claimed. With the skin off, `tools/regression.mjs` is 22 of 22 and `tools/step-probe.mjs` is identical at 20 to 144 fps.
+
+### What is missing
+
+- No block, hit-reaction or victory clip in this pack. A hit is the Idle clip with a procedural lean, which reads weak (`tuning/s15-skin-impact.jpg`).
+- Reyes's jab mark, the feints and the other tells are drawn by the procedural joints, which are hidden. The teaching in bout 1 would need a clip or an overlay.
+- One punch, always the left hand. Both fighters use it, and the heavy is the same clip slower.
+- No crossfade between clips: they snap.
+- The player is skinned from `LOOKS.auditor` once; an outfit unlock after that does not repaint it.
+- The art style changes: flat low-poly people against the toon rig.
+- Not checked: portrait and touch layout, the quality ladder, the GLB drop path, retargeting (`AnimatorAvatar`, not in the bundle yet), and anything over `file://`.
+
+### Second model: RG Poly City Character Pack (free zip)
+
+Fetched: `Characters Free.zip`, 15,300,736 bytes, sha256 `c34b3449…143188`, from the itch page. The zip has no license file; the page says "CC0 Licensed. Free for personal and commercial use, no attribution required" (read 2026-11-02). macOS `unzip` and `ditto` cannot read its LZMA entries; `bsdtar` can. It holds 16 characters (glTF and FBX), one 1024×1024 colour atlas, and about 45 clips as separate FBX files on one 21-bone rig.
+
+One character and twelve clips went into `assets/rgpoly-fighter/rgpoly-fighter.glb` (1,051,248 bytes) with Blender. The fight clips line up with `ATK`:
+
+| Clip | Frames at 30 fps | Seconds | Fit |
+| --- | --- | --- | --- |
+| FightM_Punch_A | 12 | 0.40 | jab length; left fist out at 0.58 of the clip, startup 1.5× faster than native |
+| FightM_Punch_B | 12 | 0.40 | jab length; right fist out at 0.42, about the middle of the active window |
+| FightM_Punch_C | 25 | 0.83 | heavy length (0.82); fist out at 0.76, startup 1.5× faster |
+| FightM_Hit_A, B | 12 | 0.40 | jab stun is 0.30 s |
+| FightM_Hit_C | 30 | 1.00 | heavy stun is 0.55 s |
+| FightM_Death_A | 60 | 2.00 | knockout is 2.4 s |
+| FightM_Idle, FightM_Pose | 20, 10 | 0.67, 0.33 | idle loop, guard and win poses |
+| Walk_A, Runing_A | 32, 25 | 1.07, 0.83 | walk, dodge stand-in |
+
+Every state has a clip: jabs alternate A and B, hits pick A or B by side and C for a heavy, block holds the end of Pose. In the harness (the RG Poly model was removed afterwards; see the last section) draws go 152 → 29 and active meshes 118 → 45, with no errors. Two bugs on the way: the FBX material points at a texture file that is not in the zip (Blender exported an empty texture, so everything was white), and disposing the PBR material also disposed the texture the new material used.
+
+What it costs: the rig is a simple 21-bone cartoon with no fingers, the bodies are chunky, and the look is far from the grim toon rig (`tuning/s15-skin-rgpoly-impact.jpg`). The colour atlas is shared by every character, so the five-band recolouring does not apply; variety would come from choosing among the 16 models, which was not tried.
+
+### Random looks
+
+`randomLook(seed)` returns a LOOKS-shaped row from a seeded mulberry32 stream of its own, so the gameplay rng is not touched: skin from 13 tones and hair from 14, each nudged by a few percent so no two people match; any shirt hue, quieter pants, shoes (black, brown, white, grey, navy, dark red or a bright sneaker), height 0.92–1.12 and build 0.94–1.3. Colours are drawn again until every pair that sits next to another on the body is far enough apart in CIE Lab ΔE (about 2 is the least an eye notices, 30 is clearly different): skin–shirt 30, shirt–pants 30, skin–pants 25, hair–skin 20, hair–shirt 20, shoes–pants 18. Over 5,000 seeds (`node tools/look-contrast-probe.mjs`) none breaks a minimum and the fallback, which would force light against dark, never fired; the mean ΔE is 48 to 72 per pair. A seed gives the same look every time. `skinFighter(f, look)` applies it, including the root scale and `f.sx`. It works with the Quaternius model only. Six seeds on the opponent all read as different people, from dark skin and a purple shirt to blond hair, a green shirt and red sneakers (`tuning/s15-skin-random.jpg`, `tuning/s15-skin-random-2.jpg`).
+
+### Authored clips for the Quaternius model
+
+The model had Idle, Walk, Run, Punch and Death, and nothing for block, hit or Reyes's wind-up. Four clips were authored in Blender (`tools/blender/author-clips.py`, run with `Blender -b --python`) and exported into the same GLB, which is now 956,764 bytes:
+
+| Clip | How it was made |
+| --- | --- |
+| Guard | the first pose of the Punch clip: a lead fist forward and the other at the chin, held. Used for block |
+| HitA, HitB | from the guard: spine and neck bent back and to one side, with a twist, overshoot and return, 12 frames at 24 fps. At the peak the head sits 0.39 behind where it was and 0.13 to the side |
+| HitHeavy | the same, bigger: 0.69 back, 19 frames |
+| TellJab | the striking (left) arm and forearm angles found by a coordinate search so the fist sits beside the ear (error 0.006), plus a small lean back, held. Used while `ai.tell` runs, scrubbed over its 0.28 s |
+
+The red "!" over Reyes's head was moved onto the slot so it survives the skin.
+
+What did not work. A right-hand punch made by mirroring the left one, in two ways: Blender's flipped paste (it mirrors across the world X axis and the rig faces diagonally, so the fist went behind the body) and a per-bone search over all 48 signed axis permutations of the quaternion (worst bone off by 3.9 units). Dropped. Instead the opponent's whole body is mirrored with a negative x scale on the avatar holder, so he leads with the other hand and the pair faces each other as in a real bout; his hit direction is flipped to match. Babylon handled the mirrored skinned mesh without culling problems.
+
+Two Blender 5 traps, in case this is redone: assigning an action does not bind its slot unless `animation_data.action_slot` is set, and updating the scene after setting a pose re-evaluates the assigned action and overwrites the pose, so every key came out as the guard until the helper wrote values and keyed them with no update between.
+
+Checked in the harness: the jab connects and Reyes's head snaps back with his hands up (`tuning/s15-skin-hit.jpg`), and his tell shows as a coiled guard with the "!" (`tuning/s15-skin-tell.jpg`). With the skin off the regression suite is 22 of 22.
+
+Not done at that point: crossfades, a stagger in the hits, and a portrait check; they are in the next section. Death is still the only fall and the player keeps the left-hand lead.
+
+### Crossfade, stagger and portrait
+
+Crossfade. When the clip changes, `updateSkin` snapshots each bone's local rotation and position and blends from it into the new clip. The fade is 0.12 s by default and shorter for fast clips: 0.04 s into the punch, 0.05 s into a hit, 0.08 s into the fall, so the jab still reaches its impact in time. The snap is `SKIN.fade = false`. Largest rotation change of any bone in one frame, 70 frames settled before each:
+
+| Transition | Snap | Fade |
+| --- | --- | --- |
+| idle → block → idle | 98°, 2 frames over 25° | 21°, none over 25° |
+| idle → jab | 98°, 4 frames over 25° | 56°, 4 frames over 25° |
+| idle → hit → idle | 98°, 2 frames over 25° | 51°, 1 frame over 25° |
+
+Block is smooth. The jab and the hit stay fast on purpose: the punch itself moves a bone more than 25° in a frame, so those counts do not go to zero.
+
+Stagger. The hit clips now also move the hips back and down at the peak (0.22 and 0.10 for a jab hit, 0.45 and 0.18 for a heavy, in rig units), so the knees give instead of only the spine bending. The direction came from testing which hips axis moves the body against its facing. The GLB is 957,384 bytes.
+
+Portrait and touch. At 390×844 with touch emulation both fighters stay fully in the closer portrait frame during a jab, a hit and the knockout, the touch buttons sit clear below them, and the HUD is intact (`tuning/s15-skin-portrait.jpg`). Draws 150 → 27.
+
+Not done: Death is still the only fall, the player keeps the left-hand lead, and nothing was checked on a real phone.
+
+### Shipped: skin on by default, random opponents
+
+Decisions: the skinned Quaternius model is the default, the opponents get a random look each session with the colour contrast rule, and the RG Poly files are removed (`assets/rgpoly-fighter/` and its model entry). The branch is tagged `before-skinned-fighters` on the last commit before the experiment (`3a8d92a`) so the procedural version is one checkout away.
+
+What changed from the spike:
+
+- **Default and opt-out.** `SKIN.on` starts true. `?skin=0` turns it off for one load, `localStorage['sublevel-skin'] = '0'` for good, `?skin=1` overrides that, `?skinseed=N` pins the opponents' looks.
+- **Embedded model.** The GLB is also written as `assets/quaternius-human/animated-human.js` (`node tools/embed-glb.mjs`), loaded by a script tag next to the audio samples, so the skin works from `file://` with no server. That file is 1,276,609 bytes, 414,374 gzipped, so a first load is about 414 KB heavier gzipped. If the model cannot be loaded at all (checked with both the script and the GLB returning 404), the procedural fighters stay and the skin is off for the session, with one console warning.
+- **Pages.** The workflow copied only `lib` and `audio`; it now copies `assets` too.
+- **Random looks.** Each opponent's look is `randomLook(seed + bout × 7919, LOOKS[foe])`: skin, hair, shirt, pants and shoes drawn under the ΔE minimums, and height and build within ±6% of the foe's own, so Dag stays the big one (1.21–1.30 wide in the runs). The session seed is `Math.random` at load. The Auditor keeps his own look, and an outfit unlock re-skins him with the new look because `syncPlayerOutfit` builds a new fighter.
+- **No flash.** The procedural body is hidden the moment a fighter is created, before the model finishes loading.
+
+A bug caught on the way. With the skin on by default the six-bout table moved: Reyes 89.5, Dag 61.5, Pike 47, Voss 34, Chen 25, Halvorsen 23 (was 90.5 / 67.5 / 44 / 36 / 30 / 22). `resolveBodies` sets the minimum distance between the fighters from `E.sx`, and `skinFighter` was overwriting it with the random look's build. The look's scale is now visual only and `f.sx` stays the foe's own. The table is back to 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0 with the same medians, on two runs.
+
+Checked with the skin on by default:
+
+| | Result |
+| --- | --- |
+| `tools/regression.mjs` | 22 of 22 |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, twice |
+| `step-probe`, 600 ticks at 20 to 144 fps | identical, natural frames 600 of 600 single ticks |
+| Draws / active meshes / GPU | 27 / 39 / 1.2 ms (was 149 / 116 / 1.25) |
+| Damage, stamina, stun, hitstop, counter, word readable | unchanged, 50–51 ms |
+| `cam-probe`, bouts 2, 3 and 6 | head share 33.6–40% at 1920×1080 (Dag's head 18.3% from the top), 18.5–19.9% at 390×844, no clipped frame, nothing off screen |
+| Boot over `file://` and over http, default / `?skin=0` / `?skinseed=5` | skinned / procedural / skinned, no console errors |
+
+Not done: Death is the only fall; the Auditor always leads with the left hand; nothing was checked on a real phone or on an integrated GPU; the model is parsed again at each bout start (about 50 ms, hidden by the 1.15 s ready phase).
