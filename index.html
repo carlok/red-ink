@@ -1066,84 +1066,136 @@ function duckHit(){
    Each place has a tempo, a root and a scale (MUSIC_PLACES). The patterns come from a seeded stream (never the gameplay rng), so a place
    sounds the same every time: a two-bar bass line, a kick, snare and hat grid, a short lead motif, and a chord for the pad. Four layers
    (pad, pluck, bass, drums) are faded by what is happening (musicTargets). A scheduler runs 140 ms ahead of the audio clock. */
-const SCALES={phrygian:[0,1,3,5,7,8,10],minor:[0,2,3,5,7,8,10],pent:[0,3,5,7,10],dorian:[0,2,3,5,7,9,10],harm:[0,2,3,5,7,8,11],pdom:[0,1,4,5,7,8,10]};
+const SCALES={minor:[0,2,3,5,7,8,10],dorian:[0,2,3,5,7,9,10]};
+/* 80s: minor keys, an i-VI-III-VII chord line, tempos from 84 to 126 */
 const MUSIC_PLACES=[
-  {bpm:78,root:38,scale:'phrygian',swing:.10,kick:'sparse',snare:'rim',hat:'soft',lead:'pluck',arp:false},
-  {bpm:96,root:36,scale:'pent',swing:0,kick:'four',snare:'back',hat:'metal',lead:'pluck',arp:false},
-  {bpm:84,root:41,scale:'dorian',swing:.06,kick:'sparse',snare:'back',hat:'soft',lead:'pluck',arp:true},
-  {bpm:70,root:33,scale:'minor',swing:0,kick:'sparse',snare:'none',hat:'none',lead:'bell',arp:false},
-  {bpm:100,root:40,scale:'harm',swing:0,kick:'four',snare:'march',hat:'soft',lead:'pluck',arp:false},
-  {bpm:112,root:43,scale:'pdom',swing:0,kick:'four',snare:'back',hat:'drive',lead:'pluck',arp:true}
+  {bpm:84,root:40,scale:'minor',kick:'sparse',snare:'back',hat:'soft',lead:'saw',arp:false},
+  {bpm:100,root:33,scale:'minor',kick:'four',snare:'back',hat:'metal',lead:'saw',arp:false},
+  {bpm:110,root:38,scale:'dorian',kick:'four',snare:'back',hat:'soft',lead:'saw',arp:true},
+  {bpm:92,root:36,scale:'minor',kick:'sparse',snare:'rim',hat:'soft',lead:'bell',arp:false},
+  {bpm:118,root:41,scale:'minor',kick:'four',snare:'march',hat:'metal',lead:'saw',arp:true},
+  {bpm:126,root:43,scale:'minor',kick:'four',snare:'back',hat:'drive',lead:'saw',arp:true}
 ];
-const MUS={timer:0,step:0,bar:0,nextT:0,place:0,pat:null,bus:null,delay:null,noise:null,layer:{},cur:{pad:0,pluck:0,bass:0,drums:0},tgt:{pad:0,pluck:0,bass:0,drums:0},moment:false,momentBars:0,cool:0};
+const MUS={timer:0,step:0,bar:0,nextT:0,place:0,pat:null,bus:null,delay:null,rev:null,noise:null,layer:{},pump:{},cur:{pad:0,pluck:0,bass:0,drums:0},tgt:{pad:0,pluck:0,bass:0,drums:0},moment:false,momentBars:0,cool:0};
 const mhz=m=>440*Math.pow(2,(m-69)/12);
-const MUS_LEVEL={pad:.5,pluck:.55,bass:.7,drums:.7}; /* layer trims, set with tools/audio-bed-probe.mjs */
+const MUS_LEVEL={pad:2.2,pluck:1.4,bass:.55,drums:.5}; /* layer trims, set with tools/audio-bed-probe.mjs */
 function musicBuild(i){
   const P=MUSIC_PLACES[i%MUSIC_PLACES.length], sc=SCALES[P.scale], r=mulberry32(9001+i*131), pick=a=>a[Math.floor(r()*a.length)];
   const deg=d=>{ const n=sc.length; return sc[((d%n)+n)%n]+12*Math.floor(d/n); };
-  const bass=new Array(32).fill(-99); [0,8,16,24].forEach(x=>{ bass[x]=0; });
-  [3,6,11,14,19,22,27,30].forEach(x=>{ if(r()<.55) bass[x]=deg(pick([0,0,2,4,-1,-3])); });
   const kick=P.kick==='four'?[0,4,8,12]:[0,10].concat(r()<.5?[6]:[]);
   const snare=P.snare==='back'?[4,12]:P.snare==='rim'?[12]:P.snare==='march'?[4,12]:[];
   const ghost=P.snare==='march'?[7,15]:[];
-  const hat=[]; if(P.hat!=='none'){ const every=P.hat==='soft'?2:1; for(let x=0;x<16;x+=every) if(P.hat==='drive'||r()<.8) hat.push([x,x%4===0?.55:.3+r()*.2]); }
+  const hat=[]; if(P.hat!=='none'){ const every=P.hat==='soft'?2:1; for(let x=0;x<16;x+=every) if(P.hat==='drive'||r()<.85) hat.push([x,x%4===0?.55:.3+r()*.2]); }
   const lead=new Array(32).fill(-99); let d=pick([2,3,4]);
   const slots=[0,3,6,8,11,14,16,19,22,24,27].filter(()=>r()<.62);
   slots.forEach(x=>{ d=Math.max(1,Math.min(9,d+pick([-2,-1,-1,1,1,2]))); lead[x]=deg(d); });
   const chords=[0,5,2,6].map(rt=>[deg(rt),deg(rt+2),deg(rt+4)]);
-  const arp=[0,2,4,2,5,4,2,0,2,4,5,7,5,4,2,4].map(x=>deg(x));
-  return {bass,kick,snare,ghost,hat,lead,chords,arp};
+  return {kick,snare,ghost,hat,lead,chords,deg};
 }
 function musicSetPlace(i){
   MUS.place=((i%MUSIC_PLACES.length)+MUSIC_PLACES.length)%MUSIC_PLACES.length; MUS.pat=musicBuild(MUS.place); MUS.step=0; MUS.bar=0;
   if(MUS.delay) MUS.delay.delayTime.value=60/MUSIC_PLACES[MUS.place].bpm*.75;
 }
+/* a chorus on a layer: the dry signal plus a copy through a delay that a slow LFO sweeps by a few milliseconds */
+function chorusLayer(inp,out){
+  const d=ac.createDelay(.05), w=ac.createGain(), l=ac.createOscillator(), lg=ac.createGain(); d.delayTime.value=.018; w.gain.value=.55; l.frequency.value=.38; lg.gain.value=.004;
+  inp.connect(out); inp.connect(d); d.connect(w); w.connect(out); l.connect(lg); lg.connect(d.delayTime); l.start();
+}
 function musicInit(){
   if(MUS.bus||!ac) return;
   MUS.bus=ac.createGain(); MUS.bus.connect(musicGain);
-  ['pad','pluck','bass','drums'].forEach(k=>{ const g=ac.createGain(); g.gain.value=0; g.connect(MUS.bus); MUS.layer[k]=g; });
-  const d=ac.createDelay(1), fb=ac.createGain(), wet=ac.createGain(); d.delayTime.value=.4; fb.gain.value=.32; wet.gain.value=.38;
+  /* reverb: one convolver with a generated 1.6 s impulse, shared through a send */
+  const n=Math.floor(ac.sampleRate*1.6), ib=ac.createBuffer(2,n,ac.sampleRate); let a=3;
+  for(let c=0;c<2;c++){ const d=ib.getChannelData(c); for(let i=0;i<n;i++){ a=(Math.imul(a,1664525)+1013904223)>>>0; d[i]=(a/2147483648-1)*Math.exp(-i/ac.sampleRate/.42); } }
+  MUS.rev=ac.createConvolver(); MUS.rev.buffer=ib; const rw=ac.createGain(); rw.gain.value=.4; MUS.rev.connect(rw); rw.connect(MUS.bus); MUS.revIn=ac.createGain(); MUS.revIn.connect(MUS.rev);
+  ['pad','pluck','bass','drums'].forEach(k=>{
+    const g=ac.createGain(); g.gain.value=0; MUS.layer[k]=g;
+    let out=MUS.bus;
+    if(k==='pad'||k==='bass'){ const pm=ac.createGain(); pm.connect(MUS.bus); MUS.pump[k]=pm; out=pm; }
+    if(k==='pad'||k==='pluck') chorusLayer(g,out); else g.connect(out);
+  });
+  const d=ac.createDelay(1), fb=ac.createGain(), wet=ac.createGain(); d.delayTime.value=.4; fb.gain.value=.34; wet.gain.value=.36;
   d.connect(fb); fb.connect(d); d.connect(wet); wet.connect(MUS.layer.pluck); MUS.delay=d;
-  const n=Math.floor(ac.sampleRate*1.5), nb=ac.createBuffer(1,n,ac.sampleRate), nd=nb.getChannelData(0); let a=7;
-  for(let i=0;i<n;i++){ a=(Math.imul(a,1664525)+1013904223)>>>0; nd[i]=a/2147483648-1; }
-  MUS.noise=nb; musicSetPlace(MUS.place); MUS.timer=setInterval(musicTick,25);
+  const m=Math.floor(ac.sampleRate*1.5), nb=ac.createBuffer(1,m,ac.sampleRate), nd=nb.getChannelData(0); a=7;
+  for(let i=0;i<m;i++){ a=(Math.imul(a,1664525)+1013904223)>>>0; nd[i]=a/2147483648-1; }
+  MUS.noise=nb;
+  [['hatC','hatCf'],['hatO','hatOf']].forEach(k=>{ const s=ac.createBufferSource(), f=ac.createBiquadFilter(), g=ac.createGain(); s.buffer=nb; s.loop=true; f.type='highpass'; f.frequency.value=7500; g.gain.value=.0001; s.connect(f); f.connect(g); g.connect(MUS.layer.drums); s.start(); MUS[k[0]]=g; MUS[k[1]]=f; });
+  musicSetPlace(MUS.place); MUS.timer=setInterval(musicTick,25);
 }
 /* voices: each is a few nodes that stop themselves */
 function mEnv(dest,t,dur,peak,atk){ const g=ac.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(Math.max(.0002,peak),t+atk); g.gain.exponentialRampToValueAtTime(.0001,t+dur); g.connect(dest); return g; }
-function vKick(t,v){ const o=ac.createOscillator(); o.frequency.setValueAtTime(135,t); o.frequency.exponentialRampToValueAtTime(42,t+.14); o.connect(mEnv(MUS.layer.drums,t,.34,.95*v,.004)); o.start(t); o.stop(t+.36); }
-function vNoise(dest,t,dur,v,type,f,q){ const s=ac.createBufferSource(), fl=ac.createBiquadFilter(); s.buffer=MUS.noise; fl.type=type; fl.frequency.value=f; fl.Q.value=q||.7; s.connect(fl); fl.connect(mEnv(dest,t,dur,v,.002)); s.start(t,Math.random()*1.2); s.stop(t+dur+.02); }
-function vSnare(t,v,soft){ vNoise(MUS.layer.drums,t,soft?.1:.2,.5*v,'bandpass',soft?2600:1900,.8); if(!soft){ const o=ac.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(210,t); o.frequency.exponentialRampToValueAtTime(140,t+.1); o.connect(mEnv(MUS.layer.drums,t,.14,.35*v,.002)); o.start(t); o.stop(t+.16); } }
-function vHat(t,v,metal){ vNoise(MUS.layer.drums,t,.05,.22*v,metal?'bandpass':'highpass',metal?9000:7500,metal?2:.7); }
-function vBass(t,m,dur,v){ const o=ac.createOscillator(), f=ac.createBiquadFilter(); o.type='sawtooth'; o.frequency.value=mhz(m); f.type='lowpass'; f.frequency.setValueAtTime(950,t); f.frequency.exponentialRampToValueAtTime(260,t+dur); f.Q.value=3; o.connect(f); f.connect(mEnv(MUS.layer.bass,t,dur,.34*v,.01)); o.start(t); o.stop(t+dur+.02); }
-function vPluck(t,m,v,bell){
-  const o=ac.createOscillator(), g=mEnv(MUS.layer.pluck,t,bell?1.4:.55,.3*v,.004); o.type=bell?'sine':'triangle'; o.frequency.value=mhz(m); o.connect(g); o.connect(MUS.delay); o.start(t); o.stop(t+(bell?1.45:.6));
-  if(bell){ const h=ac.createOscillator(); h.frequency.value=mhz(m)*2.76; h.connect(mEnv(MUS.layer.pluck,t,.5,.1*v,.003)); h.start(t); h.stop(t+.55); }
+function revSend(node,amt){ const g=ac.createGain(); g.gain.value=amt; node.connect(g); g.connect(MUS.revIn); }
+function pumpKick(t){ ['pad','bass'].forEach(k=>{ const g=MUS.pump[k]&&MUS.pump[k].gain; if(!g) return; g.cancelScheduledValues(t); g.setValueAtTime(.55,t); g.linearRampToValueAtTime(1,t+.2); }); }
+function vKick(t,v){
+  const o=ac.createOscillator(); o.frequency.setValueAtTime(165,t); o.frequency.exponentialRampToValueAtTime(48,t+.12); o.connect(mEnv(MUS.layer.drums,t,.32,.95*v,.003)); o.start(t); o.stop(t+.34);
+  pumpKick(t);
 }
+function vNoise(dest,t,dur,v,type,f,q){ const s=ac.createBufferSource(), fl=ac.createBiquadFilter(); s.buffer=MUS.noise; fl.type=type; fl.frequency.value=f; fl.Q.value=q||.7; s.connect(fl); fl.connect(mEnv(dest,t,dur,v,.002)); s.start(t,Math.random()*1.2); s.stop(t+dur+.02); return fl; }
+/* snare with a gated reverb: the body, then a plateau of band-passed noise held for 140 ms and cut at 180 ms, which is what a gated reverb is */
+function vSnare(t,v,soft){
+  vNoise(MUS.layer.drums,t,soft?.1:.2,.5*v,'bandpass',soft?2600:1900,.8);
+  if(soft) return;
+  const o=ac.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(210,t); o.frequency.exponentialRampToValueAtTime(140,t+.1); o.connect(mEnv(MUS.layer.drums,t,.14,.35*v,.002)); o.start(t); o.stop(t+.16);
+  const s=ac.createBufferSource(), f=ac.createBiquadFilter(), g=ac.createGain(); s.buffer=MUS.noise; f.type='bandpass'; f.frequency.value=2200; f.Q.value=.6; s.connect(f); f.connect(g); g.connect(MUS.layer.drums);
+  g.gain.setValueAtTime(.0001,t); g.gain.linearRampToValueAtTime(.3*v,t+.004); g.gain.setValueAtTime(.26*v,t+.14); g.gain.linearRampToValueAtTime(.0001,t+.18); s.start(t,Math.random()*1.2); s.stop(t+.2);
+}
+function vClap(t,v){
+  const s=ac.createBufferSource(), f=ac.createBiquadFilter(), g=ac.createGain(); s.buffer=MUS.noise; f.type='bandpass'; f.frequency.value=1500; f.Q.value=1.2; s.connect(f); f.connect(g); g.connect(MUS.layer.drums);
+  g.gain.setValueAtTime(.0001,t); [0,.011,.022].forEach((d,i)=>{ g.gain.linearRampToValueAtTime(.3*v,t+d+.002); g.gain.linearRampToValueAtTime(i<2?.05*v:.0001,t+d+(i<2?.009:.12)); }); s.start(t,Math.random()*1.2); s.stop(t+.14);
+}
+/* hats cost no nodes per hit: two looping noise chains (closed, open) whose gain is automated */
+function vHat(t,v,metal,open){
+  const h=open?MUS.hatO:MUS.hatC; if(!h) return; const g=h.gain, dur=open?.2:.05, pk=(open?.16:.22)*v;
+  if(MUS.hatMetal!==metal){ MUS.hatMetal=metal; [MUS.hatCf,MUS.hatOf].forEach(f=>{ f.type=metal?'bandpass':'highpass'; f.frequency.value=metal?9000:7500; f.Q.value=metal?2:.7; }); }
+  g.setValueAtTime(.0001,t); g.linearRampToValueAtTime(pk,t+.002); g.exponentialRampToValueAtTime(.0001,t+dur);
+}
+function vTom(t,f,v){ const o=ac.createOscillator(); o.frequency.setValueAtTime(f,t); o.frequency.exponentialRampToValueAtTime(f*.55,t+.2); o.connect(mEnv(MUS.layer.drums,t,.26,.55*v,.003)); o.start(t); o.stop(t+.28); vNoise(MUS.layer.drums,t,.03,.2*v,'bandpass',1200,1); }
+function vBass(t,m,dur,v){
+  const o=ac.createOscillator(), u=ac.createOscillator(), f=ac.createBiquadFilter(), g=mEnv(MUS.layer.bass,t,dur,.34*v,.008);
+  o.type='sawtooth'; o.frequency.value=mhz(m); u.frequency.value=mhz(m-12); f.type='lowpass'; f.frequency.setValueAtTime(1100,t); f.frequency.exponentialRampToValueAtTime(280,t+dur); f.Q.value=4; o.connect(f); u.connect(g); f.connect(g); o.start(t); u.start(t); o.stop(t+dur+.02); u.stop(t+dur+.02);
+}
+/* the 80s lead: two detuned sawtooths through a closing filter, into the layer's chorus and the delay */
+function vLead(t,m,v,dur){
+  dur=dur||.5; const f=ac.createBiquadFilter(), g=mEnv(MUS.layer.pluck,t,dur,.2*v,.006);
+  f.type='lowpass'; f.Q.value=2; f.frequency.setValueAtTime(4200,t); f.frequency.exponentialRampToValueAtTime(1300,t+dur*.7); f.connect(g); g.connect(MUS.delay); revSend(g,.25);
+  [-9,9].forEach(c=>{ const o=ac.createOscillator(); o.type='sawtooth'; o.detune.value=c; o.frequency.value=mhz(m); o.connect(f); o.start(t); o.stop(t+dur+.02); });
+}
+/* a DX-style bell: a sine carrier frequency-modulated by a sine at 3.5 times its pitch, the modulation dying away */
+function vBell(t,m,v){
+  const c=ac.createOscillator(), md=ac.createOscillator(), mg=ac.createGain(), g=mEnv(MUS.layer.pluck,t,1.5,.3*v,.003);
+  c.frequency.value=mhz(m); md.frequency.value=mhz(m)*3.5; mg.gain.setValueAtTime(mhz(m)*2.2,t); mg.gain.exponentialRampToValueAtTime(mhz(m)*.1,t+.7); md.connect(mg); mg.connect(c.frequency); c.connect(g); g.connect(MUS.delay); revSend(g,.3);
+  c.start(t); md.start(t); c.stop(t+1.55); md.stop(t+1.55);
+}
+const vPluck=(t,m,v,bell)=>bell?vBell(t,m,v):vLead(t,m,v);
+function vArp(t,m,v){ const o=ac.createOscillator(); o.type='square'; o.frequency.value=mhz(m); o.connect(mEnv(MUS.layer.pluck,t,.12,.1*v,.003)); o.start(t); o.stop(t+.14); }
+/* the pad: three detuned sawtooths a note, slow attack, one lowpass; the layer's chorus widens it */
 function vPad(t,notes,dur){
-  notes.forEach(n=>{ [-7,7].forEach(c=>{ const o=ac.createOscillator(), f=ac.createBiquadFilter(); o.type='sawtooth'; o.detune.value=c; o.frequency.value=mhz(n); f.type='lowpass'; f.frequency.value=720; o.connect(f);
-    const g=ac.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.045,t+Math.min(1.4,dur*.4)); g.gain.setValueAtTime(.045,t+dur*.7); g.gain.exponentialRampToValueAtTime(.0001,t+dur); f.connect(g); g.connect(MUS.layer.pad); o.start(t); o.stop(t+dur+.05); }); });
+  notes.forEach(n=>{ [-7,7].forEach(c=>{ const o=ac.createOscillator(), f=ac.createBiquadFilter(), g=ac.createGain(); o.type='sawtooth'; o.detune.value=c; o.frequency.value=mhz(n); f.type='lowpass'; f.frequency.value=900; o.connect(f);
+    g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.03,t+Math.min(.9,dur*.35)); g.gain.setValueAtTime(.03,t+dur*.75); g.gain.exponentialRampToValueAtTime(.0001,t+dur); f.connect(g); g.connect(MUS.layer.pad); o.start(t); o.stop(t+dur+.05); }); });
 }
 function musicStep(s,t){
-  const P=MUSIC_PLACES[MUS.place], pat=MUS.pat, L=MUS.cur, root=P.root, sd=60/P.bpm/4, st=s%16;
+  const P=MUSIC_PLACES[MUS.place], pat=MUS.pat, L=MUS.cur, root=P.root, sd=60/P.bpm/4, st=s%16, bar=MUS.bar, ch=pat.chords[bar%4];
   if(L.drums>.04){
     if(pat.kick.includes(st)) vKick(t,.55+.45*L.drums);
-    if(pat.snare.includes(st)) vSnare(t,.6+.4*L.drums,P.snare==='rim');
+    if(pat.snare.includes(st)){ vSnare(t,.6+.4*L.drums,P.snare==='rim'); if(P.snare!=='rim'&&L.drums>.5) vClap(t,.5); }
     if(pat.ghost.includes(st)) vSnare(t,.3,true);
-    pat.hat.forEach(h=>{ if(h[0]===st&&L.drums>.5) vHat(t,h[1],P.hat==='metal'); });
+    if(bar%4===3&&st>=12&&L.drums>.5) vTom(t,[230,190,150,115][st-12],.7+.3*L.drums);
+    else pat.hat.forEach(h=>{ if(h[0]===st&&L.drums>.5) vHat(t,h[1],P.hat!=='soft',false); });
+    if((P.hat==='metal'||P.hat==='drive')&&st%4===2&&L.drums>.5) vHat(t,.6,true,true);
   }
-  if(L.bass>.04&&pat.bass[s]>-99) vBass(t,root+pat.bass[s],sd*(pat.bass[s]===0?3:1.6),.5+.5*L.bass);
+  if(L.bass>.04&&st%2===0){ const oct=(st%4===2)?12:0; vBass(t,root+ch[0]+oct,sd*(st===0?3:1.7),.5+.5*L.bass); }
   if(L.pluck>.04){
     if(pat.lead[s]>-99) vPluck(t,root+12+pat.lead[s],.5+.5*L.pluck,P.lead==='bell');
-    else if(P.arp&&L.pluck>.5&&L.drums>.3&&s%2===0) vPluck(t,root+24+pat.arp[st],.28,false);
+    else if(P.arp&&L.pluck>.5&&L.drums>.3) vArp(t,root+24+ch[st%3]+(st%4===3?12:0),.5);
   }
-  if(L.pad>.04&&s===0){ const ch=pat.chords[MUS.bar%4]; vPad(t,ch.map(x=>root+12+x).concat([root+ch[0]]),sd*32); }
+  if(L.pad>.04&&st===0) vPad(t,ch.map(x=>root+12+x),sd*16*1.05);
 }
 function musicTick(){
   if(!ac||!MUS.bus||ac.state!=='running'||splashHold||document.hidden||G.state==='pause'){ MUS.nextT=0; return; }
   const now=ac.currentTime, P=MUSIC_PLACES[MUS.place], sd=60/P.bpm/4;
   if(MUS.nextT<now) MUS.nextT=now+.06;
   while(MUS.nextT<now+.14){
-    musicStep(MUS.step, MUS.nextT+((MUS.step&1)?P.swing*sd:0));
+    musicStep(MUS.step, MUS.nextT);
     MUS.step=(MUS.step+1)%32; MUS.nextT+=sd;
     if(MUS.step%16===0){ MUS.bar++; if(MUS.moment&&--MUS.momentBars<=0){ MUS.moment=false; MUS.cool=12; } else if(!MUS.moment&&MUS.cool>0) MUS.cool--; }
   }

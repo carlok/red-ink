@@ -7,6 +7,9 @@
 import { withPage, bootSublevel } from "./cdp-session.mjs";
 
 await withPage(async (cdp) => {
+  const pageErrors = [];
+  cdp.ws.addEventListener("message", (ev) => { const m = JSON.parse(ev.data); if (m.method === "Runtime.exceptionThrown") pageErrors.push((m.params.exceptionDetails.exception || {}).description || m.params.exceptionDetails.text); });
+  await cdp.send("Runtime.enable");
   await bootSublevel(cdp);
   const out = await cdp.eval(`(async () => {
     const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G;
@@ -57,7 +60,7 @@ await withPage(async (cdp) => {
     const res = { ctx: g.ac.state, sampleLoops: 0, liveBed: !!g.BED.ready };
     res.titleShape = await shape(8000); res.titlePitches = await pitches(8000);
     res.title = await rms(1500);
-    document.getElementById("wrap").hidden = true; S.seed(5); S.startBout(0);
+    document.getElementById("wrap").hidden = true; S.seed(5); S.startBout(${Number(process.env.BOUT || 0)});
     while (G.state !== "fight") await raf();
     S.E.ai.cd = 99; S.E.cfg.cd = 99; S.E.speed0 = 0; S.E.cfg.block = 0; S.E.cfg.dodge = 0; S.P.pos.set(-0.7, 0, 0); S.E.pos.set(0.7, 0, 0); S.P.hp = S.P.maxHp = 1e6; S.E.hp = S.E.maxHp = 1e6;
     await sleep(2500); res.fightIdle = await rms(2000);
@@ -71,5 +74,5 @@ await withPage(async (cdp) => {
     /* a suspended context keeps its last buffer in the analyser, so silence is read as the clock standing still */
     S.toSplash(true); await sleep(600); const c0 = g.ac.currentTime; await sleep(2000); res.splash = { ctx: g.ac.state, state: G.state, clockAdvancedSeconds: Math.round((g.ac.currentTime - c0) * 100) / 100 };
     return JSON.stringify(res); })()`, true);
-  console.log(out);
+  const o = JSON.parse(out); o.pageErrors = pageErrors.slice(0, 3); console.log(JSON.stringify(o));
 }, { args: ["--autoplay-policy=no-user-gesture-required"] });
