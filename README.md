@@ -68,3 +68,12 @@ The camera is sized from the frame: a fighter fills about a third of the screen 
 The fight steps at a fixed 60 Hz and the view interpolates, so reaction times and hit windows run on the same clock on a 30, 60, or 144 Hz screen.
 
 Quality steps down resolution, then shadow filtering, then shadows, when the frame rate stays under 44 for 1.8 seconds. The floor is half the starting resolution.
+
+## Credits
+
+The skinned-fighter spike uses CC0 assets. Nothing here requires attribution, but they deserve it:
+
+- [Animated Human](https://opengameart.org/content/animated-human-low-poly) by [Quaternius](https://quaternius.com), CC0 1.0. `assets/quaternius-human/`.
+- [City Character Pack](https://rg-poly.itch.io/cartoon-city-massive-pack-characters) (free version) by RG Poly, CC0 per the itch page. `assets/rgpoly-fighter/`.
+
+Each folder says how its files were converted.

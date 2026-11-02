@@ -991,7 +991,7 @@ Punch retiming. The clip is 1.04 s and a left-hand punch. Jab (0.40 s, active 0.
 
 ### Variety from `LOOKS`
 
-The UVs point at five flat bands of one 32×32 palette: skin rows 0–5, eyes 6–10, hair 11–16, shirt 17–22, pants 23–31. `skinPalette` paints them from the look's `skin`, `hair` (or `cap`), `shirt` and `pants`, and height and build come from the look's `sx`, `sy` on the fighter root. All six opponents load and read as different people (`tuning/s15-skin-variants.jpg`: Dag, bigger, in orange). The look's `shoes`, `tie`, `stripe`, `pocket`, `wrap` and cap have nowhere to go: the model is barefoot and has no accessories.
+The UVs point at flat bands of one 32×32 palette: skin rows 0–5, eyes 6–10, hair 11–16, shirt 17–22, pants 23–27, and shoes 28–31. The shoes band is new: the feet used the skin texels, so in Blender the 260 faces weighted to the Foot and ToeBase bones were re-pointed at row 29 (they reach 13% of the body height, so they read as high-tops). `skinPalette` paints the bands from the look's `skin`, `hair` (or `cap`), `shirt`, `pants` and `shoes`, and height and build come from the look's `sx`, `sy` on the fighter root. All six opponents load and read as different people (`tuning/s15-skin-variants.jpg`: Dag, bigger, in orange). The look's `tie`, `stripe`, `pocket`, `wrap` and cap have nowhere to go: the model has no accessories. Its `shoes` now show.
 
 ### Numbers
 
@@ -1017,6 +1017,31 @@ Draws fall by about 120 because each procedural fighter is about 35 meshes drawn
 - The art style changes: flat low-poly people against the toon rig.
 - Not checked: portrait and touch layout, the quality ladder, the GLB drop path, retargeting (`AnimatorAvatar`, not in the bundle yet), and anything over `file://`.
 
+### Second model: RG Poly City Character Pack (free zip)
+
+Fetched: `Characters Free.zip`, 15,300,736 bytes, sha256 `c34b3449…143188`, from the itch page. The zip has no license file; the page says "CC0 Licensed. Free for personal and commercial use, no attribution required" (read 2026-11-02). macOS `unzip` and `ditto` cannot read its LZMA entries; `bsdtar` can. It holds 16 characters (glTF and FBX), one 1024×1024 colour atlas, and about 45 clips as separate FBX files on one 21-bone rig.
+
+One character and twelve clips went into `assets/rgpoly-fighter/rgpoly-fighter.glb` (1,051,248 bytes) with Blender. The fight clips line up with `ATK`:
+
+| Clip | Frames at 30 fps | Seconds | Fit |
+| --- | --- | --- | --- |
+| FightM_Punch_A | 12 | 0.40 | jab length; left fist out at 0.58 of the clip, startup 1.5× faster than native |
+| FightM_Punch_B | 12 | 0.40 | jab length; right fist out at 0.42, about the middle of the active window |
+| FightM_Punch_C | 25 | 0.83 | heavy length (0.82); fist out at 0.76, startup 1.5× faster |
+| FightM_Hit_A, B | 12 | 0.40 | jab stun is 0.30 s |
+| FightM_Hit_C | 30 | 1.00 | heavy stun is 0.55 s |
+| FightM_Death_A | 60 | 2.00 | knockout is 2.4 s |
+| FightM_Idle, FightM_Pose | 20, 10 | 0.67, 0.33 | idle loop, guard and win poses |
+| Walk_A, Runing_A | 32, 25 | 1.07, 0.83 | walk, dodge stand-in |
+
+Every state has a clip: jabs alternate A and B, hits pick A or B by side and C for a heavy, block holds the end of Pose. In the harness (`node tools/skin-probe.mjs <prefix> rg`) draws go 152 → 29 and active meshes 118 → 45, with no errors. Two bugs on the way: the FBX material points at a texture file that is not in the zip (Blender exported an empty texture, so everything was white), and disposing the PBR material also disposed the texture the new material used.
+
+What it costs: the rig is a simple 21-bone cartoon with no fingers, the bodies are chunky, and the look is far from the grim toon rig (`tuning/s15-skin-rgpoly-impact.jpg`). The colour atlas is shared by every character, so the five-band recolouring does not apply; variety would come from choosing among the 16 models, which was not tried.
+
+### Random looks
+
+`randomLook(seed)` returns a LOOKS-shaped row from a seeded mulberry32 stream of its own, so the gameplay rng is not touched: skin from 13 tones and hair from 14, each nudged by a few percent so no two people match; any shirt hue, quieter pants, shoes (black, brown, white, grey, navy, dark red or a bright sneaker), height 0.92–1.12 and build 0.94–1.3. Colours are drawn again until every pair that sits next to another on the body is far enough apart in CIE Lab ΔE (about 2 is the least an eye notices, 30 is clearly different): skin–shirt 30, shirt–pants 30, skin–pants 25, hair–skin 20, hair–shirt 20, shoes–pants 18. Over 5,000 seeds (`node tools/look-contrast-probe.mjs`) none breaks a minimum and the fallback, which would force light against dark, never fired; the mean ΔE is 48 to 72 per pair. A seed gives the same look every time. `skinFighter(f, look)` applies it, including the root scale and `f.sx`. It works with the Quaternius model only. Six seeds on the opponent all read as different people, from dark skin and a purple shirt to blond hair, a green shirt and red sneakers (`tuning/s15-skin-random.jpg`, `tuning/s15-skin-random-2.jpg`).
+
 ### Next
 
-`Characters Free.zip` from RG Poly (CC0, 14 MB, 17 characters on one skeleton, glTF, with Fight Punch A/B/C, Fight Combo, Fight Hit A/B/C and Fight Death) is the better candidate for hits and a second punch. It sits behind the itch download and was not fetched. KayKit's itch pack lists "unarmed" and "blocking", but no clip names could be read. Missing clips can be authored in Blender, which is installed here.
+Choose a model: Quaternius (recolourable, but only Idle, Walk, Run, Punch and Death) or RG Poly (every state, one look per model). Reyes's tells still need a clip or an overlay. The KayKit itch pack stays unread. Missing clips can be authored in Blender, which is installed here. Credits for both packs are in the README on this branch.
