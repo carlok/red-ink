@@ -808,7 +808,7 @@ Questions: (1) Lock landscape only after fullscreen succeeds on Android? (2) Add
 
 Goal: fighters at about a third of the screen height at close range (they were 24% on a desktop and 9% on a phone in portrait), both always in frame through a chase and a knockback, and the same bout on a 30, 60 or 144 Hz screen.
 
-Probes: `node tools/cam-probe.mjs [tag] [--close] [--norim] [--only sizes] [--cam key=value]`, `node tools/step-probe.mjs`, `node tools/combat-probe.mjs`, `node tools/balance-run.mjs 200 normal 1 normal [hz]`. Share is the fighter's bounding-box height over the viewport height at gap 2.0 m, after 90 frames for the camera to settle. Clipped means a body (0.6 m either side of its centre) outside the central 84% of the width, a head above 10% of the height, or a foot below 99%. Off screen means outside 2% to 98% of the width. The chase and circle runs move both fighters at 4.4 m/s, the player's top speed. Knockback sets 18 m/s on one fighter, the heavy-hit value. The first probe run counted 1.2 m of arm either side as body; arms point along the fight axis, which the camera sees side on, so the definition went to 0.6 m and the baseline was run again on the old camera with it.
+Probes: `node tools/cam-probe.mjs [tag] [--close] [--norim] [--only sizes] [--cam key=value]`, `node tools/step-probe.mjs`, `node tools/combat-probe.mjs`, `node tools/balance-run.mjs 200 normal 1 normal 0,1,2 [hz]`. Share is the fighter's bounding-box height over the viewport height at gap 2.0 m, after 90 frames for the camera to settle. Clipped means a body (0.6 m either side of its centre) outside the central 84% of the width, a head above 10% of the height, or a foot below 99%. Off screen means outside 2% to 98% of the width. The chase and circle runs move both fighters at 4.4 m/s, the player's top speed. Knockback sets 18 m/s on one fighter, the heavy-hit value. The first probe run counted 1.2 m of arm either side as body; arms point along the fight axis, which the camera sees side on, so the definition went to 0.6 m and the baseline was run again on the old camera with it.
 
 ### Baseline
 
@@ -887,3 +887,50 @@ Hypothesis: a word is a world-sized plane, so at 0.7 of the distance it would co
 | Shake angle at full | ±0.80° | ±0.80°, by construction |
 
 Verdict: **keep**. The readable time is sampled once a frame (16.7 ms), so 32 and 50 are one frame apart. The word scale is `clamp(distance to the word ÷ 7.56, 0.35, 1)`. `combat-probe` divides it back out so "readable" still means a scale of 0.45.
+
+### Change 3 — a fixed 1/60 s step, drawn interpolated, frame times snapped
+
+Hypothesis: running the fight in 1/60 s ticks, the loop `simMeet` already uses, makes every refresh rate play the table that was measured. The two fighters are drawn between their last two tick positions so a 120 or 144 Hz screen does not judder. Frame times within 8% of a multiple of 1/60 s are snapped to it so a 60 Hz screen runs one tick per frame.
+
+Seeded rng, bout 1, a player who stands still, 900 ticks (15 s) recorded per tick at five frame lengths. `engine.getDeltaTime` is overridden; `G.trace` and `G.seed` are probe hooks.
+
+| Frame rate | Frames for 900 ticks | State vs 60 fps | Drawn frames where the walking enemy did not move |
+| --- | --- | --- | --- |
+| 20 fps | 300 | identical, 900 ticks | 0 of 190 |
+| 30 fps | 450 | identical | 0 of 278 |
+| 60 fps | 900 | — | 0 of 577 |
+| 120 fps | 1800 | identical | 0 of 1153 |
+| 144 fps | 2158 | identical | 0 of 1381 |
+
+The player took hits in that run (hp 100 → 72.8), so the comparison covers the AI rng, strikes and stun, not an empty room. The camera shake used the gameplay `rng` three times per drawn frame; with a seed that made the AI depend on the frame count. It now uses `Math.random`, and `frame()` no longer touches `rng`.
+
+| | Before | After |
+| --- | --- | --- |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0% | 90.5 / 67.5 / 44.0% |
+| Medians | 32.3 / 34.0 / 43.9 s | 32.3 / 34.0 / 43.9 s |
+| Fight draws / active meshes / GPU | 149 / 119 / 1.217 ms | 147–149 / 115–118 / 1.25–1.34 ms (three runs) |
+| S6 pose numbers (`pose-probe`), S5 AI answers (`ai-probe`) | — | unchanged |
+| Touch jab to attack / to pose | 17 / 17 ms | 16–17 / 33–34 ms |
+| Pad jab to attack / to pose | 17–18 / 18–34 ms | 16–17 / 33–34 ms |
+| Keyboard heavy to attack | 17 ms | 17 ms |
+
+Frame times in headless Chrome at a 60 Hz present: mean 16.67 ms, standard deviation 0.38 ms, range 15.1–18.2 ms. A plain accumulator on those gave 67 frames with no tick and 66 with two out of 600 (an earlier run happened to give 600 single ticks, so I first wrote that it did not matter). With the snap, 598–600 of 600 frames fall inside the window and three runs gave 600 of 600 single ticks. 144 Hz frames (6.94 ms) fall outside the window and keep their own length. This is headless timing; a real display's was not measured.
+
+`input-probe` reads the pose of a touch or pad jab at 33–34 ms where it read 16–18 ms, a frame later than the state. A trace from a settled guard shows the right shoulder 0.054 rad along on the first frame after the press, and the keyboard heavy reads 16–17 ms for state and pose. The probe takes its starting arm angle right after the state returns to idle, while the arm is still settling from the last swing, so the 0.02 rad threshold crosses a frame earlier or later with the tick phase. That is the likely cause, not a proven one. Both readings are inside the 80 ms budget.
+
+Verdict: **keep**.
+
+### Checked, no code change
+
+Outline. `part()` is the only function that sets `renderOutline`, and nothing calls it; the fighters are built with `pp()` and have no outline. The thickening I expected from a closer camera does not exist. Left the dead function alone.
+
+Rim. In portrait the nearest pillar at one heading is 1.31–1.67 m from the camera over four runs, around the 1.5 m I set; the old camera was 0.36 m from one. Nothing sat between the camera and the fighters in 24 placements. No pull toward the centre was added.
+
+First key press. `input-probe` measured 117–134 ms for the first keyboard press on the old build and 118–208 ms on the new one. It is the first `keydown` calling `audioInit`, which decodes the audio pack in the handler. In play that press is Start or Enter on the title card. Later key presses are 17 ms. No change.
+
+Hand check still open: 55 fps at 1080p on an iGPU, a real pad and phone, and how the closer view feels on a real monitor. The headless runs measure draws, GPU time and pixels, not feel.
+
+
+
+
+

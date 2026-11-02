@@ -1227,7 +1227,7 @@ function applyPose(f,dt){
 }
 
 /* ---------- combat ---------- */
-const G={state:'title',bout:0,t:0,hitstop:0,shake:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
+const G={state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
 function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0}; }
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
@@ -1672,7 +1672,8 @@ function updateCamera(dt){
   camTgt.x=lerp(camTgt.x,dt2.x,k); camTgt.y=lerp(camTgt.y,dt2.y,k); camTgt.z=lerp(camTgt.z,dt2.z,k);
   G.shake=Math.max(0,G.shake-dt*6);
   const sh=G.shake*(reduceMotion?0:1)*.12*V3.Distance(camPos,camTgt)/CAM.ref;
-  cam.position.set(camPos.x+rand(-1,1)*sh,camPos.y+rand(-1,1)*sh,camPos.z+rand(-1,1)*sh);
+  const j=()=>Math.random()*2-1; /* render only: the gameplay rng stays out of the frame loop */
+  cam.position.set(camPos.x+j()*sh,camPos.y+j()*sh,camPos.z+j()*sh);
   cam.setTarget(camTgt);
   const f=camTgt.subtract(camPos); f.y=0; f.normalize(); G.camF.copyFrom(f); G.camR.set(f.z,0,-f.x);
 }
@@ -1789,24 +1790,55 @@ function updateAmbient(dt){
 }
 
 /* ---------- main loop ---------- */
-function frame(){
-  let dt=Math.min(engine.getDeltaTime()/1000,.05);
-  const real=dt;
-  if(G.state==='pause'){ pollPad(); updateHud(); return; }
-  if(G.hitstop>0){ G.hitstop-=real; dt*=.12; }
-  G.t+=dt;
-  audioTick(real);
-  if(tutorLeft>0){ tutorLeft-=real; if(tutorLeft<=0) hideTutor(); }
+/* The fight steps at a fixed 1/60 s, the rate the balance table is measured at (simMeet). Reaction times and the
+   hit windows are a few frames long, so a 30 or 144 Hz step changes who wins. Fighters are drawn at a position
+   interpolated between the last two ticks. f.pos is the root node's own position: the true one is put back before
+   the next tick, and a position written from outside (a reset, a probe) is taken as the truth. */
+const SIM=1/60;
+let acc=0;
+/* Frame times wobble by about 0.4 ms around vsync, and an accumulator turns that into frames that run 0 or 2 ticks.
+   A frame within 8% of a whole multiple of 1/60 s (or 1/2, 1/3, 1/4 of one) counts as exactly that. */
+const SNAP=[3,2,1,.5,1/3,.25];
+function snapDt(d){ for(const m of SNAP){ const s=SIM*m; if(Math.abs(d-s)<s*.08) return s; } return d; }
+function simSync(f){
+  if(!f.cur){ f.cur=f.pos.clone(); f.prev=f.pos.clone(); f.shown=f.pos.clone(); return; }
+  if(f.pos.equalsWithEpsilon(f.shown,1e-6)) f.pos.copyFrom(f.cur);
+  else { f.cur.copyFrom(f.pos); f.prev.copyFrom(f.pos); }
+}
+function simShow(f,a){
+  f.cur.copyFrom(f.pos);
+  f.pos.set(lerp(f.prev.x,f.cur.x,a),lerp(f.prev.y,f.cur.y,a),lerp(f.prev.z,f.cur.z,a));
+  f.shown.copyFrom(f.pos);
+}
+function simTick(){
+  let dt=SIM;
+  if(G.hitstop>0){ G.hitstop-=dt; dt*=.12; }
   buf.jab=Math.max(0,buf.jab-dt); buf.heavy=Math.max(0,buf.heavy-dt); buf.dodge=Math.max(0,buf.dodge-dt);
-  pollPad();
   const live=G.state==='fight';
   if(G.state==='ready'){ G.readyT+=dt; if(G.readyT>1.15){ G.state='fight'; banner('FIGHT!'); } }
   const Ip=live?playerIntent():IDLE, Ie=live?aiIntent(E,P,dt):IDLE;
+  P.prev.copyFrom(P.pos); E.prev.copyFrom(E.pos);
   step(P,E,Ip,dt); if(P.started&&buf[P.started]!==undefined) buf[P.started]=0;
   step(E,P,Ie,dt);
   resolveBodies();
-  if(live) noteCorner(real);
+  if(live) noteCorner(SIM);
   if(G.state==='ko'){ G.koTimer-=dt; if(G.koTimer<=0){ G.state='card'; afterKO(); } }
+  G.ticks++; if(G.trace) G.trace(G.ticks);
+}
+function frame(){
+  let dt=Math.min(engine.getDeltaTime()/1000,.05);
+  const real=dt;
+  if(G.state==='pause'){ acc=0; pollPad(); updateHud(); return; }
+  if(G.hitstop>0) dt*=.12;
+  G.t+=dt;
+  audioTick(real);
+  if(tutorLeft>0){ tutorLeft-=real; if(tutorLeft<=0) hideTutor(); }
+  pollPad();
+  simSync(P); simSync(E);
+  acc=Math.min(acc+snapDt(real),SIM*5);
+  while(acc>=SIM-1e-9){ acc-=SIM; simTick(); }
+  const a=Math.max(0,acc/SIM);
+  simShow(P,a); simShow(E,a);
   updateFx(real); updateAmbient(dt); updateCamera(dt); updateHud();
 }
 
@@ -2012,7 +2044,7 @@ function simMeet(opt){
   if(opt.diff&&DIFF[opt.diff]) diff=opt.diff;
   const bouts=opt.bouts||[0,1,2];
   const prevRng=rng, prevState=G.state;
-  const dt=1/60, CAP=60, out=[];
+  const dt=opt.dt||1/60, CAP=60, out=[];
   for(let bi=0; bi<bouts.length; bi++){
     const bout=bouts[bi], rows=[];
     for(let i=0;i<n;i++){
@@ -2368,7 +2400,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

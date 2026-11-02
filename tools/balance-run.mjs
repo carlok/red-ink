@@ -1,6 +1,7 @@
 /**
- * Run seeded bot meets. Usage: node tools/balance-run.mjs [n] [skill] [seed] [diff] [bouts]
+ * Run seeded bot meets. Usage: node tools/balance-run.mjs [n] [skill] [seed] [diff] [bouts] [hz]
  * bouts: comma list (default 0,1,2) or all / 0-5 for six foes.
+ * hz is the step rate of the sim, default 60. Use 30 or 144 to see what frame rate does to the table.
  */
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
@@ -21,6 +22,7 @@ function parseBouts(arg) {
   return arg.split(",").map((s) => Number(s.trim())).filter((n) => n >= 0 && n < 6);
 }
 const BOUT_LIST = parseBouts(BOUTS_ARG);
+const HZ = Number(process.argv[7] || 60);
 
 function serve() {
   const types = { ".html": "text/html", ".js": "text/javascript", ".txt": "text/plain" };
@@ -92,7 +94,7 @@ try {
       if (performance.now() - t > 15000) throw new Error("boot");
       await new Promise((r) => requestAnimationFrame(r));
     }
-    const rows = window.__sublevel.simMeet({ n: ${N}, skill: ${JSON.stringify(SKILL)}, seed: ${SEED}, diff: ${JSON.stringify(DIFFNAME)}, bouts: ${JSON.stringify(BOUT_LIST)} });
+    const rows = window.__sublevel.simMeet({ n: ${N}, skill: ${JSON.stringify(SKILL)}, seed: ${SEED}, diff: ${JSON.stringify(DIFFNAME)}, bouts: ${JSON.stringify(BOUT_LIST)}, dt: ${1 / HZ} });
     return { ms: Math.round(performance.now() - t), rows };
   })()`;
   const out = await cdp.send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
