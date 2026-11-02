@@ -409,6 +409,10 @@ const UNLOCK_CHAIN=[
 ];
 const SAVE_KEY='sublevel-progress';
 let progress={wins:0,outfit:'auditor',arena:0,dock:0};
+/* fight camera. frac: share of the screen height a fighter fills at close range (portrait uses fracPortrait).
+   pad: metres of floor kept visible beside each fighter. lead: seconds of walking speed the aim runs ahead, so a chase stays in frame.
+   follow: how fast the camera catches up, per second. A phone in portrait sees under 5 m across and needs the faster one. */
+const CAM={fovV:.85,fovH:1,wide:1.25,frac:.34,fracPortrait:.2,pad:1.7,padPortrait:1.5,pitch:.47,aimY:1.1,body:1.9,lead:.25,follow:3.2,followPortrait:8};
 
 /* ---------- engine, scene ---------- */
 const canvas=$('view');
@@ -1642,20 +1646,24 @@ if($('tutorGo')) $('tutorGo').addEventListener('click',hideTutor);
 if($('resume')) $('resume').addEventListener('click',resumeFight);
 if($('restart')) $('restart').addEventListener('click',restartBout);
 function updateCamera(dt){
+  const asp=engine.getAspectRatio(cam), portrait=asp<CAM.wide;
+  if(portrait){ cam.fovMode=B.Camera.FOVMODE_HORIZONTAL_FIXED; cam.fov=CAM.fovH; } else { cam.fovMode=B.Camera.FOVMODE_VERTICAL_FIXED; cam.fov=CAM.fovV; }
   let dp,dt2;
   if(G.state==='title'||G.state==='card'){
     const a=G.t*.12; dp=new V3(Math.sin(a)*11.5,4.6,-Math.cos(a)*11.5); dt2=new V3(0,1.2,0);
   } else {
     const mid=P.pos.add(E.pos).scale(.5), d=V3.Distance(P.pos,E.pos);
+    mid.x+=(P.mv.x+E.mv.x)*.5*CAM.lead; mid.z+=(P.mv.z+E.mv.z)*.5*CAM.lead;
     const ax=E.pos.subtract(P.pos); ax.y=0; if(ax.length()>1e-3) ax.normalize();
     const n=new V3(-ax.z,0,ax.x); if(n.z>0) n.scaleInPlace(-1);
     const dv=new V3(0,0,-.55).add(n.scale(.45)); dv.normalize();
-    dp=mid.add(dv.scale(6.6+d*.5)); dp.y=Math.min(7.2,4.6+d*.22); dt2=mid.add(new V3(0,1.1,0));
+    /* far enough that a fighter fills `frac` of the height, and that both fit with `pad` metres beside them */
+    const tanH=portrait?Math.tan(CAM.fovH/2):Math.tan(CAM.fovV/2)*asp, tanV=portrait?tanH/asp:Math.tan(CAM.fovV/2);
+    const D=Math.max(CAM.body/(2*tanV*(portrait?CAM.fracPortrait:CAM.frac)),(d+2*(portrait?CAM.padPortrait:CAM.pad))/(2*tanH));
+    dp=mid.add(dv.scale(D*Math.cos(CAM.pitch))); dp.y=CAM.aimY+D*Math.sin(CAM.pitch); dt2=mid.add(new V3(0,CAM.aimY,0));
     dp.x=clamp(dp.x,-15.5,15.5); dp.z=clamp(dp.z,-15.5,15.5);
   }
-  const asp=engine.getAspectRatio(cam);
-  if(asp<1.25){ cam.fovMode=B.Camera.FOVMODE_HORIZONTAL_FIXED; cam.fov=1.0; } else { cam.fovMode=B.Camera.FOVMODE_VERTICAL_FIXED; cam.fov=.85; }
-  const k=damp(G.state==='title'||G.state==='card'?1.5:3.2,dt);
+  const k=damp(G.state==='title'||G.state==='card'?1.5:portrait?CAM.followPortrait:CAM.follow,dt);
   camPos.x=lerp(camPos.x,dp.x,k); camPos.y=lerp(camPos.y,dp.y,k); camPos.z=lerp(camPos.z,dp.z,k);
   camTgt.x=lerp(camTgt.x,dt2.x,k); camTgt.y=lerp(camTgt.y,dt2.y,k); camTgt.z=lerp(camTgt.z,dt2.z,k);
   G.shake=Math.max(0,G.shake-dt*6);
@@ -2356,7 +2364,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
