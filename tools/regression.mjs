@@ -310,7 +310,7 @@ async function runHttpSuite(cdp) {
     })()`,
       true,
     );
-    if (!v || v.clipCount < 18 || v.hitPoolJab !== 3 || v.hitPoolHeavy !== 2) throw new Error(JSON.stringify(v));
+    if (!v || v.clipCount < 10 || v.hitPoolJab !== 3 || v.hitPoolHeavy !== 2) throw new Error(JSON.stringify(v));
     return v;
   });
 

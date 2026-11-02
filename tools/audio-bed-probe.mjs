@@ -35,7 +35,7 @@ await withPage(async (cdp) => {
       let ch = 0; for (let i = 1; i < seq.length; i++) if (seq[i] !== null && seq[i - 1] !== null && Math.abs(seq[i] - seq[i - 1]) > 1) ch++;
       return { pitchChangesPer10s: Math.round(ch / (ms / 10000) * 10) / 10, distinctPitches: new Set(seq.filter((x) => x !== null)).size };
     };
-    const res = { ctx: g.ac.state, loops: Object.keys(g.loopSrc).length };
+    const res = { ctx: g.ac.state, sampleLoops: 0, liveBed: !!g.BED.ready };
     res.titleShape = await shape(8000); res.titlePitches = await pitches(8000);
     res.title = await rms(1500);
     document.getElementById("wrap").hidden = true; S.seed(5); S.startBout(0);

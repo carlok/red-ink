@@ -768,7 +768,7 @@ function applyEnv(i){
   paintFloor(e); paintHaz(e.fix.hazA,e.fix.hazB);
   floorMat.emissiveColor.set(F.emis[0],F.emis[1],F.emis[2]); floorMat.specularColor.set(F.spec[0],F.spec[1],F.spec[2]);
   ['wall','pipe','pillar','crate'].forEach(k=>setEnvMat(k,e.fix[k]));
-  musicSetPlace(i);
+  musicSetPlace(i); bedPlace(i);
   ARENA_BASE.exp=L.exp; ARENA_BASE.key=L.key.slice(); ARENA_BASE.bulbA=L.bulbA.slice(); ARENA_BASE.bulbB=L.bulbB.slice();
   hemi.diffuse.set(L.hemi[0],L.hemi[1],L.hemi[2]); hemi.groundColor.set(L.ground[0],L.ground[1],L.ground[2]);
   scene.fogColor.set(e.fog[0],e.fog[1],e.fog[2]); scene.fogDensity=e.fog[3]; scene.clearColor.set(e.fog[0],e.fog[1],e.fog[2],1);
@@ -936,7 +936,6 @@ const PEAK={jab:.5012,jab2:.5012,jab3:.5012,heavy:.5012,heavy2:.5012,block:.5012
 const HIT_POOL={jab:['jab','jab2','jab3'],heavy:['heavy','heavy2'],block:['block','block2']};
 const HIT_RATE=[1,.97,1.04,.92,1.08];
 let hitPick=0;
-const loopSrc={};
 function loadAudioPrefs(){
   try{
     const m=localStorage.getItem('sublevel-mute');
@@ -1006,22 +1005,12 @@ function loadSamples(){
     return ac.decodeAudioData(wavBytes(pack.clips[name]).slice(0)).then(buf=>{
       bufs[name]=buf; gains[name]=(PEAK[name]||1)/Math.max(bufPeak(buf),1e-8);
     });
-  })).then(()=>{
-    startLoop('room', roomGain);
-    startLoop('crowd', crowdGain);
-  });
+  })).then(()=>{ bedInit(); });
 }
 function bufPeak(buf){
   const d=buf.getChannelData(0); let m=0;
   for(let i=0;i<d.length;i++) if(Math.abs(d[i])>m) m=Math.abs(d[i]);
   return m;
-}
-function startLoop(name, dest){
-  if(!bufs[name]||!dest) return;
-  const s=ac.createBufferSource(), g=ac.createGain();
-  g.gain.value=gains[name]||1;
-  s.buffer=bufs[name]; s.loop=true; s.connect(g); g.connect(dest);
-  try{ s.start(); loopSrc[name]=s; }catch(e){}
 }
 function playSample(name, rate){
   if(splashHold||!ac||muted||!bufs[name]||!sfxGain) return;
@@ -1171,6 +1160,47 @@ function musicSting(kind){
    not read as loops; the crowd rises with G.cheer. The calm stem plays on cards and fades out after cardQuiet seconds of nobody pressing
    anything; the tense stem only when a fighter is under 40% hp; the finish stem on the knockout. Pause hushes everything. */
 const MIX={room:1.2,crowdBase:.45,crowdSwell:1.1,cardQuiet:40};
+/* The bed is live noise, not a looped file: a 4 s noise buffer with a cross-faded seam, filtered into a room tone and a crowd murmur, each
+   with its own slow level wobble, so nothing repeats on a short period. A few low events per place (BED_EVENTS) are scheduled on the clock. */
+const BED={ready:false,murmur:null,wind:null,next:0,t:0};
+function loopNoise(sec){
+  const n=Math.floor(ac.sampleRate*sec), xf=Math.floor(ac.sampleRate*.3), b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0); let a=11;
+  for(let i=0;i<n;i++){ a=(Math.imul(a,1664525)+1013904223)>>>0; d[i]=a/2147483648-1; }
+  for(let i=0;i<xf;i++){ const w=i/xf; d[n-xf+i]=d[n-xf+i]*(1-w)+d[i]*w; }
+  return b;
+}
+function bedInit(){
+  if(BED.ready||!ac||!roomGain) return; BED.ready=true;
+  const nb=loopNoise(4);
+  const mk=(type,f,q,gain,dest,lfoHz,depth)=>{
+    const s=ac.createBufferSource(), fl=ac.createBiquadFilter(), g=ac.createGain(); s.buffer=nb; s.loop=true; fl.type=type; fl.frequency.value=f; fl.Q.value=q; g.gain.value=gain;
+    s.connect(fl); fl.connect(g); g.connect(dest);
+    if(lfoHz){ const o=ac.createOscillator(), dp=ac.createGain(); o.frequency.value=lfoHz; dp.gain.value=depth*gain; o.connect(dp); dp.connect(g.gain); o.start(); }
+    s.start(0,Math.random()*3); return {g,fl};
+  };
+  mk('lowpass',380,.5,.1,roomGain,.05,.25);
+  BED.murmur=mk('bandpass',420,.6,.09,crowdGain,.21,.55).fl;
+  mk('bandpass',1500,.8,.045,crowdGain,.37,.7);
+  BED.wind=mk('bandpass',650,2.5,0,roomGain,.07,.9).g;
+  bedPlace(envIdx<0?0:envIdx);
+}
+function bedPlace(i){ if(BED.wind) BED.wind.gain.value=(i%6)===3?.07:0; BED.next=ac?ac.currentTime+3:0; }
+const BED_EVENTS=[
+  {every:[2.5,7],f:t=>{ const o=ac.createOscillator(); o.frequency.setValueAtTime(1900,t); o.frequency.exponentialRampToValueAtTime(1000,t+.07); o.connect(mEnvOn(roomGain,t,.1,.05,.003)); o.start(t); o.stop(t+.12); }},
+  {every:[14,30],f:t=>{ [0,.26].forEach(d=>{ const o=ac.createOscillator(); o.type='square'; o.frequency.value=2300; const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=3000; o.connect(f); f.connect(mEnvOn(roomGain,t+d,.15,.014,.004)); o.start(t+d); o.stop(t+d+.17); }); }},
+  {every:[9,18],f:t=>{ const o=ac.createOscillator(); o.frequency.value=1250; o.connect(mEnvOn(roomGain,t,.7,.03,.004)); o.start(t); o.stop(t+.72); }},
+  {every:[8,20],f:t=>{ if(!MUS.noise) return; const s=ac.createBufferSource(), fl=ac.createBiquadFilter(); s.buffer=MUS.noise; fl.type='highpass'; fl.frequency.value=5200; s.connect(fl); fl.connect(mEnvOn(roomGain,t,.07,.05,.002)); s.start(t,Math.random()); s.stop(t+.09); }},
+  {every:[12,25],f:t=>{ if(!MUS.noise) return; const s=ac.createBufferSource(), fl=ac.createBiquadFilter(); s.buffer=MUS.noise; fl.type='bandpass'; fl.frequency.value=1800; fl.Q.value=2; s.connect(fl); fl.connect(mEnvOn(roomGain,t,.22,.035,.01)); s.start(t,Math.random()); s.stop(t+.25); const o=ac.createOscillator(); o.frequency.value=1000; o.connect(mEnvOn(roomGain,t+.3,.07,.025,.004)); o.start(t+.3); o.stop(t+.4); }},
+  {every:[3,6],f:t=>{ const o=ac.createOscillator(); o.frequency.setValueAtTime(52,t); o.frequency.exponentialRampToValueAtTime(40,t+.6); o.connect(mEnvOn(roomGain,t,.7,.07,.02)); o.start(t); o.stop(t+.72); }}
+];
+function mEnvOn(dest,t,dur,peak,atk){ const g=ac.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(Math.max(.0002,peak),t+atk); g.gain.exponentialRampToValueAtTime(.0001,t+dur); g.connect(dest); return g; }
+function bedEvents(){
+  if(!BED.ready||!ac||ac.state!=='running'||splashHold||audOut||document.hidden) return;
+  if(G.state!=='fight'&&G.state!=='ready') return;
+  const now=ac.currentTime; if(now<BED.next) return;
+  const ev=BED_EVENTS[(envIdx<0?0:envIdx)%BED_EVENTS.length]; ev.f(now+.05);
+  BED.next=now+ev.every[0]+Math.random()*(ev.every[1]-ev.every[0]);
+}
 let audPause=0, audCardT=0, audClock=0, audFade=1;
 function audioTick(dt){
   audClock+=dt;
@@ -1186,11 +1216,12 @@ function audioTick(dt){
   audFade=lerp(audFade, quiet?0:1, Math.min(1,dt*(quiet?.6:3)));
   const live=(1-audPause)*audFade;
   musicUpdate(dt,live);
+  bedEvents();
   const drift=(a,b)=>.5+.5*Math.sin(audClock*a)*Math.sin(audClock*b+1.7), hush=1-.85*audPause, cheer=clamp(G.cheer||0,0,1.4);
   if(roomGain) roomGain.gain.value=MIX.room*(.75+.25*drift(.37,.11))*hush;
   if(crowdGain){
     crowdGain.gain.value=(MIX.crowdBase+MIX.crowdSwell*cheer/1.4)*(.8+.2*drift(.29,.13))*hush;
-    if(loopSrc.crowd) loopSrc.crowd.playbackRate.value=.92+.18*clamp(G.cheer||0,0,1.2);
+    if(BED.murmur) BED.murmur.frequency.value=420*(1+.5*cheer/1.4);
   }
 }
 function audioMetrics(){
@@ -3166,7 +3197,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,loopSrc,MUS}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
