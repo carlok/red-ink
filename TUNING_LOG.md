@@ -874,3 +874,16 @@ Portrait settings tried (share, chase and circle clipped, knockback clipped / of
 | 6 / 2.2 | 13.7% | 0, 0 | 0 / 0 |
 
 Verdict: **keep**. `tuning/s14-before-1920.jpg`, `tuning/s14-after-1920.jpg` (and the `-close` pair at gap 1.2), `-844` and `-390` are the frames. At gap 1.2 no rig seam shows. The dust motes near the lens were bigger from the old camera (36 px against about 12 px).
+
+### Change 2 — comic words and shake follow the camera distance
+
+Hypothesis: a word is a world-sized plane, so at 0.7 of the distance it would cover 1.4 times as much of the screen; scaling it by distance holds the screen share. Shake moves the camera by up to 0.12 m around a fixed aim, so its angle grows as the camera comes in; scaling the amplitude by distance holds the angle.
+
+| | Before | After |
+| --- | --- | --- |
+| Word width, jab / heavy / block / K.O. | 15.8 / 17.6 / 17.3 / 33.0% | 15.9 / 15.9 / 16.0 / 29.6% |
+| Word readable | 51 / 32 / 51 / 33 ms | 33–50 ms, varies by run |
+| Damage, stamina, stun, hitstop, counter | 7 / 16, 10 / 24, 0.30 / 0.55 s, 0.05 / 0.09 / 0.14 s, 8.75 | same |
+| Shake angle at full | ±0.80° | ±0.80°, by construction |
+
+Verdict: **keep**. The readable time is sampled once a frame (16.7 ms), so 32 and 50 are one frame apart. The word scale is `clamp(distance to the word ÷ 7.56, 0.35, 1)`. `combat-probe` divides it back out so "readable" still means a scale of 0.45.
