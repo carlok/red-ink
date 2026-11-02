@@ -1,6 +1,8 @@
 /**
  * Contrast of the random looks: draws 5000 seeds from randomLook and checks every pair in LOOK_MIN (CIE Lab ΔE) is far enough apart.
- * Usage: node tools/look-probe.mjs   (prints the minimum and mean ΔE per pair, the count of violations, and that a seed repeats)
+ * Also draws 2000 whole sessions (the Auditor plus the six opponents, S.skinLooks(5)) and checks no two people share a skin, hair, shirt,
+ * pants or shoe colour: the least ΔE per slot over all 21 pairs against LOOK_UNIQUE, and how many sessions have a clash.
+ * Usage: node tools/look-contrast-probe.mjs   (prints the minimum and mean ΔE per pair, the count of violations, and that a seed repeats)
  */
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -40,9 +42,25 @@ try {
       skins.add(L.skin); hairs.add(L.hair); shirts.add(L.shirt);
     }
     const r1 = (v) => Math.round(v * 10) / 10;
+    const slots = Object.keys(S.LOOK_UNIQUE), uMin = {}; slots.forEach((k) => { uMin[k] = 1e9; });
+    const T = window.__sublevel, savedSeed = T.SKIN.seed; let sessClash = 0, selfBad = 0;
+    for (let n = 1; n <= 2000; n++) {
+      T.SKIN.seed = n * 104729;
+      const crowd = [T.P.L, ...S.skinLooks(5)].map((L) => ({ L, c: S.lookSlots(L) }));
+      let clash = false;
+      for (let a = 0; a < crowd.length; a++) {
+        if (a > 0 && !S.lookOk(crowd[a].L)) selfBad++;
+        for (let b = a + 1; b < crowd.length; b++) slots.forEach((k) => {
+          const d = S.colorDelta(crowd[a].c[k], crowd[b].c[k]); uMin[k] = Math.min(uMin[k], d); if (d < S.LOOK_UNIQUE[k]) clash = true;
+        });
+      }
+      if (clash) sessClash++;
+    }
+    T.SKIN.seed = savedSeed;
     return { N, bad, fallback, hexOk, deterministic: JSON.stringify(S.randomLook(77)) === JSON.stringify(S.randomLook(77)),
       min: Object.fromEntries(keys.map((k) => [k, r1(mins[k])])), mean: Object.fromEntries(keys.map((k) => [k, r1(sums[k] / N)])),
-      required: S.LOOK_MIN, sy, sx, distinct: { skin: skins.size, hair: hairs.size, shirt: shirts.size } };
+      required: S.LOOK_MIN, sy, sx, distinct: { skin: skins.size, hair: hairs.size, shirt: shirts.size },
+      sessions: { N: 2000, withClash: sessClash, selfContrastViolations: selfBad, leastDeltaE: Object.fromEntries(slots.map((k) => [k, r1(uMin[k])])), floors: S.LOOK_UNIQUE } };
   })()` });
   console.log(JSON.stringify(out.result.result.value));
   ws.close();

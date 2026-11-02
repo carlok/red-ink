@@ -1,6 +1,6 @@
 # Sublevel Three
 
-![A jab lands inside the yellow tape. The auditor, in a white shirt, snaps Reyes back in a magenta sleeveless shirt, with a POW burst and orange sparks between them and the crowd dark behind.](tuning/s15-hero.jpg)
+![A jab lands inside the yellow tape. The auditor, in a white shirt, snaps Reyes back, grey-haired in a purple shirt, with a POW burst and orange sparks between them and the crowd dark behind.](tuning/s16-hero.jpg)
 
 Browser fighting game. One HTML file, no account, no build step to play.
 
@@ -63,7 +63,7 @@ Touch: move stick on the left, Jab in the bottom-right of the button cluster. Th
 
 Drop a `.glb` on the title screen to replace the auditor. Fighters are otherwise built in code (`makeFighter`). Tuning constants are at the top of the script: `ATK`, `LOOKS`, `BOUTS`, `CAM`.
 
-Fighters are skinned low-poly people (CC0, see Credits) animated by the fight state: each clip is scrubbed by sim time, so hitstop, pause, and the fixed step stay exact. Every opponent gets a random look each session: skin, hair, shirt, pants, and shoes are drawn so that neighbouring colours always differ clearly, and the height and build stay near the opponent's own. Add `?skin=0` to the address to play with the original procedural fighters, or `?skinseed=7` to repeat a set of looks. If the model cannot be loaded the game falls back to the procedural fighters by itself.
+Fighters are skinned low-poly people (CC0, see Credits) animated by the fight state: each clip is scrubbed by sim time, so hitstop, pause, and the fixed step stay exact. Every opponent gets a random look each session: skin, hair, shirt, pants, and shoes are drawn so that neighbouring colours always differ clearly, and no two people in a session share a skin, hair, shirt, pants or shoe colour. The height and build stay near the opponent's own, and a soft gradient on skin, hair, clothes and shoes keeps arms and faces from reading flat. Add `?skin=0` to the address to play with the original procedural fighters, or `?skinseed=7` to repeat a set of looks. If the model cannot be loaded the game falls back to the procedural fighters by itself.
 
 The camera is sized from the frame: a fighter fills about a third of the screen height at close range, and both stay in view during a chase or a knockback. On a phone held upright the width limits it: only about 5 m of floor fits across, so the fighters fill about 18% of the height. `CAM` holds the numbers.
 

@@ -1915,7 +1915,7 @@ const SKIN_MODELS={
 };
 /* On by default. ?skin=0 turns it off for one load, localStorage 'sublevel-skin'='0' for good, ?skin=1 overrides that; ?skinseed=N pins
    the opponents' looks. If the model cannot be loaded the game falls back to the procedural fighters and stays there. */
-const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,seed:(Math.random()*4294967296)>>>0};
+const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,shade:true,seed:(Math.random()*4294967296)>>>0};
 try{
   const q=new URLSearchParams(location.search), v=q.get('skin');
   if(v==='0'||(v!=='1'&&localStorage.getItem('sublevel-skin')==='0')) SKIN.on=false;
@@ -1966,11 +1966,20 @@ function lookDeltas(L){
           hairSkin:colorDelta(L.hair,L.skin),hairShirt:colorDelta(L.hair,L.shirt),shoesPants:colorDelta(L.shoes,L.pants)};
 }
 function lookOk(L){ const d=lookDeltas(L); return Object.keys(LOOK_MIN).every(k=>d[k]>=LOOK_MIN[k]); }
+/* Two people in one session never share a skin, hair, shirt, pants or shoe colour: each slot has a floor on its ΔE against the same slot
+   on everyone else. lookClash is the worst slot as a share of its floor, so 1 or more is clear. */
+const LOOK_UNIQUE={skin:9,hair:14,shirt:28,pants:18,shoes:14};
+function lookSlots(L){ return {skin:L.skin,hair:L.hair||L.cap||'#2b1d15',shirt:L.shirt,pants:L.pants,shoes:L.shoes||'#17181b'}; }
+function lookClash(L,others){
+  const a=lookSlots(L); let m=Infinity;
+  others.forEach(o=>{ const b=lookSlots(o); Object.keys(LOOK_UNIQUE).forEach(k=>{ m=Math.min(m,colorDelta(a[k],b[k])/LOOK_UNIQUE[k]); }); });
+  return m;
+}
 /* A reasonably random look from a seed, in the shape of a LOOKS row. Its own mulberry32 stream: the gameplay rng is never touched.
    Skin and hair start from lists of plausible tones and are nudged a little so no two people match; shirt is any hue, pants are
    quieter, shoes are black, brown, white, grey or a bright sneaker; height 0.92-1.12, build 0.94-1.3. Colours are drawn again
-   until every pair in LOOK_MIN is far enough apart, so a person is never all one brown. */
-function randomLook(seed,base){
+   until every pair in LOOK_MIN is far enough apart, so a person is never all one brown; each colour also keeps clear of the same slot on `others`. */
+function randomLook(seed,base,others){
   const r=mulberry32(seed>>>0), pick=a=>a[Math.floor(r()*a.length)];
   const hsl=(h,s,l)=>{ const a=s*Math.min(l,1-l), f=n=>{ const k=(n+h/30)%12; return l-a*Math.max(-1,Math.min(k-3,9-k,1)); }; return new C3(f(0),f(8),f(4)).toHexString(); };
   const nudge=(hex,amt)=>{ const c=C3.FromHexString(hex), k=1+(r()*2-1)*amt; return new C3(Math.min(1,c.r*k),Math.min(1,c.g*k),Math.min(1,c.b*k)).toHexString(); };
@@ -1979,10 +1988,24 @@ function randomLook(seed,base){
   const skins=['#ffe0c4','#ffdbac','#f1c8a5','#e6b88f','#e0ac81','#d9a679','#c68642','#b07a4f','#a9714b','#8d5524','#704214','#5c3a21','#3f2a1d'];
   const hairs=['#0e0b09','#1a1410','#2b1d15','#3a2618','#4a3020','#6b4423','#7a5230','#b07a3a','#d9b46a','#e8d4a0','#8a8a86','#c9c9c6','#a33b1f','#7d2a1a'];
   const shoes=['#17181b','#17181b','#2a2522','#4a3020','#6b4423','#e8e8e4','#9a9a96','#223a5e','#a52a2a'];
-  const draw=()=>({skin:nudge(pick(skins),.05),hair:nudge(pick(hairs),.12),shirt:hsl(r()*360,.35+r()*.45,.3+r()*.35),
-                   pants:hsl(r()*360,.08+r()*.3,.14+r()*.26),shoes:nudge(r()<.15?hsl(r()*360,.7,.5):pick(shoes),.1)});
-  let L=draw();
-  for(let i=0;i<60&&!lookOk(L);i++) L=draw();
+  /* each colour is tried against the same slot on everyone in `others` (up to 40 tries, keeping the best), so a slot that has run out of
+     room does not sink the whole look; the person's own contrast pairs are checked afterwards */
+  const slot=(k,gen)=>{
+    let best=null, q=-1;
+    for(let i=0;i<40;i++){
+      const c=gen(); if(!others||!others.length) return c;
+      const m=Math.min.apply(null,others.map(o=>colorDelta(c,lookSlots(o)[k])))/LOOK_UNIQUE[k];
+      if(m>q){ best=c; q=m; } if(q>=1) break;
+    }
+    return best;
+  };
+  const draw=()=>({skin:slot('skin',()=>nudge(pick(skins),.05)),hair:slot('hair',()=>nudge(pick(hairs),.12)),
+                   shirt:slot('shirt',()=>hsl(r()*360,.35+r()*.45,.3+r()*.35)),pants:slot('pants',()=>hsl(r()*360,.08+r()*.37,.14+r()*.36)),
+                   shoes:slot('shoes',()=>nudge(r()<.15?hsl(r()*360,.7,.5):pick(shoes),.1))});
+  /* draw until the colours suit each other; clearing `others` is already done slot by slot. If the contrast never holds, fall back below. */
+  let L=null;
+  for(let i=0;i<60&&!L;i++){ const c=draw(); if(lookOk(c)) L=c; }
+  if(!L) L=draw();
   if(!lookOk(L)){ /* give up on luck: put the shirt and pants on opposite sides of the skin's lightness */
     const light=labOf(L.skin)[0]>55;
     L.shirt=light?'#243b6b':'#f2efe6'; L.pants=light?'#16161a':'#3b4a63'; L.shoes=light?'#e8e8e4':'#17181b';
@@ -1990,6 +2013,25 @@ function randomLook(seed,base){
   }
   L.iris='#2a1a10'; L.sx=Math.round(sx*100)/100; L.sy=Math.round(sy*100)/100;
   return L;
+}
+/* The palette gives each region one flat colour, so an arm or a face reads as a cut-out. Vertex colours put the gradient back: they are
+   interpolated across the triangles and multiplied into the texture. Each region gets [base, how much the up-facing normal adds,
+   how much height inside the region adds]: tops catch light and undersides fall off, the hem of a shirt and the ankle of a trouser
+   leg go darker, hair has a sheen on top. Skin also turns warmer where it falls off, like blood showing through. The eyes are left alone. */
+const SKIN_SHADE={skin:[.80,.24,.10],hair:[.66,.46,.14],shirt:[.78,.26,.16],pants:[.80,.24,.14],shoes:[.62,.36,.24],eyes:[1,0,0]};
+function skinShade(m){
+  const pos=m.getVerticesData('position'), nor=m.getVerticesData('normal'), uv=m.getVerticesData('uv'); if(!pos||!nor||!uv) return;
+  const n=pos.length/3, name=new Array(n), lo={}, hi={};
+  for(let i=0;i<n;i++){
+    const row=Math.floor((1-uv[i*2+1])*32), b=SKIN_BANDS.find(b=>row>=b[1]&&row<b[1]+b[2]), k=b?b[0]:'skin', y=pos[i*3+1];
+    name[i]=k; if(lo[k]===undefined||y<lo[k]) lo[k]=y; if(hi[k]===undefined||y>hi[k]) hi[k]=y;
+  }
+  const col=new Float32Array(n*4);
+  for(let i=0;i<n;i++){
+    const k=name[i], c=SKIN_SHADE[k], h=.5+.5*nor[i*3+1], t=((pos[i*3+1]-lo[k])/((hi[k]-lo[k])||1))*2-1, g=c[0]+c[1]*h+c[2]*t, w=k==='skin'?1-h:0;
+    col[i*4]=g; col[i*4+1]=g*(1-.07*w); col[i*4+2]=g*(1-.12*w); col[i*4+3]=1;
+  }
+  m.setVerticesData('color',col,false,4); m.useVertexColors=true; /* 'color' is VertexBuffer.ColorKind, which the bundle does not export */
 }
 async function skinFighter(f,look){
   /* the look's build is only visual: f.sx, the body size resolveBodies uses, stays the foe's own so the balance table does not move */
@@ -2020,6 +2062,7 @@ async function skinFighter(f,look){
     const sm=new B.StandardMaterial('skinM',scene);
     sm.diffuseTexture=pal; sm.emissiveTexture=pal; sm.emissiveColor=new C3(.3,.3,.3); sm.specularColor=new C3(0,0,0);
     m.material=sm; p.dispose(false,true);
+    if(SKIN.shade){ try{ skinShade(m); }catch(e){ if(window.console) console.warn('skin shade off:',e); } }
   });
   f.skin_pal=pal;
   const groups={}; res.animationGroups.forEach(g=>{ groups[g.name.split('|').pop()]=g; });
@@ -2088,7 +2131,14 @@ function skinEnsure(f,look){
 function skinBout(i){
   if(!SKIN.on) return;
   skinEnsure(P);
-  skinEnsure(E,randomLook(SKIN.seed+i*7919,LOOKS[E.cfg.look]));
+  skinEnsure(E,skinLooks(i)[i]);
+}
+/* The opponents of bouts 0..i. Each one is drawn clear of the Auditor and of every opponent before it, so no two of them match, and
+   the same session seed gives the same people in the same order however the bouts are reached. */
+function skinLooks(i){
+  const out=[], others=[P.L];
+  for(let k=0;k<=i;k++){ const L=randomLook(SKIN.seed+k*7919,LOOKS[BOUTS[k].look],others.slice()); out.push(L); others.push(L); }
+  return out;
 }
 async function skinOn(on,model){
   if(model) SKIN.model=model;
@@ -2601,7 +2651,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,skinOn,skinFighter,randomLook,lookDeltas,lookOk,LOOK_MIN,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,skinOn,skinFighter,randomLook,skinLooks,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
