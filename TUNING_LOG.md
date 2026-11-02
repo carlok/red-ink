@@ -1219,3 +1219,22 @@ Checked:
 | `?skin=0` | procedural fighters boot, no errors, 148 draws |
 
 Not done: head look-at and breathing (the Idle clip already moves and the bodies already face each other), rim separation was judged by eye and not measured as a luminance ratio, opponents' dark trousers nearly vanish on the black floor of The Reconciler (clothing is not checked against the floor), heavy-hit kick was not measured, and the feel of the new angle and the KO slow-motion on your monitor, a real phone and an integrated GPU are not checked.
+
+## Sprint 19: clothing against the floor
+
+Problem seen in Sprint 18: opponents' dark trousers nearly vanished on the black floor of The Reconciler, because pants and shoes were only checked against the other people, never against the floor behind them.
+
+`randomLook` now takes the floor colour of the bout the look is worn in (`ENV[k].floor.base`, passed by `skinLooks`) and picks pants and shoes clear of it, in the same per-slot loop that keeps them clear of the other fighters: ΔE at least 22 for pants and 14 for shoes (`FLOOR_MIN`). The fallback look picks the pants and shoes furthest from the floor.
+
+The Auditor's black trousers had the same problem in the last place: ΔE 3.9 from the floor `#14151a`. The Reconciler's floor base moved to `#242732` (still dark glass with the lit grid), which makes it 13.6; the other places are 22.6 to 56.
+
+| Check | Result |
+| --- | --- |
+| `tools/look-contrast-probe.mjs`, 2,000 sessions, 6 opponents each | 0 floor violations; least ΔE pants 22.0, shoes 14.0; 0 of 2,000 sessions with two matching people; 0 own-contrast violations |
+| `tools/regression.mjs` | 22 of 22 |
+| Bout table, 200 fights, seed 1 | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, unchanged |
+| `tools/env-probe.mjs`, bout 6, `file://` | no console errors, 33 draws |
+
+Screenshot: `tuning/s19-reconciler-floor.jpg`.
+
+Not done: shirts are not checked against the floor or the crowd, the floor ΔE uses the base colour and not what the lights make of it, and the Auditor's 13.6 is under the 22 the opponents get (his look is fixed).

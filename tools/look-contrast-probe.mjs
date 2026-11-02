@@ -43,7 +43,7 @@ try {
     }
     const r1 = (v) => Math.round(v * 10) / 10;
     const slots = Object.keys(S.LOOK_UNIQUE), uMin = {}; slots.forEach((k) => { uMin[k] = 1e9; });
-    const T = window.__sublevel, savedSeed = T.SKIN.seed; let sessClash = 0, selfBad = 0;
+    const T = window.__sublevel, savedSeed = T.SKIN.seed; let sessClash = 0, selfBad = 0, floorBad = 0; const floorMin = { pants: 1e9, shoes: 1e9 };
     for (let n = 1; n <= 2000; n++) {
       T.SKIN.seed = n * 104729;
       const crowd = [T.P.L, ...S.skinLooks(5)].map((L) => ({ L, c: S.lookSlots(L) }));
@@ -55,11 +55,17 @@ try {
         });
       }
       if (clash) sessClash++;
+      /* pants and shoes against the floor of the bout they are worn in (the opponents only; crowd[0] is the Auditor) */
+      for (let a = 1; a < crowd.length; a++) {
+        const fl = S.ENV[a - 1].floor.base;
+        ["pants", "shoes"].forEach((k) => { const d = S.colorDelta(crowd[a].c[k], fl); floorMin[k] = Math.min(floorMin[k], d); if (d < S.FLOOR_MIN[k]) floorBad++; });
+      }
     }
     T.SKIN.seed = savedSeed;
     return { N, bad, fallback, hexOk, deterministic: JSON.stringify(S.randomLook(77)) === JSON.stringify(S.randomLook(77)),
       min: Object.fromEntries(keys.map((k) => [k, r1(mins[k])])), mean: Object.fromEntries(keys.map((k) => [k, r1(sums[k] / N)])),
       required: S.LOOK_MIN, sy, sx, distinct: { skin: skins.size, hair: hairs.size, shirt: shirts.size },
+      floor: { violations: floorBad, leastDeltaE: { pants: r1(floorMin.pants), shoes: r1(floorMin.shoes) }, required: S.FLOOR_MIN, auditorPantsOnFloors: S.ENV.map((e) => r1(S.colorDelta(T.P.L.pants, e.floor.base))) },
       sessions: { N: 2000, withClash: sessClash, selfContrastViolations: selfBad, leastDeltaE: Object.fromEntries(slots.map((k) => [k, r1(uMin[k])])), floors: S.LOOK_UNIQUE } };
   })()` });
   console.log(JSON.stringify(out.result.result.value));

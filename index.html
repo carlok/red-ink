@@ -502,7 +502,7 @@ const ENV=[
    fog:[.07,.05,.035,.026],dust:[[1,.8,.5,.22],[1,.85,.65,.12]],
    signL:['GATE 5','ALL VISITORS SIGN IN','#e8e0d0','#d9a441'],signR:['CHECKPOINT','NO PASS, NO EXIT','#e8e0d0','#d0432b']},
   {key:'final',props:'strips',
-   floor:{base:'#14151a',pat:'neon',seed:66,emis:[.03,.035,.05],spec:[.3,.3,.35],blood:'150,30,30'},
+   floor:{base:'#242732',pat:'neon',seed:66,emis:[.03,.035,.05],spec:[.3,.3,.35],blood:'150,30,30'},
    fix:{wall:'#1b1c22',pipe:'#2a2c35',pillar:'#2c2e38',crate:'#3a2024',hazA:'#ff4a3d',hazB:'#0c0c10',sign:'#15161c'},
    light:{exp:1.45,key:[.82,.88,1],bulbA:[1,.3,.25],bulbB:[1,.4,.3],hemi:[.5,.5,.9],ground:[.15,.05,.06]},
    fog:[.05,.015,.02,.026],dust:[[1,.4,.35,.2],[1,.5,.45,.12]],
@@ -2128,8 +2128,10 @@ function lookClash(L,others){
 /* A reasonably random look from a seed, in the shape of a LOOKS row. Its own mulberry32 stream: the gameplay rng is never touched.
    Skin and hair start from lists of plausible tones and are nudged a little so no two people match; shirt is any hue, pants are
    quieter, shoes are black, brown, white, grey or a bright sneaker; height 0.92-1.12, build 0.94-1.3. Colours are drawn again
-   until every pair in LOOK_MIN is far enough apart, so a person is never all one brown; each colour also keeps clear of the same slot on `others`. */
-function randomLook(seed,base,others){
+   until every pair in LOOK_MIN is far enough apart, so a person is never all one brown; each colour also keeps clear of the same slot on `others`, and pants and shoes of the floor. */
+/* The legs and feet are what the floor sits behind, so pants and shoes also keep a ΔE from the floor of the place the bout is in. */
+const FLOOR_MIN={pants:22,shoes:14};
+function randomLook(seed,base,others,floor){
   const r=mulberry32(seed>>>0), pick=a=>a[Math.floor(r()*a.length)];
   const hsl=(h,s,l)=>{ const a=s*Math.min(l,1-l), f=n=>{ const k=(n+h/30)%12; return l-a*Math.max(-1,Math.min(k-3,9-k,1)); }; return new C3(f(0),f(8),f(4)).toHexString(); };
   const nudge=(hex,amt)=>{ const c=C3.FromHexString(hex), k=1+(r()*2-1)*amt; return new C3(Math.min(1,c.r*k),Math.min(1,c.g*k),Math.min(1,c.b*k)).toHexString(); };
@@ -2143,8 +2145,9 @@ function randomLook(seed,base,others){
   const slot=(k,gen)=>{
     let best=null, q=-1;
     for(let i=0;i<40;i++){
-      const c=gen(); if(!others||!others.length) return c;
-      const m=Math.min.apply(null,others.map(o=>colorDelta(c,lookSlots(o)[k])))/LOOK_UNIQUE[k];
+      const c=gen(), fl=floor&&FLOOR_MIN[k]?colorDelta(c,floor)/FLOOR_MIN[k]:Infinity;
+      if((!others||!others.length)&&fl===Infinity) return c;
+      const m=Math.min(fl,others&&others.length?Math.min.apply(null,others.map(o=>colorDelta(c,lookSlots(o)[k])))/LOOK_UNIQUE[k]:Infinity);
       if(m>q){ best=c; q=m; } if(q>=1) break;
     }
     return best;
@@ -2159,6 +2162,10 @@ function randomLook(seed,base,others){
   if(!lookOk(L)){ /* give up on luck: put the shirt and pants on opposite sides of the skin's lightness */
     const light=labOf(L.skin)[0]>55;
     L.shirt=light?'#243b6b':'#f2efe6'; L.pants=light?'#16161a':'#3b4a63'; L.shoes=light?'#e8e8e4':'#17181b';
+    if(floor){ /* and the pair of each that is furthest from the floor */
+      const far=(list,ref)=>list.slice().sort((a,b)=>colorDelta(b,ref)-colorDelta(a,ref))[0];
+      L.pants=far(['#16161a','#3b4a63','#8a93a6','#c9c3b4'],floor); L.shoes=far(['#17181b','#e8e8e4','#9a9a96'],floor);
+    }
     if(colorDelta(L.hair,L.skin)<LOOK_MIN.hairSkin) L.hair=light?'#1a1410':'#e8d4a0';
   }
   L.iris='#2a1a10'; L.sx=Math.round(sx*100)/100; L.sy=Math.round(sy*100)/100;
@@ -2341,7 +2348,7 @@ function skinBout(i){
    the same session seed gives the same people in the same order however the bouts are reached. */
 function skinLooks(i){
   const out=[], others=[P.L];
-  for(let k=0;k<=i;k++){ const L=randomLook(SKIN.seed+k*7919,LOOKS[BOUTS[k].look],others.slice()); out.push(L); others.push(L); }
+  for(let k=0;k<=i;k++){ const L=randomLook(SKIN.seed+k*7919,LOOKS[BOUTS[k].look],others.slice(),ENV[k%ENV.length].floor.base); out.push(L); others.push(L); }
   return out;
 }
 async function skinOn(on,model){
@@ -2855,7 +2862,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
