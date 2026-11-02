@@ -1108,3 +1108,30 @@ Checked with the skin on by default:
 | Boot over `file://` and over http, default / `?skin=0` / `?skinseed=5` | skinned / procedural / skinned, no console errors |
 
 Not done: Death is the only fall; the Auditor always leads with the left hand; nothing was checked on a real phone or on an integrated GPU; the model is parsed again at each bout start (about 50 ms, hidden by the 1.15 s ready phase).
+
+## Sprint 16: shading on the skinned fighters, and nobody matches
+
+Goal: the skinned fighters read flat (one colour per region, so an arm or a face is a cut-out), and nothing stopped two people in a session from sharing a skin, hair, shirt, pants or shoe colour.
+
+### Gradient
+
+The model's UVs point each region at one texel of a 32×32 palette, so a gradient cannot come from the texture. `skinShade` bakes a colour per vertex (4,477 vertices, one mesh) and the standard material multiplies it into the texture. Each region gets a base, a term for how far the normal faces up and a term for height inside the region: tops catch light, undersides fall off, shirt hem and trouser ankle go darker, hair has a sheen on top, and skin turns a little warmer (blood showing through) where it falls off. The eyes are untouched. The vertex colour is baked in the bind pose, so it moves with the bones like paint. `SKIN.shade = false` turns it off. `VertexBuffer` is not in the bundle, so the attribute is set by its name, `'color'`.
+
+First try threw on `B.VertexBuffer.ColorKind`, the skin switched itself off and the T-pose bodies showed next to the procedural ones; the call is now guarded, so a failure drops only the shading.
+
+Result (`tuning/s16-shading-closeup.jpg`, `tuning/s16-hero.jpg`): arms, faces, shirts and trousers now have a visible light-to-dark change, and the low-poly facets show. Draws 27, active 40, GPU 1.21 ms, the same as before.
+
+### Distinct looks
+
+Each slot has a floor on its ΔE against the same slot on every other person: skin 9, hair 14, shirt 28, pants 18, shoes 14 (`LOOK_UNIQUE`). `skinLooks(i)` draws bouts 0..i in order, each clear of the Auditor and of the opponents before it, so the same session seed gives the same people however the bouts are reached. Inside `randomLook` every slot is tried up to 40 times against the others and the best is kept, then the person's own contrast pairs (`LOOK_MIN`) are checked.
+
+The first version drew the whole look and kept the best of 150: 1,832 of 2,000 sessions had a clash, because one crowded slot (skin) sank the whole draw. Per slot, and a skin floor of 9 instead of 12 (seven people at 12 do not fit in the 13 skin tones), gives 0 of 2,000. The pants range was widened to lightness .14–.50 and saturation up to .45 to make room.
+
+| Check | Result |
+| --- | --- |
+| 2,000 sessions, the Auditor plus 6 opponents, 21 pairs each | 0 with a clash; least ΔE skin 9.0, hair 14.0, shirt 28.0, pants 18.0, shoes 14.0 |
+| Own contrast (`LOOK_MIN`), 5,000 looks and the 2,000 sessions | 0 violations |
+| `tools/regression.mjs` | 22 of 22 |
+| Bout table, 200 fights, seed 1 | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0% |
+
+Not done: the crowd is not checked against the fighters, the shading is baked in the bind pose and does not respond to the lights, and the floors are tuned by eye.
