@@ -64,16 +64,34 @@ LOCS = list(itertools.product((1, -1), repeat=3))
 at(acts["Punch"], 1); guard = capture()
 a = new_action("Guard"); key(a, 1, guard); key(a, 12, guard)
 
-# 3. hit reactions, from the guard pose
-def hit(name, back, side, twist, frames):
+# 3. hit reactions, from the guard pose: spine bends back and to a side, and the whole body gives a little (hips back and down)
+def hips_vectors():
+    """local Hips location offsets that move the body one world unit back (against F) and one down"""
+    base = guard["Hips"][0].copy(); pb["Hips"].rotation_quaternion = guard["Hips"][1]; pb["Hips"].location = base
+    arm.animation_data.action = None; bpy.context.view_layer.update(); w0 = wp("Hips")
+    best_back = best_down = None
+    for ax in (Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1))):
+        for sg in (1, -1):
+            pb["Hips"].location = base + ax * sg * 0.1; bpy.context.view_layer.update()
+            d = (wp("Hips") - w0) / 0.1
+            if best_back is None or -d.dot(F) > best_back[0]: best_back = (-d.dot(F), ax * sg / max(1e-6, -d.dot(F)))
+            if best_down is None or -d.z > best_down[0]: best_down = (-d.z, ax * sg / max(1e-6, -d.z))
+    pb["Hips"].location = base; bpy.context.view_layer.update()
+    print("HIPSAXES back gain", round(best_back[0], 2), "down gain", round(best_down[0], 2))
+    return best_back[1], best_down[1]
+BACK, DOWN = hips_vectors()
+def hit(name, back, side, twist, frames, give_back, give_down):
     spec = lambda k: [("Spine", X, -back * k), ("Spine1", X, -back * k), ("Spine2", X, -back * k), ("Neck", X, -back * .6 * k),
                       ("Spine", Z, side * k), ("Spine1", Z, side * k), ("Spine2", Z, side * k), ("Spine1", Y, twist * k)]
+    def pose(k):
+        d = offset(guard, spec(k)); l, q = d["Hips"]
+        d["Hips"] = (l + BACK * give_back * k + DOWN * give_down * k, q); return d
     act = new_action(name)
-    key(act, 1, guard); key(act, 1 + frames[0], offset(guard, spec(1.0))); key(act, 1 + frames[1], offset(guard, spec(.55)))
-    key(act, 1 + frames[2], offset(guard, spec(.2))); key(act, 1 + frames[3], guard)
-hit("HitA", .09, -.08, .12, (2, 5, 8, 11))
-hit("HitB", .09, .08, -.12, (2, 5, 8, 11))
-hit("HitHeavy", .17, -.12, .2, (3, 8, 13, 18))
+    key(act, 1, guard); key(act, 1 + frames[0], pose(1.0)); key(act, 1 + frames[1], pose(.55))
+    key(act, 1 + frames[2], pose(.2)); key(act, 1 + frames[3], guard)
+hit("HitA", .09, -.08, .12, (2, 5, 8, 11), .22, .10)
+hit("HitB", .09, .08, -.12, (2, 5, 8, 11), .22, .10)
+hit("HitHeavy", .17, -.12, .2, (3, 8, 13, 18), .45, .18)
 
 # 4. tell: search the left (striking) arm and forearm angles that put the fist beside the ear
 def solve_tell():
@@ -110,7 +128,7 @@ a = new_action("TellJab"); key(a, 1, guard); key(a, 5, tell); key(a, 8, tell)
 # diagnostics, evaluated with the slot bound
 def rel(n):
     d = wp(n) - wp("Hips"); return "(F%+.2f R%+.2f U%+.2f)" % (d.dot(F), d.dot(R), d.z)
-for name, frames in (("Punch", (1, 7, 14)), ("HitA", (1, 3, 6)), ("HitB", (3,)), ("HitHeavy", (4,)), ("TellJab", (1, 5))):
+for name, frames in (("Punch", (1,)), ("HitA", (1, 3, 6)), ("HitB", (3,)), ("HitHeavy", (4,)), ("TellJab", (1, 5))):
     act = [x for x in bpy.data.actions if x.name == name or x.name.endswith("|" + name)][0]
     for f in frames:
         at(act, f)

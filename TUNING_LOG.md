@@ -1061,8 +1061,26 @@ Two Blender 5 traps, in case this is redone: assigning an action does not bind i
 
 Checked in the harness: the jab connects and Reyes's head snaps back with his hands up (`tuning/s15-skin-hit.jpg`), and his tell shows as a coiled guard with the "!" (`tuning/s15-skin-tell.jpg`). With the skin off the regression suite is 22 of 22.
 
-Not done: no crossfade between clips, so block, hit and idle snap; Death is still the only fall; the hit leans are a single bend of the spine, with no step back or knee give; the player keeps the left-hand lead; the clips are untested in portrait and under touch.
+Not done at that point: crossfades, a stagger in the hits, and a portrait check; they are in the next section. Death is still the only fall and the player keeps the left-hand lead.
+
+### Crossfade, stagger and portrait
+
+Crossfade. When the clip changes, `updateSkin` snapshots each bone's local rotation and position and blends from it into the new clip. The fade is 0.12 s by default and shorter for fast clips: 0.04 s into the punch, 0.05 s into a hit, 0.08 s into the fall, so the jab still reaches its impact in time. The snap is `SKIN.fade = false`. Largest rotation change of any bone in one frame, 70 frames settled before each:
+
+| Transition | Snap | Fade |
+| --- | --- | --- |
+| idle → block → idle | 98°, 2 frames over 25° | 21°, none over 25° |
+| idle → jab | 98°, 4 frames over 25° | 56°, 4 frames over 25° |
+| idle → hit → idle | 98°, 2 frames over 25° | 51°, 1 frame over 25° |
+
+Block is smooth. The jab and the hit stay fast on purpose: the punch itself moves a bone more than 25° in a frame, so those counts do not go to zero.
+
+Stagger. The hit clips now also move the hips back and down at the peak (0.22 and 0.10 for a jab hit, 0.45 and 0.18 for a heavy, in rig units), so the knees give instead of only the spine bending. The direction came from testing which hips axis moves the body against its facing. The GLB is 957,384 bytes.
+
+Portrait and touch. At 390×844 with touch emulation both fighters stay fully in the closer portrait frame during a jab, a hit and the knockout, the touch buttons sit clear below them, and the HUD is intact (`tuning/s15-skin-portrait.jpg`). Draws 150 → 27.
+
+Not done: Death is still the only fall, the player keeps the left-hand lead, and nothing was checked on a real phone.
 
 ### Next
 
-Pick the model: with these clips the Quaternius model now has every state. Then crossfades, a second punch for variety (a mirrored one through the same negative-scale trick, but only between bouts so it does not pop), and a look at portrait and touch.
+Pick the model and decide how the skin would ship: it needs http or https, since the model loads with `fetch`, and a switch (a setting, or on by default). Then the README text for the new look, and a decision on the RG Poly files in `assets/rgpoly-fighter/`, which are not needed if Quaternius is the choice.

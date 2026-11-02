@@ -1841,7 +1841,7 @@ function frame(){
   while(acc>=SIM-1e-9){ acc-=SIM; simTick(); }
   const a=Math.max(0,acc/SIM);
   simShow(P,a); simShow(E,a);
-  if(SKIN.on){ updateSkin(P); updateSkin(E); }
+  if(SKIN.on){ updateSkin(P,real); updateSkin(E,real); }
   updateFx(real); updateAmbient(dt); updateCamera(dt); updateHud();
 }
 
@@ -1916,7 +1916,7 @@ const SKIN_MODELS={
            jab:['FightM_Punch_A','FightM_Punch_B'],heavy:['FightM_Punch_C'],hit:['FightM_Hit_A','FightM_Hit_B'],hitHeavy:'FightM_Hit_C'},
     impact:{FightM_Punch_A:7/12,FightM_Punch_B:5/12,FightM_Punch_C:19/25}} /* furthest hand, measured in Blender */
 };
-const SKIN={on:false,model:'rg',files:{},koSeconds:2.2};
+const SKIN={on:false,model:'rg',files:{},koSeconds:2.2,fade:true};
 async function skinFile(M){
   if(!SKIN.files[M.url]){ const r=await fetch(M.url); if(!r.ok) throw new Error('skin '+r.status); SKIN.files[M.url]=new File([await r.blob()],'fighter.glb'); }
   return SKIN.files[M.url];
@@ -2036,11 +2036,32 @@ function skinPick(f,M){
   if((st==='idle'||st==='block')&&f.moveAmt>.12&&C.walk) return [C.walk,(f.phase/(Math.PI*2))%1];
   return [C.idle,(f.t/dur(C.idle))%1];
 }
-function updateSkin(f){
+/* When the clip changes, the bones blend from the pose they were in to the new clip. Fast clips fade fast: a jab has 0.15 s to reach
+   its impact, so a long fade would hide the punch. */
+const SKIN_FADE={Punch:.04,HitA:.05,HitB:.05,HitHeavy:.05,Death:.08,def:.12};
+function skinNodes(S){
+  if(!S.nodes){ const sk=S.res.skeletons[0]; S.nodes=(sk?sk.bones:[]).map(b=>b.getTransformNode()).filter(n=>n&&n.rotationQuaternion); }
+  return S.nodes;
+}
+function updateSkin(f,dt){
   const S=f&&f.skin; if(!S) return;
   const pick=skinPick(f,S.M), g=S.groups[pick[0]]; if(!g) return;
-  if(S.cur!==g){ if(S.cur) S.cur.stop(); g.start(false,1,g.from,g.to,false); g.pause(); S.cur=g; }
+  if(S.cur!==g){
+    if(SKIN.fade&&S.cur){ const ns=skinNodes(S); S.fade={t:0,len:SKIN_FADE[pick[0]]||SKIN_FADE.def,q:ns.map(n=>n.rotationQuaternion.clone()),p:ns.map(n=>n.position.clone())}; }
+    if(S.cur) S.cur.stop(); g.start(false,1,g.from,g.to,false); g.pause(); S.cur=g;
+  }
   g.goToFrame(g.from+(g.to-g.from)*clamp(pick[1],0,1));
+  const fd=S.fade;
+  if(fd){
+    fd.t+=dt||0; const k=Math.min(1,fd.t/fd.len), e=k*k*(3-2*k), ns=S.nodes;
+    for(let i=0;i<ns.length;i++){
+      const n=ns[i], a=fd.q[i], b=n.rotationQuaternion, sg=(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w)<0?-1:1;
+      let x=a.x*sg*(1-e)+b.x*e, y=a.y*sg*(1-e)+b.y*e, z=a.z*sg*(1-e)+b.z*e, w=a.w*sg*(1-e)+b.w*e; const l=Math.hypot(x,y,z,w)||1;
+      b.set(x/l,y/l,z/l,w/l);
+      n.position.set(lerp(fd.p[i].x,n.position.x,e),lerp(fd.p[i].y,n.position.y,e),lerp(fd.p[i].z,n.position.z,e));
+    }
+    if(k>=1) S.fade=null;
+  }
   S.lastClip=pick[0]; S.lastU=pick[1];
   if(f.state==='ko'){ f.body.rotation.set(0,0,0); f.body.position.set(0,0,0); }
 }
