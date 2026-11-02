@@ -928,6 +928,12 @@ Rim. In portrait the nearest pillar at one heading is 1.31–1.67 m from the cam
 
 First key press. `input-probe` measured 117–134 ms for the first keyboard press on the old build and 118–208 ms on the new one. It is the first `keydown` calling `audioInit`, which decodes the audio pack in the handler. In play that press is Start or Enter on the title card. Later key presses are 17 ms. No change.
 
+Review findings, left as they are. An independent read of the diff, by hand and without running it, found no bug. It listed three small things, with its own figures:
+
+- Crossing aspect 1.25 on a resize or a rotation changes the target distance, because portrait uses 0.20 of the height and landscape 0.34. At gap 4.6 it reported 7.05 m against 10.86 m. Between aspect 0.8 and 1.25 a nearly square window shows the fighters at about 20% of the height. The follow eases the move.
+- A fighter in the `ko` state keeps its last walking `mv`, since `step` returns early. The camera lead then sits up to about 0.55 m off for the 2.4 s of the knockout.
+- A steady frame time within 8% of a snap point, 17.5 ms for example, runs one tick per frame. The sim then runs about 5% slow there, and about 8% fast near 65 or 130 Hz. Sim-time balance is not affected, only the wall-clock pace.
+
 Hand check still open: 55 fps at 1080p on an iGPU, a real pad and phone, and how the closer view feels on a real monitor. The headless runs measure draws, GPU time and pixels, not feel.
 
 
