@@ -166,6 +166,35 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("esc_opens_menu_on_every_card", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })), o = {};
+      document.getElementById("wrap").hidden = true;
+      const cards = {
+        title: () => S.titleCard(), dossier: () => S.introCard(2), hub: () => S.hubCard(1), dock: () => S.dockMission(() => {}), final: () => S.showFinalCard(),
+        win: async () => { S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); }, lose: async () => { S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(false); }
+      };
+      S.qaResetProgress();
+      for (const [name, open] of Object.entries(cards)) {
+        await open(); await sleep(200);
+        const title = $("cTitle").textContent;
+        kd("Escape"); await sleep(120);
+        const opened = G.menuOpen && !$("pause").hidden && getComputedStyle($("restart")).display === "none" && $("resume").textContent === "Back";
+        const cardKept = !$("wrap").hidden && G.state === "card" && $("cTitle").textContent === title;
+        kd("Escape"); await sleep(120);
+        const closed = !G.menuOpen && $("pause").hidden;
+        o[name] = opened && cardKept && closed;
+      }
+      S.titleCard(); await sleep(150); $("cardMenu").click(); await sleep(100); const viaButton = G.menuOpen; $("pauseCredits").click(); await sleep(150);
+      const creditsOpen = $("cTitle").textContent === "Who made this"; $("go").click(); await sleep(150);
+      o.menuButtonAndCreditsBack = viaButton && creditsOpen && $("cTitle").textContent === "Sublevel Three";
+      kd("Escape"); await sleep(100); $("quitTitle").click(); await sleep(250); o.quitFromCardMenu = G.state === "splash" && $("pause").hidden && !G.menuOpen;
+      S.play(); await sleep(250);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("opponent_dossier_every_bout", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = { bouts: [] };

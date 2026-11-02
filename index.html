@@ -119,6 +119,8 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .pauseCard h2{margin:0;font:800 36px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
 .pauseCard button,.pauseCard label{font:600 13px/1 var(--f-data);letter-spacing:.06em;text-transform:uppercase}
 .pauseCard button{background:#111;color:var(--tape);border:0;padding:12px 14px;cursor:pointer;text-align:left}
+.pause[data-mode=menu] #restart{display:none}
+.cardMenu{align-self:flex-start;margin:10px 20px 0}
 .pauseCard button.quiet{background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:10px 12px}
 .wrap.dossier{place-items:center end;padding-right:clamp(16px,6vw,96px);background:linear-gradient(to left,rgba(8,8,9,.74),rgba(8,8,9,.12) 64%)}
 .wrap.dossier .card{margin:auto 0 auto auto;max-height:calc(100% - 24px);overflow:auto}
@@ -259,6 +261,7 @@ dl.rows dd a{color:inherit}
         </div>
       </div>
       <button class="go" id="go" type="button"><span id="goTxt">Start</span><span aria-hidden="true">&rarr;</span></button>
+      <button class="btn2 cardMenu" id="cardMenu" type="button">Menu &middot; Esc</button>
       <div class="cardLinks" id="cardLinks" hidden>
         <button class="btn2" id="linkCredits" type="button">Credits</button>
         <button class="btn2" id="linkOut" type="button">Clock out</button>
@@ -336,6 +339,7 @@ const STR={
   card_title_body:{en:'You audit pallet counts from ten to six. Totals always reconcile. You have not slept in eleven months. Pike slides you a keycard toward a door missing from the floor plan.',it:'Controlli i pallet dalle dieci alle sei. I totali tornano sempre. Non dormi da undici mesi. Pike ti passa una tessera verso una porta assente dalla pianta.'},
   card_title_btn:{en:'Take the stairs',it:'Scendi le scale'},
   credits_btn:{en:'Credits',it:'Crediti'},
+  card_menu:{en:'Menu · Esc',it:'Menu · Esc'},
   dos_health:{en:'Health',it:'Salute'},
   dos_speed:{en:'Speed',it:'Velocità'},
   dos_reflex:{en:'Reaction',it:'Reazione'},
@@ -498,7 +502,7 @@ function paintLang(){
   set('pauseTitle','pause_title'); set('resume','resume_btn'); set('restart','restart_btn'); set('quitTitle','quit_btn'); set('pauseCredits','credits_btn');
   if(!resetArmed) set('resetBtn','reset_btn');
   set('spPlayTxt','play_btn'); set('spCredits','credits_btn'); set('spKick','company_form'); set('spTitle','card_title_name');
-  set('linkCredits','credits_btn'); set('linkOut','out_btn'); set('menuBtn','menu_btn');
+  set('linkCredits','credits_btn'); set('cardMenu','card_menu'); set('linkOut','out_btn'); set('menuBtn','menu_btn');
   lab('pMusic','music_lbl'); lab('pAmb','amb_lbl'); lab('lessMotion2','motion_lbl');
 }
 function boutPlace(c){ return L(c.placeKey); }
@@ -1607,7 +1611,7 @@ function applyPose(f,dt){
 }
 
 /* ---------- combat ---------- */
-const G={showcase:null,state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
+const G={menuOpen:false,lastCard:null,showcase:null,state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
 function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0}; }
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
@@ -1911,12 +1915,13 @@ window.addEventListener('keydown',e=>{
   }
   if(k==='escape'){
     e.preventDefault();
-    if(G.state==='card'&&cardEsc&&!wrapEl.hidden){ $('go').click(); return; }
+    if(G.menuOpen){ closeMenu(); return; }
+    if(G.state==='card'&&!wrapEl.hidden){ if(cardEsc) $('go').click(); else openMenu(); return; }
     if(G.state==='fight'||G.state==='ready') pauseFight();
     else if(G.state==='pause') resumeFight();
     return;
   }
-  if(k==='enter'&&!$('wrap').hidden){ e.preventDefault(); $('go').click(); return; }
+  if(k==='enter'&&!$('wrap').hidden&&!G.menuOpen){ e.preventDefault(); $('go').click(); return; }
   if(['space','arrowup','arrowdown','arrowleft','arrowright'].includes(k)&&$('wrap').hidden) e.preventDefault();
   if(e.repeat) return;
   keys.add(k); capLight(k,true);
@@ -2072,6 +2077,17 @@ function resumeFight(){
   G.state=G.pauseFrom||'fight';
   if($('pause')) $('pause').hidden=true;
 }
+/* The menu over a card: the pause card without Restart, and Resume reads Back. Esc, Back or the Menu button toggles it. */
+function openMenu(){
+  if(G.menuOpen||G.state!=='card'||wrapEl.hidden) return;
+  G.menuOpen=true; $('pause').dataset.mode='menu'; $('pause').hidden=false; $('resume').textContent=L('back_btn'); $('pauseTitle').textContent=L('menu_btn');
+  setTimeout(()=>{ try{ $('resume').focus({preventScroll:true}); }catch(e){} },20);
+}
+function closeMenu(){
+  if(!G.menuOpen) return;
+  G.menuOpen=false; $('pause').hidden=true; $('pause').dataset.mode='fight'; $('resume').textContent=L('resume_btn'); $('pauseTitle').textContent=L('pause_title');
+  try{ $('go').focus({preventScroll:true}); }catch(e){}
+}
 function restartBout(){
   if($('pause')) $('pause').hidden=true;
   startBout(G.bout||0);
@@ -2080,7 +2096,7 @@ function restartBout(){
    Nothing plays and the audio context stays suspended until Play. */
 function toSplash(withNote){
   try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen(); else if(document.webkitFullscreenElement&&document.webkitExitFullscreen) document.webkitExitFullscreen(); }catch(e){}
-  if($('pause')) $('pause').hidden=true; wrapEl.hidden=true; hudEl.hidden=true; $('touch').hidden=true;
+  if($('pause')) $('pause').hidden=true; G.menuOpen=false; $('pause').dataset.mode='fight'; $('resume').textContent=L('resume_btn'); $('pauseTitle').textContent=L('pause_title'); wrapEl.hidden=true; hudEl.hidden=true; $('touch').hidden=true;
   G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
   G.state='splash'; splashHold=true; audOut=true; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
   if(ac&&ac.state!=='closed'){ try{ ac.suspend(); }catch(e){} }
@@ -2105,7 +2121,7 @@ function creditsCard(back){
           [L('cr_type'),'Big Shoulders Stencil Display by the Big Shoulders Project Authors; IBM Plex Mono and Plex Sans Condensed by IBM. SIL OFL 1.1'],
           [L('cr_sound'),L('cr_sound_v')],
           [L('cr_source'),lnk('https://github.com/carlok/red-ink','github.com/carlok/red-ink')]],
-    btn:L('back_btn'),go:back,esc:true});
+    btn:L('back_btn'),go:back,esc:true,noRemember:true});
 }
 /* Clock out is Quit from the title card; the browser cannot close a tab it did not open, so the splash is the exit. window.close() is
    tried anyway and works for a tab a script opened. */
@@ -2126,6 +2142,7 @@ function onResetClick(){
 }
 if($('resetBtn')) $('resetBtn').addEventListener('click',onResetClick);
 function openCreditsFromPause(){
+  if(G.menuOpen){ const prev=G.lastCard; closeMenu(); creditsCard(()=>{ showCard(prev); }); return; }
   if($('pause')) $('pause').hidden=true;
   creditsCard(()=>{ wrapEl.hidden=true; G.state='pause'; if($('pause')) $('pause').hidden=false; hudEl.hidden=false; if(isTouch) $('touch').hidden=false; });
 }
@@ -2140,7 +2157,8 @@ loadMotion(); paintMotion();
 if($('lessMotion')) $('lessMotion').addEventListener('change',()=>setLessMotion($('lessMotion').checked));
 if($('lessMotion2')) $('lessMotion2').addEventListener('change',()=>setLessMotion($('lessMotion2').checked));
 if($('tutorGo')) $('tutorGo').addEventListener('click',hideTutor);
-if($('resume')) $('resume').addEventListener('click',resumeFight);
+if($('resume')) $('resume').addEventListener('click',()=>{ if(G.menuOpen) closeMenu(); else resumeFight(); });
+if($('cardMenu')) $('cardMenu').addEventListener('click',()=>{ if(G.menuOpen) closeMenu(); else openMenu(); });
 if($('restart')) $('restart').addEventListener('click',restartBout);
 function updateCamera(dt,real){
   real=real||dt;
@@ -2212,7 +2230,8 @@ function showCard(c){
   $('cRows').hidden=!(c.rows&&c.rows.length);
   $('avatarBox').hidden=!c.avatar; $('goTxt').textContent=c.btn;
   $('go').onclick=()=>{ audioInit('click'); SFX.ui(); wrapEl.hidden=true; c.go(); };
-  cardEsc=!!c.esc; if($('cardLinks')) $('cardLinks').hidden=!c.links;
+  cardEsc=!!c.esc; if($('cardLinks')) $('cardLinks').hidden=!c.links; if(!c.noRemember) G.lastCard=c; if($('cardMenu')) $('cardMenu').hidden=!!c.esc;
+  if(G.menuOpen) closeMenu();
   G.showcase=c.showcase?true:null; wrapEl.classList.toggle('dossier',!!c.showcase);
   G.state='card'; wrapEl.hidden=false; hudEl.hidden=true; $('touch').hidden=true; wrapEl.scrollTop=0;
   setTimeout(()=>{ try{ $('go').focus({preventScroll:true}); }catch(e){} },30);
@@ -3334,7 +3353,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,CROWD,crowd,introCard,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
