@@ -1313,3 +1313,68 @@ Fonts. The page loaded three families from Google Fonts: Big Shoulders Stencil D
 Reset progress. A button at the end of the title card's settings: the first click asks "Sure? Click again" (four seconds to confirm), the second clears bouts won, unlocked outfits and arena grades, and the dock mission, saves, and rebuilds the player's fighter. Keys, sound, language and difficulty stay. English and Italian.
 
 Not done: characters outside the Latin subset fall back to Impact or the system monospace; Reset progress is only on the title card, not in the pause menu.
+
+## Sprint 22: a silent splash, real music, spectators, and an opponent dossier
+
+Asked for: the music is still a hum; the audience should look like random players; other things; a Quit that leads to a splash with no hum and a Play button. Mid-sprint: a card between levels with the upcoming opponent, full rotating body, metrics, strengths and weaknesses.
+
+### Why it was a hum
+
+Every music stem was `loopTone()`: two sine waves with a tremolo, looped every 2 s at 16 kHz. `room` was noise under a `sin(pi t)` window (a pulse every 1.5 s) and `crowd` noise times a 2 Hz sine. Nine loops ran from the first key press, in menus, in pause, in a background tab.
+
+### Splash
+
+The page opens on a splash (the title over the orbiting arena, Play, Credits). No audio context exists until Play; keys and the sound button do nothing meanwhile. Quit in the pause menu and Quit on the title card (the old Clock out) return to it with a line saying how many bouts are saved, leave fullscreen and suspend the context. Enter or Space plays. `tools/audio-bed-probe.mjs`: after Quit the context is `suspended` and its clock does not move (0 s over 2 s). The probes press Play through `bootSublevel`, the regression Chrome runs with the autoplay flag, and a bout started straight from the splash by a probe clears the hold.
+
+### Music (a live sequencer, no files)
+
+Six places, six tempos and scales (phrygian 78 bpm, minor pentatonic 96, dorian 84, minor 70 with a bell, harmonic minor 100 with a march snare, phrygian dominant 112). Patterns come from a seeded stream (never `rng`): a two-bar bass line, kick, snare and hat grid, a lead motif, a chord for the pad. Voices are a few Web Audio nodes each: kick (sine with a pitch drop), snare and hat (filtered noise), bass (sawtooth through a sweeping lowpass), pluck (triangle into a dotted delay), pad (detuned sawtooths). Layers fade by what is happening: cards play pad and a slow motif (fading out after 40 s of nobody pressing anything); a fight is silent until a fighter is under 40% health (bass and kick, hats from 25%) or the crowd cheers for a stretch (8 bars on, 12 off); stings for the bout start, a knockout, a win and a loss; hushed on pause, stopped on the splash, idle in a hidden tab.
+
+| `tools/audio-bed-probe.mjs` | Drone stems | Sequencer |
+| --- | --- | --- |
+| Title card, onsets per 10 s / loudness modulation | 1.3 / 0.16 | 12–15 / 0.56–0.61 |
+| Tense moment, onsets / modulation | 31 / 0.28 (the tremolo counts) | 25 / 1.29 |
+| Distinct dominant pitches, tense moment | 4 | 8–9 |
+| Title card loudness (dBFS rms) | −26.6 | −26.3 |
+| Tense loudness | −25 | −24.8 |
+
+The dominant-pitch metric is unreliable for a decaying pluck over a pad (the title card reads 2–5 and got worse when I made the lead louder), so the onsets and the modulation are the evidence. Whether it sounds like music is for your ears.
+
+### Bed
+
+`room` and `crowd` are now live: a 4 s noise buffer with a cross-faded seam, filtered into a room tone and a crowd murmur (two bands, each with its own slow wobble, the low one rising in pitch with the cheer) and a wind layer in Cold Storage. A few low events per place: drips in The Sump, a forklift beep at Dock Four, a radar ping at The Blind Map, an ice crack in Cold Storage, a radio squelch at The Gatehouse, a reactor thump at The Reconciler (fight and ready phase only). `audio/samples.js` went from 833 KB to 107 KB: the ten hit, whoosh, KO and UI clips are byte-identical, the nine loops are gone.
+
+| dBFS rms | Sprint 20 | Now |
+| --- | --- | --- |
+| Title card | −26.1 | −26.3 |
+| Fight, nothing happening | −40.7 | −38.9 |
+| Paused | −54.2 | −52.6 |
+| Rally, rms / peak | −26.5 / −4.0 | −25.7 / −4.0 |
+
+### Spectators
+
+Fourteen of the 34 spectators nearest the usual view (the far side and the sides, closest to the ring) are the Quaternius person: clones of one loaded asset container, each with its own palette, its own vertex colours, height ±8% and half mirrored, a random look from `randomLook` and the place's style (hi-vis vests at Dock Four, parkas in Cold Storage, navy jackets at The Gatehouse, black coats at The Reconciler). They are dimmed (emissive 0.12, colours ×0.55, shirts toned toward grey) so the fighters stay the brightest thing: `tools/crowd-probe.mjs` gives the spectators 9–25% of the fighters' mean luminance in bouts 1, 3, 4 and 6 (7 of the 14 are in frame at the standard framing). They idle with their own offset, pump a fist (the Punch clip) while the crowd cheers, and flinch on a knockout. The other 20 stay boxes in the dark. Built two a frame after the first bout starts, off the critical path; no console errors in six places. `skinLite` (quality step 2) hides them and brings the boxes back.
+
+| `tools/env-probe.mjs` | Before | After |
+| --- | --- | --- |
+| Draws | 33 | 41–42 (27 after `skinLite`) |
+| Active meshes | 38–40 | 44–46 |
+| GPU, 1600×900 | 1.5–2.1 ms | about 2.0 ms (noisy: this machine reads 1.4–2.7 on the same build) |
+
+### Opponent dossier
+
+The intro card before each bout is now a dossier. The next opponent stands in the place he will fight in (`applyEnv`, the player hidden), the camera walks all the way round him once every 12 s, and the card sits beside him; on a phone it is a bottom sheet with a sticky Step in button and the body shows above it. Six metrics as five-pip bars with the number: health, speed, reaction (ms), power (damage × (0.6 + heavy chance)), guard (%) and reach, ranked against the six opponents from the `BOUTS` table itself so a retune shows up; plus style, a strength, a weakness and the tip. The twelve strength and weakness lines (English and Italian) follow the table: Dag is slowest on his feet and to react, Chen has the slowest reactions of the six and the most heavies, Voss the most health and the best guard, Pike the fastest and the lightest hitter, Halvorsen the weakest guard, Reyes the least health.
+
+### Checked
+
+| Check | Result |
+| --- | --- |
+| `tools/regression.mjs` | 27 of 27 (new: menu and Quit to the splash, silent splash on load, the dossier for all six bouts) |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, unchanged |
+| `tools/step-probe.mjs` | identical at 20 to 144 fps (the 20 fps run now matches too) |
+| `tools/combat-probe.mjs` | damage 7 / 16 / 0.7, counter 8.75, word readable 50 ms, unchanged |
+| `tools/ui-probe.mjs`, `tools/input-probe.mjs`, `tools/font-probe.mjs`, `tools/look-contrast-probe.mjs` | no failures; 0 clashes, 0 floor violations in 2,000 sessions |
+
+Screenshots: `tuning/s22-splash.jpg`, `s22-splash-phone.jpg`, `s22-crowd.jpg`, `s22-dossier-reyes.jpg`, `s22-dossier-voss.jpg`, `s22-dossier-phone.jpg`.
+
+Not done: the small extras of the plan (footsteps, a crowd gasp) were left out to keep this reviewable; how the music and the bed sound over speakers is unchecked (the numbers say it is not a drone, not that it is good); the spectators use the Punch clip as a fist pump, which reads as swinging at the air; the first bout's crowd takes about a second to appear; on `?skin=0` the crowd stays boxes and the dossier shows the procedural opponent; a real phone and an integrated GPU are still unchecked.
