@@ -3,14 +3,16 @@
  * is sent during a bout while every sim tick is logged (fighter state, stamina, and the action that started on the tick). A press is
  * accepted when its action starts inside the buffer window (J, K, Space) or the block is up within 3 ticks (L); otherwise the states seen
  * in the window say why: stamina, recovery from an attack, stun, dodge, or "other".
- * Usage: node tools/key-probe.mjs [seconds per scenario, default 60] [--window 0.22]   (prints a JSON summary per scenario)
+ * Usage: node tools/key-probe.mjs [seconds per scenario, default 60] [--buf 0.22] [--pace 1]   (prints a JSON summary per scenario)
  * Scenarios: "passive" (the opponent never acts, so only the player's own state and stamina can drop a press) and "live" (Reyes plays).
  */
 import { withPage, bootSublevel } from "./cdp-session.mjs";
 
 const SECS = Number(process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : 60);
-const wi = process.argv.indexOf("--window");
-const WINDOW = wi >= 0 ? Number(process.argv[wi + 1]) : 0.22;
+const bi = process.argv.indexOf("--buf");
+const pi = process.argv.indexOf("--pace");
+const PACE = pi >= 0 ? Number(process.argv[pi + 1]) : 1;   /* 1 is mashing (a press every 90-610 ms); 2.5 is about one a second */
+const WINDOW = bi >= 0 ? Number(process.argv[bi + 1]) : 0.22;   /* the input buffer under test: set in the page and used to judge each press */
 
 await withPage(async (cdp) => {
   await bootSublevel(cdp);
@@ -18,7 +20,7 @@ await withPage(async (cdp) => {
   for (const scenario of ["passive", "live"]) {
     const raw = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G;
-      document.getElementById("wrap").hidden = true; S.seed(5); S.startBout(0);
+      document.getElementById("wrap").hidden = true; S.INPUT.buf = ${WINDOW}; S.seed(5); S.startBout(0);
       while (G.state !== "fight") await raf();
       for (let i = 0; i < 90; i++) await raf();
       const E = S.E, P = S.P;
@@ -32,7 +34,7 @@ await withPage(async (cdp) => {
         await raf(); const now = performance.now();
         if (lHeld && now >= lUp) { key("l", false); lHeld = false; }
         if (now >= next) {
-          const r = rnd(); next = now + 90 + rnd() * 520;
+          const r = rnd(); next = now + (90 + rnd() * 520) * ${PACE};
           const act = r < .4 ? "jab" : r < .62 ? "heavy" : r < .74 ? "dodge" : "block";
           if (act === "block") { if (!lHeld) { key("l", true); lHeld = true; lUp = now + 160 + rnd() * 380; presses.push({ act, tick: G.ticks }); } }
           else { const k = act === "jab" ? "j" : act === "heavy" ? "k" : " "; key(k, true); key(k, false); presses.push({ act, tick: G.ticks }); }
@@ -62,5 +64,5 @@ await withPage(async (cdp) => {
     stats.acceptedShare = Math.round(stats.accepted / stats.presses * 1000) / 10;
     out[scenario] = stats;
   }
-  console.log(JSON.stringify({ windowSeconds: WINDOW, secondsPerScenario: SECS, ...out }, null, 1));
+  console.log(JSON.stringify({ windowSeconds: WINDOW, pace: PACE, secondsPerScenario: SECS, ...out }, null, 1));
 });

@@ -53,6 +53,9 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
 .keys{font:500 11px/1.7 var(--f-data);color:var(--paper);text-align:right;background:#0a0a0b;padding:6px 8px}
 .keys kbd{font:inherit;color:var(--paper);border:1px solid var(--mute);padding:0 5px;margin:0 2px}
+.keys kbd.on{background:var(--tape);color:#111;border-color:var(--tape)}
+.bar i.st.deny{background:var(--stain);animation:deny .25s}
+@keyframes deny{0%,60%{opacity:.35}30%,100%{opacity:1}}
 .snd{pointer-events:auto;font:600 11px var(--f-data);letter-spacing:.12em;text-transform:uppercase;background:rgba(10,10,11,.55);color:var(--paper);border:1px solid var(--mute);padding:7px 10px;cursor:pointer}
 .is-touch .keys{display:none}
 .is-touch .snd{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:calc(76px + env(safe-area-inset-top,0px));padding:5px 8px;font-size:10px}
@@ -1602,7 +1605,7 @@ function paintBinds(){
     const kbd=el.querySelector('kbd'); if(kbd) kbd.textContent=keyLabel(binds[el.dataset.bind]);
     el.classList.toggle('listen', listenAct===el.dataset.bind);
   });
-  keysHtml='<kbd>WASD</kbd> move <kbd>'+keyLabel(binds.jab)+'</kbd> jab <kbd>'+keyLabel(binds.heavy)+'</kbd> heavy <kbd>'+keyLabel(binds.block)+'</kbd> block (hold) <kbd>'+keyLabel(binds.dodge)+'</kbd> dodge';
+  keysHtml='<kbd data-k="move">WASD</kbd> move <kbd data-k="jab">'+keyLabel(binds.jab)+'</kbd> jab <kbd data-k="heavy">'+keyLabel(binds.heavy)+'</kbd> heavy <kbd data-k="block">'+keyLabel(binds.block)+'</kbd> block (hold) <kbd data-k="dodge">'+keyLabel(binds.dodge)+'</kbd> dodge';
   if(!padOn) $('keys').innerHTML=keysHtml;
   document.querySelectorAll('#cRows dt').forEach(dt=>{
     if(dt.textContent==='Strike') dt.nextElementSibling.textContent=keyLabel(binds.jab)+' jab, '+keyLabel(binds.heavy)+' heavy';
@@ -1619,7 +1622,31 @@ function actionFor(k){
 }
 loadBinds();
 loadRumble();
-function keyName(e){ return e.key===' '?'space':e.key.toLowerCase(); }
+/* The key as it is labelled on the keycap, and for a layout whose letters are not Latin (Cyrillic, Greek, Arabic, Hebrew) the key in that
+   position, so J K L and WASD are in the same place on any keyboard. */
+function keyName(e){
+  if(e.key===' ') return 'space';
+  const k=e.key.toLowerCase();
+  if(k.length===1&&/[a-z0-9]/.test(k)) return k;
+  const m=/^Key([A-Z])$/.exec(e.code||''); if(m) return m[1].toLowerCase();
+  return k;
+}
+const INPUT={buf:.22}; /* seconds a press of jab, heavy or dodge waits for the fighter to be free */
+/* The key hint under the arena lights a key as the game receives it, so a press that does nothing can be told from a key that never arrived. */
+const MOVE_KEYS=new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']);
+function capLight(k,on){
+  const el=$('keys'); if(!el||padOn) return;
+  const act=MOVE_KEYS.has(k)?'move':actionFor(k); if(!act) return;
+  const kb=el.querySelector('kbd[data-k="'+act+'"]'); if(!kb) return;
+  if(act==='move'){ const down=[...keys].some(q=>MOVE_KEYS.has(q)); kb.classList.toggle('on',down); } else kb.classList.toggle('on',on);
+}
+/* A press that cannot start (not enough stamina) says so: the stamina bar blinks and a low tick plays. */
+let denyT=0;
+function denyCue(){
+  const now=performance.now(); if(now-denyT<250) return; denyT=now;
+  const st=$('pSt'); if(st){ st.classList.remove('deny'); void st.offsetWidth; st.classList.add('deny'); }
+  playSample('ui',.55);
+}
 window.addEventListener('keydown',e=>{
   audioInit('key');
   const k=keyName(e);
@@ -1641,14 +1668,20 @@ window.addEventListener('keydown',e=>{
   if(k==='enter'&&!$('wrap').hidden){ e.preventDefault(); $('go').click(); return; }
   if(['space','arrowup','arrowdown','arrowleft','arrowright'].includes(k)&&$('wrap').hidden) e.preventDefault();
   if(e.repeat) return;
-  keys.add(k);
+  keys.add(k); capLight(k,true);
   const act=actionFor(k);
-  if(act==='jab') buf.jab=.22;
-  else if(act==='heavy') buf.heavy=.22;
-  else if(act==='dodge') buf.dodge=.22;
+  if(act==='jab') buf.jab=INPUT.buf;
+  else if(act==='heavy') buf.heavy=INPUT.buf;
+  else if(act==='dodge') buf.dodge=INPUT.buf;
+  if(P&&(G.state==='fight')&&(act==='jab'||act==='heavy'||act==='dodge')&&P.stam<(act==='dodge'?16:ATK[act].cost)) denyCue();
 });
-window.addEventListener('keyup',e=>keys.delete(keyName(e)));
-window.addEventListener('blur',()=>{keys.clear();touchBlock=false;});
+window.addEventListener('keyup',e=>{
+  const k=keyName(e); keys.delete(k); capLight(k,false);
+  if(e.key==='Meta'){ keys.clear(); document.querySelectorAll('#keys kbd.on').forEach(x=>x.classList.remove('on')); } /* macOS sends no keyup for keys released under Cmd */
+});
+const dropKeys=()=>{ keys.clear(); touchBlock=false; document.querySelectorAll('#keys kbd.on').forEach(x=>x.classList.remove('on')); };
+window.addEventListener('blur',()=>{ dropKeys(); if(G.state==='fight'||G.state==='ready') pauseFight(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ dropKeys(); if(G.state==='fight'||G.state==='ready') pauseFight(); } });
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 function playerIntent(){
   let ix=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
@@ -2862,7 +2895,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,stemGain,hubGain,loopSrc}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,stemGain,hubGain,loopSrc}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
