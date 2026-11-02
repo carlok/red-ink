@@ -1906,8 +1906,11 @@ window.addEventListener('drop',e=>{ e.preventDefault(); dragDepth=0; $('dropHint
    the fixed step stay exact. Block, hit and win fall back to the Idle clip plus the procedural lean where a model has no clip. */
 const SKIN_MODELS={
   quaternius:{url:'assets/quaternius-human/animated-human.glb',palette:true,
-    clips:{idle:'Idle',walk:'Walk',run:'Run',ko:'Death',jab:['Punch'],heavy:['Punch']},
-    impact:{Punch:13/24}}, /* the left fist is fully out at frame 14 of 25, measured in Blender */
+    clips:{idle:'Idle',walk:'Walk',run:'Run',ko:'Death',block:'Guard',win:'Guard',tell:'TellJab',
+           jab:['Punch'],heavy:['Punch'],hit:['HitA','HitB'],hitHeavy:'HitHeavy'},
+    /* Guard, HitA, HitB, HitHeavy and TellJab were authored in Blender from the Punch clip's first pose (see assets/quaternius-human/README.txt).
+       The fist is fully out at frame 14 of 25, measured in Blender. */
+    impact:{Punch:13/24}},
   rg:{url:'assets/rgpoly-fighter/rgpoly-fighter.glb',palette:false,
     clips:{idle:'FightM_Idle',walk:'Walk_A',run:'Runing_A',ko:'FightM_Death_A',block:'FightM_Pose',win:'FightM_Pose',
            jab:['FightM_Punch_A','FightM_Punch_B'],heavy:['FightM_Punch_C'],hit:['FightM_Hit_A','FightM_Hit_B'],hitHeavy:'FightM_Hit_C'},
@@ -1988,7 +1991,9 @@ async function skinFighter(f,look){
   holder.parent=anchor;
   const root=res.meshes[0]; root.parent=holder;
   const bb=root.getHierarchyBoundingVectors(true), h=(bb.max.y-bb.min.y)||1, s=1.8/h;
-  holder.scaling.setAll(s); holder.position.set(-(bb.min.x+bb.max.x)/2*s,-bb.min.y*s,-(bb.min.z+bb.max.z)/2*s);
+  /* the opponent is mirrored, so he leads with the other hand and the two fighters face each other as in a real bout */
+  const mirror=!f.isPlayer, sxs=mirror?-s:s;
+  holder.scaling.set(sxs,s,s); holder.position.set(-(bb.min.x+bb.max.x)/2*sxs,-bb.min.y*s,-(bb.min.z+bb.max.z)/2*s);
   anchor.parent=f.slot;
   res.meshes.forEach(m=>{ m.isPickable=false; sg.addShadowCaster(m); m.alwaysSelectAsActiveMesh=true; });
   f.vis.setEnabled(false);
@@ -2008,12 +2013,13 @@ async function skinFighter(f,look){
   });
   f.skin_pal=pal;
   const groups={}; res.animationGroups.forEach(g=>{ groups[g.name.split('|').pop()]=g; });
-  f.skin={res,anchor,groups,M,cur:null,lastClip:'',lastU:0};
+  f.skin={res,anchor,groups,M,mirror,cur:null,lastClip:'',lastU:0};
 }
 function skinPick(f,M){
   const C=M.clips, st=f.state, G=f.skin.groups;
   const dur=n=>G[n]?(G[n].to-G[n].from)/60:1;
   if(st==='ko'&&C.ko) return [C.ko,clamp(f.koT/SKIN.koSeconds,0,1)];
+  if(st==='idle'&&f.ai&&f.ai.tell>0&&C.tell) return [C.tell,clamp(1-f.ai.tell/.28,0,1)]; /* Reyes cocks his striking fist before a jab */
   if(st==='attack'&&f.atk){
     const A=f.atk, D=A.def, list=A.type==='heavy'?C.heavy:C.jab;
     if(A.si===undefined){ f.skinN=(f.skinN||0)+1; A.si=f.skinN; }
@@ -2021,7 +2027,7 @@ function skinPick(f,M){
     return [name,t<tc?(t/tc)*I:I+(Math.min(t,D.dur)-tc)/(D.dur-tc)*(1-I)];
   }
   if(st==='hit'&&C.hit){
-    const name=f.koKind===1&&C.hitHeavy?C.hitHeavy:C.hit[f.hitSide>0?1:0]||C.hit[0];
+    const name=f.koKind===1&&C.hitHeavy?C.hitHeavy:C.hit[(f.hitSide>0?1:0)^(f.skin.mirror?1:0)]||C.hit[0];
     return [name,clamp(1-f.stunT/(f.stunMax||1),0,1)];
   }
   if(st==='block'&&C.block) return [C.block,.99];

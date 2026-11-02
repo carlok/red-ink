@@ -1042,6 +1042,27 @@ What it costs: the rig is a simple 21-bone cartoon with no fingers, the bodies a
 
 `randomLook(seed)` returns a LOOKS-shaped row from a seeded mulberry32 stream of its own, so the gameplay rng is not touched: skin from 13 tones and hair from 14, each nudged by a few percent so no two people match; any shirt hue, quieter pants, shoes (black, brown, white, grey, navy, dark red or a bright sneaker), height 0.92–1.12 and build 0.94–1.3. Colours are drawn again until every pair that sits next to another on the body is far enough apart in CIE Lab ΔE (about 2 is the least an eye notices, 30 is clearly different): skin–shirt 30, shirt–pants 30, skin–pants 25, hair–skin 20, hair–shirt 20, shoes–pants 18. Over 5,000 seeds (`node tools/look-contrast-probe.mjs`) none breaks a minimum and the fallback, which would force light against dark, never fired; the mean ΔE is 48 to 72 per pair. A seed gives the same look every time. `skinFighter(f, look)` applies it, including the root scale and `f.sx`. It works with the Quaternius model only. Six seeds on the opponent all read as different people, from dark skin and a purple shirt to blond hair, a green shirt and red sneakers (`tuning/s15-skin-random.jpg`, `tuning/s15-skin-random-2.jpg`).
 
+### Authored clips for the Quaternius model
+
+The model had Idle, Walk, Run, Punch and Death, and nothing for block, hit or Reyes's wind-up. Four clips were authored in Blender (`tools/blender/author-clips.py`, run with `Blender -b --python`) and exported into the same GLB, which is now 956,764 bytes:
+
+| Clip | How it was made |
+| --- | --- |
+| Guard | the first pose of the Punch clip: a lead fist forward and the other at the chin, held. Used for block |
+| HitA, HitB | from the guard: spine and neck bent back and to one side, with a twist, overshoot and return, 12 frames at 24 fps. At the peak the head sits 0.39 behind where it was and 0.13 to the side |
+| HitHeavy | the same, bigger: 0.69 back, 19 frames |
+| TellJab | the striking (left) arm and forearm angles found by a coordinate search so the fist sits beside the ear (error 0.006), plus a small lean back, held. Used while `ai.tell` runs, scrubbed over its 0.28 s |
+
+The red "!" over Reyes's head was moved onto the slot so it survives the skin.
+
+What did not work. A right-hand punch made by mirroring the left one, in two ways: Blender's flipped paste (it mirrors across the world X axis and the rig faces diagonally, so the fist went behind the body) and a per-bone search over all 48 signed axis permutations of the quaternion (worst bone off by 3.9 units). Dropped. Instead the opponent's whole body is mirrored with a negative x scale on the avatar holder, so he leads with the other hand and the pair faces each other as in a real bout; his hit direction is flipped to match. Babylon handled the mirrored skinned mesh without culling problems.
+
+Two Blender 5 traps, in case this is redone: assigning an action does not bind its slot unless `animation_data.action_slot` is set, and updating the scene after setting a pose re-evaluates the assigned action and overwrites the pose, so every key came out as the guard until the helper wrote values and keyed them with no update between.
+
+Checked in the harness: the jab connects and Reyes's head snaps back with his hands up (`tuning/s15-skin-hit.jpg`), and his tell shows as a coiled guard with the "!" (`tuning/s15-skin-tell.jpg`). With the skin off the regression suite is 22 of 22.
+
+Not done: no crossfade between clips, so block, hit and idle snap; Death is still the only fall; the hit leans are a single bend of the spine, with no step back or knee give; the player keeps the left-hand lead; the clips are untested in portrait and under touch.
+
 ### Next
 
-Choose a model: Quaternius (recolourable, but only Idle, Walk, Run, Punch and Death) or RG Poly (every state, one look per model). Reyes's tells still need a clip or an overlay. The KayKit itch pack stays unread. Missing clips can be authored in Blender, which is installed here. Credits for both packs are in the README on this branch.
+Pick the model: with these clips the Quaternius model now has every state. Then crossfades, a second punch for variety (a mirrored one through the same negative-scale trick, but only between bouts so it does not pop), and a look at portrait and touch.
