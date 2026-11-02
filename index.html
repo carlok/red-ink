@@ -129,7 +129,11 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 @media (max-aspect-ratio:1/1){.wrap.dossier{place-items:end center;padding:0;overflow:hidden;background:linear-gradient(to top,rgba(8,8,9,.7) 50%,rgba(8,8,9,0) 62%)}.wrap.dossier .card{margin:0;width:100%;max-height:56vh;overflow:auto}}
 .splash{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at center,rgba(8,8,9,.55),rgba(8,8,9,.92) 78%);text-align:center}
 .splash[hidden]{display:none}
-.splashIn{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:640px}
+.splash::before{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;pointer-events:none;opacity:.55;
+  background:linear-gradient(to top,rgba(255,45,149,.22),rgba(255,45,149,0) 70%),
+  repeating-linear-gradient(90deg,rgba(255,45,149,.55) 0 1px,transparent 1px 70px),repeating-linear-gradient(0deg,rgba(255,45,149,.45) 0 1px,transparent 1px 34px);
+  -webkit-mask:linear-gradient(to bottom,transparent,#000 40%);mask:linear-gradient(to bottom,transparent,#000 40%)}
+.splashIn{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:14px;max-width:640px}
 .splash .kick{font:600 11px/1.4 var(--f-data);letter-spacing:.18em;text-transform:uppercase;color:var(--paper)}
 .splash h1{margin:0;font:800 clamp(52px,13vw,150px)/.88 var(--f-display);letter-spacing:.02em;text-transform:uppercase;color:var(--tape);text-shadow:5px 5px 0 #111}
 .splash .note{margin:0;font:500 13px/1.4 var(--f-data);color:var(--paper);min-height:1.4em}
@@ -339,6 +343,8 @@ const STR={
   card_title_body:{en:'You audit pallet counts from ten to six. Totals always reconcile. You have not slept in eleven months. Pike slides you a keycard toward a door missing from the floor plan.',it:'Controlli i pallet dalle dieci alle sei. I totali tornano sempre. Non dormi da undici mesi. Pike ti passa una tessera verso una porta assente dalla pianta.'},
   card_title_btn:{en:'Take the stairs',it:'Scendi le scale'},
   credits_btn:{en:'Credits',it:'Crediti'},
+  row_perfect:{en:'Perfect',it:'Perfetto'},
+  perfect_v:{en:'You took no hits.',it:'Non hai preso colpi.'},
   card_menu:{en:'Menu · Esc',it:'Menu · Esc'},
   dos_health:{en:'Health',it:'Salute'},
   dos_speed:{en:'Speed',it:'Velocità'},
@@ -1260,6 +1266,7 @@ const VOICE={
   fight:{gain:.58,f0:[128,96],segs:[['f',.11,4500,0,0,4500,0,0,.5],['v',.13,740,1250,2500,740,1250,2500,1],['v',.17,740,1250,2500,420,2000,2700,.95],['s',.05],['p',.06,4200,0,0,4200,0,0,.7]]},
   ko:{gain:.62,f0:[120,100],segs:[['p',.05,2300,0,0,2300,0,0,.6],['v',.17,560,1800,2500,400,2200,2800,1],['s',.07],['v',.1,500,900,2400,500,900,2400,.95],['v',.14,500,900,2400,380,760,2300,.8]]},
   win:{gain:1.3,f0:[122,100],segs:[['v',.07,300,610,2200,400,2000,2600,.8],['v',.15,400,2000,2600,400,2000,2600,1],['v',.14,250,1700,2500,250,1700,2500,.55]]},
+  perfect:{gain:.8,f0:[124,98],segs:[['p',.05,1500,0,0,1500,0,0,.5],['v',.13,500,1450,2500,500,1450,2500,.95],['f',.09,4500,0,0,4500,0,0,.5],['v',.1,560,1800,2500,560,1800,2500,.9],['p',.05,2300,0,0,2300,0,0,.6],['p',.05,4200,0,0,4200,0,0,.6]]},
   lose:{gain:.7,f0:[118,92],segs:[['v',.07,360,1300,2500,500,900,2400,.8],['v',.2,500,900,2400,420,800,2300,1],['f',.17,5500,0,0,5500,0,0,.45]]}
 };
 const VOICE_GAIN=.9;
@@ -1331,6 +1338,10 @@ function musicSting(kind){
   if(kind==='ready'){
     vKick(t,1); vNoise(MUS.layer.drums,t,1.0,.5,'bandpass',300,3);
     const s=ac.createBufferSource(), fl=ac.createBiquadFilter(), g=mEnv(MUS.layer.drums,t,1.1,.28,.9); s.buffer=MUS.noise; fl.type='bandpass'; fl.Q.value=4; fl.frequency.setValueAtTime(250,t); fl.frequency.exponentialRampToValueAtTime(3000,t+1); s.connect(fl); fl.connect(g); s.start(t); s.stop(t+1.15);
+  } else if(kind==='play'){
+    /* the coin: two square notes, then a rising minor arpeggio */
+    const o=ac.createOscillator(); o.type='square'; o.frequency.setValueAtTime(mhz(83),t); o.frequency.setValueAtTime(mhz(88),t+.07); o.connect(mEnv(MUS.layer.pluck,t,.5,.1,.004)); o.start(t); o.stop(t+.52);
+    [0,3,7,12].forEach((n,j)=>vArp(t+.12+j*.09,root+24+n,.9));
   } else if(kind==='ko'){
     vKick(t,1); const o=ac.createOscillator(); o.frequency.setValueAtTime(48,t); o.frequency.exponentialRampToValueAtTime(30,t+1.2); o.connect(mEnv(MUS.layer.bass,t,1.3,.55,.01)); o.start(t); o.stop(t+1.35);
     [0,3,7].forEach((n,j)=>{ const q=ac.createOscillator(), f=ac.createBiquadFilter(); q.type='sawtooth'; q.frequency.setValueAtTime(mhz(root+24+deg(n)),t); q.frequency.exponentialRampToValueAtTime(mhz(root+12+deg(n)),t+1.4); f.type='lowpass'; f.frequency.value=1100; q.connect(f); f.connect(mEnv(MUS.layer.pad,t+.02*j,1.6,.12,.02)); q.start(t); q.stop(t+1.65); });
@@ -2255,7 +2266,7 @@ function playGame(){
   if(G.state!=='splash') return;
   $('splash').hidden=true; splashHold=false; audOut=false;
   audioInit('click'); if(ac&&ac.state==='suspended'){ try{ ac.resume(); }catch(e){} }
-  SFX.ui(); titleCard();
+  SFX.ui(); titleCard(); setTimeout(()=>musicSting('play'),170);
 }
 const lnk=(u,t)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+'</a>';
 /* Credits as a card. back() says where Back goes: the title, or the pause menu it was opened from. */
@@ -2443,7 +2454,8 @@ function showFinalCard(){
 function winCard(){
   const i=G.bout, next=i+1, uLabel=unlockLabel(i);
   grantWin(i);
-  const rows=[[L('row_you'),fightLine()]];
+  const rows=[[L('row_you'),fightLine()]], perfect=!!(G.log&&G.log.hits===0);
+  if(perfect) rows.unshift([L('row_perfect'),L('perfect_v')]);
   if(uLabel) rows.unshift([L('row_unlock'),uLabel]);
   if(next<BOUTS.length) rows.unshift([L('row_next'),boutPlace(BOUTS[next])]);
   const goNext=()=>{
@@ -2452,7 +2464,7 @@ function winCard(){
     else showFinalCard();
   };
   showCard({stamp:L('win_stamp'),kick:L('bout_stamp')+' '+(i+1)+' · '+L('win_kick'),title:BOUTS[i].foe+L('win_down'),body:L(BOUTS[i].afterKey),
-    rows,btn:L('win_btn_hub'),go:goNext,mood:'win'}); voiceSay('win',.45);
+    rows,btn:L('win_btn_hub'),go:goNext,mood:'win'}); voiceSay(perfect?'perfect':'win',.45);
 }
 
 /* ---------- flow ---------- */
