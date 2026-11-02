@@ -7,10 +7,14 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap">
 <style>
+/* Fonts are served from assets/fonts (SIL OFL 1.1, see assets/fonts/README.txt): no request to Google Fonts. */
+@font-face{font-family:'Big Shoulders Stencil Display';font-style:normal;font-weight:800;font-display:swap;src:url(assets/fonts/big-shoulders-stencil-display-800.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;src:url(assets/fonts/ibm-plex-mono-500.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:600;font-display:swap;src:url(assets/fonts/ibm-plex-mono-600.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'IBM Plex Sans Condensed';font-style:normal;font-weight:400;font-display:swap;src:url(assets/fonts/ibm-plex-sans-condensed-400.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'IBM Plex Sans Condensed';font-style:normal;font-weight:500;font-display:swap;src:url(assets/fonts/ibm-plex-sans-condensed-500.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'IBM Plex Sans Condensed';font-style:normal;font-weight:600;font-display:swap;src:url(assets/fonts/ibm-plex-sans-condensed-600.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
 /* Layout concept: one full-bleed 3D view; the interface is warehouse paperwork pinned over it
    (hazard-tape rules, stencil capitals, manifest-paper cards). One dark look, chosen on purpose. */
 :root{
@@ -234,6 +238,7 @@ dl.rows dd a{color:inherit}
             <label class="tuneRow rumble" for="ambVol">Ambience <input id="ambVol" type="range" min="0" max="100" value="100"></label>
             <label class="tuneRow rumble" for="lessMotion"><input id="lessMotion" type="checkbox"> Less motion</label>
             <label class="tuneRow rumble" for="autoFs"><input id="autoFs" type="checkbox" checked> Auto fullscreen on phone</label>
+            <div class="tuneRow"><button type="button" class="bind" id="resetBtn">Reset progress</button></div>
           </div>
           <small id="avHint">Export a cartoon avatar as GLB (MetaPerson or Avaturn), then pick it here or drop it anywhere on this page.</small>
         </div>
@@ -306,6 +311,9 @@ const STR={
   card_title_body:{en:'You audit pallet counts from ten to six. Totals always reconcile. You have not slept in eleven months. Pike slides you a keycard toward a door missing from the floor plan.',it:'Controlli i pallet dalle dieci alle sei. I totali tornano sempre. Non dormi da undici mesi. Pike ti passa una tessera verso una porta assente dalla pianta.'},
   card_title_btn:{en:'Take the stairs',it:'Scendi le scale'},
   credits_btn:{en:'Credits',it:'Crediti'},
+  reset_btn:{en:'Reset progress',it:'Azzera i progressi'},
+  reset_confirm:{en:'Sure? Click again',it:'Sicuro? Clicca ancora'},
+  reset_done:{en:'Progress reset',it:'Progressi azzerati'},
   out_btn:{en:'Clock out',it:'Timbra l\'uscita'},
   quit_btn:{en:'Quit to title',it:'Torna al titolo'},
   back_btn:{en:'Back',it:'Indietro'},
@@ -438,6 +446,7 @@ function paintLang(){
   document.querySelectorAll('[data-lang]').forEach(b=>b.classList.toggle('on', b.dataset.lang===lang));
   const set=(id,k)=>{ const el=$(id); if(el) el.textContent=L(k); }, lab=(id,k)=>{ const el=$(id); if(el&&el.parentNode&&el.parentNode.lastChild) el.parentNode.lastChild.textContent=' '+L(k); };
   set('pauseTitle','pause_title'); set('resume','resume_btn'); set('restart','restart_btn'); set('quitTitle','quit_btn'); set('pauseCredits','credits_btn');
+  if(!resetArmed) set('resetBtn','reset_btn');
   set('linkCredits','credits_btn'); set('linkOut','out_btn'); set('menuBtn','menu_btn');
   lab('pMusic','music_lbl'); lab('pAmb','amb_lbl'); lab('lessMotion2','motion_lbl');
 }
@@ -1905,7 +1914,7 @@ function creditsCard(back){
     rows:[[L('cr_game'),'Carlo Perassi, Apache-2.0'],
           [L('cr_engine'),lnk('https://www.babylonjs.com','Babylon.js')+' 9.30, Apache-2.0'],
           [L('cr_fighters'),lnk('https://opengameart.org/content/animated-human-low-poly','Animated Human')+' '+L('cr_by')+' '+lnk('https://quaternius.com','Quaternius')+', '+L('cr_fighters_v')],
-          [L('cr_type'),'Big Shoulders Stencil Display by Patric King; IBM Plex Mono by IBM. SIL OFL 1.1'],
+          [L('cr_type'),'Big Shoulders Stencil Display by the Big Shoulders Project Authors; IBM Plex Mono and Plex Sans Condensed by IBM. SIL OFL 1.1'],
           [L('cr_sound'),L('cr_sound_v')],
           [L('cr_source'),lnk('https://github.com/carlok/red-ink','github.com/carlok/red-ink')]],
     btn:L('back_btn'),go:back,esc:true});
@@ -1921,6 +1930,20 @@ function clockOut(){
     btn:L('out_back'),go:()=>{ audOut=false; titleCard(); },esc:true});
   try{ window.close(); }catch(e){}
 }
+/* Reset progress: bouts won, unlocked outfits and arena grades, and the dock mission. Two clicks, because it cannot be undone; the second
+   has to come within four seconds. Settings (keys, sound, language) stay. */
+let resetArmed=false, resetTimer=0;
+function resetProgress(){
+  progress={wins:0,outfit:'auditor',arena:0,dock:0};
+  saveProgressData(); applyArena(0); syncPlayerOutfit(); skinEnsure(P);
+}
+function onResetClick(){
+  const b=$('resetBtn'); if(!b) return;
+  if(!resetArmed){ resetArmed=true; b.textContent=L('reset_confirm'); resetTimer=setTimeout(()=>{ resetArmed=false; b.textContent=L('reset_btn'); },4000); return; }
+  clearTimeout(resetTimer); resetArmed=false; resetProgress(); b.textContent=L('reset_done');
+  setTimeout(()=>{ if(!resetArmed) b.textContent=L('reset_btn'); },2000);
+}
+if($('resetBtn')) $('resetBtn').addEventListener('click',onResetClick);
 function openCreditsFromPause(){
   if($('pause')) $('pause').hidden=true;
   creditsCard(()=>{ wrapEl.hidden=true; G.state='pause'; if($('pause')) $('pause').hidden=false; hudEl.hidden=false; if(isTouch) $('touch').hidden=false; });

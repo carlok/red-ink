@@ -12,6 +12,6 @@ The license text is lib/babylon.Apache-2.0.txt.
 audio/samples.js was generated for this game and is released under
 CC0 1.0. See audio/CC0.txt.
 
-The page loads Big Shoulders Stencil Display and IBM Plex Mono from Google
-Fonts. Both are licensed under the SIL Open Font License 1.1
-(https://openfontlicense.org).
+assets/fonts/ holds Big Shoulders Stencil Display, IBM Plex Mono and IBM Plex
+Sans Condensed (Latin subset, unmodified), licensed under the SIL Open Font
+License 1.1. The licence texts are assets/fonts/OFL-*.txt.

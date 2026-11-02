@@ -1298,3 +1298,18 @@ The pause card had Resume and Restart only, and on a phone it could not be opene
 Screenshots: `tuning/s20-credits.jpg`, `s20-pause.jpg`, `s20-clockout.jpg`, `s20-pause-phone.jpg`.
 
 Not done: how the new sound feels over speakers (the numbers say quieter, not better), a real keyboard that ghosts, a real phone, a screen-reader pass over the new cards, and the 1.5 s room and crowd loops are still 1.5 s (the drift hides them, it does not lengthen them). The fonts still come from Google; self-hosting them would make `file://` fully offline.
+
+## Sprint 21: fonts served from the page, and Reset progress
+
+Fonts. The page loaded three families from Google Fonts: Big Shoulders Stencil Display 800, IBM Plex Mono 500 and 600, IBM Plex Sans Condensed 400, 500 and 600 (Sprint 20's credits said two; the body font was missing). Now the six Latin-subset woff2 files, as Google serves them (the same `unicode-range`, U+0000-00FF plus general punctuation and a few symbols, which covers Italian), are in `assets/fonts/` with the two OFL texts and a README, and `@font-face` rules at the top of the style block replace the `<link>` and the two `preconnect` tags. 79 KB in all, untouched. The Big Shoulders licence names "The Big Shoulders Project Authors", not a person, so the credit says that (Sprint 20 named someone from memory).
+
+| Check | Result |
+| --- | --- |
+| `tools/font-probe.mjs`, over `file://` and over http | all six faces `loaded`; no request to any other host; no failed request |
+| Title card, 1280×800 | looks the same as with the Google fonts |
+| `tools/offline-zip.mjs` | the zip lacked the embedded skin script (`animated-human.js`) since Sprint 15, so an offline copy played with the procedural fighters; it now has it, the licence and the fonts |
+| `tools/regression.mjs` | 25 of 25 (new: `reset_progress_two_clicks`) |
+
+Reset progress. A button at the end of the title card's settings: the first click asks "Sure? Click again" (four seconds to confirm), the second clears bouts won, unlocked outfits and arena grades, and the dock mission, saves, and rebuilds the player's fighter. Keys, sound, language and difficulty stay. English and Italian.
+
+Not done: characters outside the Latin subset fall back to Impact or the system monospace; Reset progress is only on the title card, not in the pause menu.
