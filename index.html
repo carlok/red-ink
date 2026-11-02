@@ -1076,7 +1076,7 @@ const MUSIC_PLACES=[
   {bpm:118,root:41,scale:'minor',kick:'four',snare:'march',hat:'metal',lead:'saw',arp:true},
   {bpm:126,root:43,scale:'minor',kick:'four',snare:'back',hat:'drive',lead:'saw',arp:true}
 ];
-const MUS={timer:0,step:0,bar:0,nextT:0,place:0,pat:null,bus:null,delay:null,rev:null,noise:null,layer:{},pump:{},cur:{pad:0,pluck:0,bass:0,drums:0},tgt:{pad:0,pluck:0,bass:0,drums:0},moment:false,momentBars:0,cool:0};
+const MUS={mood:'card',mbar:0,riff:[],timer:0,step:0,bar:0,nextT:0,place:0,pat:null,bus:null,delay:null,rev:null,noise:null,layer:{},pump:{},cur:{pad:0,pluck:0,bass:0,drums:0},tgt:{pad:0,pluck:0,bass:0,drums:0},moment:false,momentBars:0,cool:0};
 const mhz=m=>440*Math.pow(2,(m-69)/12);
 const MUS_LEVEL={pad:2.2,pluck:1.4,bass:.55,drums:.5}; /* layer trims, set with tools/audio-bed-probe.mjs */
 function musicBuild(i){
@@ -1151,11 +1151,13 @@ function vHat(t,v,metal,open){
 }
 function vTom(t,f,v){ const o=ac.createOscillator(); o.frequency.setValueAtTime(f,t); o.frequency.exponentialRampToValueAtTime(f*.55,t+.2); o.connect(mEnv(MUS.layer.drums,t,.26,.55*v,.003)); o.start(t); o.stop(t+.28); vNoise(MUS.layer.drums,t,.03,.2*v,'bandpass',1200,1); }
 function vBass(t,m,dur,v){
+  if(MUS.log) MUS.log.push(m);
   const o=ac.createOscillator(), u=ac.createOscillator(), f=ac.createBiquadFilter(), g=mEnv(MUS.layer.bass,t,dur,.34*v,.008);
   o.type='sawtooth'; o.frequency.value=mhz(m); u.frequency.value=mhz(m-12); f.type='lowpass'; f.frequency.setValueAtTime(1100,t); f.frequency.exponentialRampToValueAtTime(280,t+dur); f.Q.value=4; o.connect(f); u.connect(g); f.connect(g); o.start(t); u.start(t); o.stop(t+dur+.02); u.stop(t+dur+.02);
 }
 /* the 80s lead: two detuned sawtooths through a closing filter, into the layer's chorus and the delay */
 function vLead(t,m,v,dur){
+  if(MUS.log) MUS.log.push(m);
   dur=dur||.5; const f=ac.createBiquadFilter(), g=mEnv(MUS.layer.pluck,t,dur,.2*v,.006);
   f.type='lowpass'; f.Q.value=2; f.frequency.setValueAtTime(4200,t); f.frequency.exponentialRampToValueAtTime(1300,t+dur*.7); f.connect(g); g.connect(MUS.delay); revSend(g,.25);
   [-9,9].forEach(c=>{ const o=ac.createOscillator(); o.type='sawtooth'; o.detune.value=c; o.frequency.value=mhz(m); o.connect(f); o.start(t); o.stop(t+dur+.02); });
@@ -1167,10 +1169,10 @@ function vBell(t,m,v){
   c.start(t); md.start(t); c.stop(t+1.55); md.stop(t+1.55);
 }
 const vPluck=(t,m,v,bell)=>bell?vBell(t,m,v):vLead(t,m,v);
-function vArp(t,m,v){ const o=ac.createOscillator(); o.type='square'; o.frequency.value=mhz(m); o.connect(mEnv(MUS.layer.pluck,t,.12,.1*v,.003)); o.start(t); o.stop(t+.14); }
+function vArp(t,m,v){ if(MUS.log) MUS.log.push(m); const o=ac.createOscillator(); o.type='square'; o.frequency.value=mhz(m); o.connect(mEnv(MUS.layer.pluck,t,.12,.1*v,.003)); o.start(t); o.stop(t+.14); }
 /* the pad: three detuned sawtooths a note, slow attack, one lowpass; the layer's chorus widens it */
 function vPad(t,notes,dur){
-  notes.forEach(n=>{ [-7,7].forEach(c=>{ const o=ac.createOscillator(), f=ac.createBiquadFilter(), g=ac.createGain(); o.type='sawtooth'; o.detune.value=c; o.frequency.value=mhz(n); f.type='lowpass'; f.frequency.value=900; o.connect(f);
+  notes.forEach(n=>{ if(MUS.log) MUS.log.push(n); [-7,7].forEach(c=>{ const o=ac.createOscillator(), f=ac.createBiquadFilter(), g=ac.createGain(); o.type='sawtooth'; o.detune.value=c; o.frequency.value=mhz(n); f.type='lowpass'; f.frequency.value=900; o.connect(f);
     g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.03,t+Math.min(.9,dur*.35)); g.gain.setValueAtTime(.03,t+dur*.75); g.gain.exponentialRampToValueAtTime(.0001,t+dur); f.connect(g); g.connect(MUS.layer.pad); o.start(t); o.stop(t+dur+.05); }); });
 }
 function musicStep(s,t){
@@ -1190,14 +1192,62 @@ function musicStep(s,t){
   }
   if(L.pad>.04&&st===0) vPad(t,ch.map(x=>root+12+x),sd*16*1.05);
 }
+/* Themes for the cards that follow a bout. WIN: the place's key moved up a minor third to its relative major, 8% faster, an I-V-vi-IV line, a
+   brass-like stab, four-on-the-floor with claps, an octave bass and a rising arpeggio; after 8 bars only the stab and the arpeggio remain.
+   LOSE: 64 bpm, minor, a wide low pad, a whole-bar sub, a falling four-note motif every other bar, no drums, and a tape-stop at the start.
+   DOSSIER: a bass riff and an arpeggio drawn from the opponent's own seed over a pad, so each of the six has his own few bars. */
+const MAJOR=[0,2,4,5,7,9,11];
+function vStab(t,notes,dur){
+  notes.forEach(n=>{ if(MUS.log) MUS.log.push(n); [-8,8].forEach(c=>{ const o=ac.createOscillator(), f=ac.createBiquadFilter(), g=mEnv(MUS.layer.pad,t,dur,.05,.006); o.type='sawtooth'; o.detune.value=c; o.frequency.value=mhz(n);
+    f.type='lowpass'; f.Q.value=1.5; f.frequency.setValueAtTime(3200,t); f.frequency.exponentialRampToValueAtTime(900,t+dur*.8); o.connect(f); f.connect(g); o.start(t); o.stop(t+dur+.02); }); });
+}
+function musicStepWin(s,t,sd){
+  const P=MUSIC_PLACES[MUS.place], L=MUS.cur, root=P.root+3, st=s%16, bar=MUS.bar, dg=d=>MAJOR[((d%7)+7)%7]+12*Math.floor(d/7), rt=[0,4,5,3][bar%4], ch=[dg(rt),dg(rt+2),dg(rt+4)];
+  if(L.drums>.04){
+    if(st%4===0) vKick(t,.9);
+    if(st===4||st===12){ vClap(t,.8); vSnare(t,.7,false); }
+    if(bar%4===3&&st>=12) vTom(t,[250,205,165,125][st-12],.9); else if(st%4===2) vHat(t,.6,true,true); else if(st%2===0) vHat(t,.4,true,false);
+  }
+  if(L.bass>.04&&st%2===0) vBass(t,root+ch[0]+(st%4===2?12:0),sd*1.7,.8);
+  if(L.pad>.04&&(st===0||st===10)) vStab(t,ch.map(x=>root+12+x),sd*5);
+  if(L.pluck>.04) vArp(t,root+24+[ch[0],ch[1],ch[2],ch[0]+12][st%4]+(st>=8?12:0),.8);
+}
+function musicStepLose(s,t,sd){
+  const P=MUSIC_PLACES[MUS.place], L=MUS.cur, root=P.root, st=s%16, bar=MUS.bar, sc=SCALES.minor, dg=d=>sc[((d%7)+7)%7]+12*Math.floor(d/7), rt=[0,5,3,4][bar%4], ch=[dg(rt),dg(rt+2),dg(rt+4)];
+  if(L.pad>.04&&st===0) vPad(t,ch.map(x=>root+x),sd*16*1.15);
+  if(L.bass>.04&&st===0) vBass(t,root+ch[0],sd*15,.8);
+  if(L.pluck>.04&&st%4===0&&bar%2===0) vLead(t,root+12+dg([4,3,1,0][st/4]),.7,sd*5);
+}
+function musicStepDossier(s,t,sd){
+  const P=MUSIC_PLACES[MUS.place], L=MUS.cur, root=P.root, st=s%16, bar=MUS.bar, sc=SCALES[P.scale], dg=d=>sc[((d%7)+7)%7]+12*Math.floor(d/7), ch=MUS.pat.chords[bar%4];
+  if(L.pad>.04&&st===0) vPad(t,ch.map(x=>root+12+x),sd*16*1.05);
+  if(L.bass>.04&&MUS.riff[st]>-99) vBass(t,root+dg(MUS.riff[st]),sd*1.6,.7);
+  if(L.pluck>.04&&st%2===0) vArp(t,root+24+ch[(st/2)%3]+(st%8===6?12:0),.5);
+}
+function musicMoodSet(m,arg){
+  if(MUS.mood===m&&m!=='dossier') return;
+  MUS.mood=m; MUS.step=0; MUS.bar=0; MUS.mbar=0; MUS.nextT=0;
+  if(m==='dossier'){ const r=mulberry32(7000+(arg|0)*53), sc=SCALES[MUSIC_PLACES[MUS.place].scale]; MUS.riff=new Array(16).fill(-99); [0,2,3,5,6,8,10,11,13].forEach(x=>{ if(x===0||r()<.7) MUS.riff[x]=x===0?0:[0,0,2,3,4,-1,5][Math.floor(r()*7)]; }); }
+  if(!ac||!MUS.bus||ac.state!=='running'||splashHold||audOut) return;
+  const t=ac.currentTime+.04, root=MUSIC_PLACES[MUS.place].root;
+  if(m==='win'){
+    vNoise(MUS.layer.drums,t,.9,.3,'highpass',5000,.7); vKick(t,1);
+    vStab(t,[0,4,7].map(x=>root+3+12+x),.9);
+  } else if(m==='lose'){
+    /* a tape stop: a drone that slows to a halt over 1.4 s */
+    const o=ac.createOscillator(), f=ac.createBiquadFilter(); o.type='sawtooth'; o.frequency.setValueAtTime(mhz(root+12),t); o.frequency.exponentialRampToValueAtTime(mhz(root-12),t+1.4); f.type='lowpass'; f.frequency.setValueAtTime(1800,t); f.frequency.exponentialRampToValueAtTime(200,t+1.4);
+    o.connect(f); f.connect(mEnv(MUS.layer.pad,t,1.5,.12,.01)); o.start(t); o.stop(t+1.55);
+  }
+}
 function musicTick(){
   if(!ac||!MUS.bus||ac.state!=='running'||splashHold||document.hidden||G.state==='pause'){ MUS.nextT=0; return; }
-  const now=ac.currentTime, P=MUSIC_PLACES[MUS.place], sd=60/P.bpm/4;
+  const now=ac.currentTime, P=MUSIC_PLACES[MUS.place], onCard=G.state==='card'&&!$('wrap').hidden, mood=onCard?MUS.mood:'card',
+    sd=60/(mood==='win'?P.bpm*1.08:mood==='lose'?64:P.bpm)/4;
   if(MUS.nextT<now) MUS.nextT=now+.06;
   while(MUS.nextT<now+.14){
-    musicStep(MUS.step, MUS.nextT);
+    if(mood==='win') musicStepWin(MUS.step,MUS.nextT,sd); else if(mood==='lose') musicStepLose(MUS.step,MUS.nextT,sd); else if(mood==='dossier') musicStepDossier(MUS.step,MUS.nextT,sd); else musicStep(MUS.step, MUS.nextT);
     MUS.step=(MUS.step+1)%32; MUS.nextT+=sd;
-    if(MUS.step%16===0){ MUS.bar++; if(MUS.moment&&--MUS.momentBars<=0){ MUS.moment=false; MUS.cool=12; } else if(!MUS.moment&&MUS.cool>0) MUS.cool--; }
+    if(MUS.step%16===0){ MUS.bar++; MUS.mbar++; if(MUS.moment&&--MUS.momentBars<=0){ MUS.moment=false; MUS.cool=12; } else if(!MUS.moment&&MUS.cool>0) MUS.cool--; }
   }
 }
 /* what each layer should be doing now */
@@ -1205,7 +1255,14 @@ function musicTargets(){
   const t={pad:0,pluck:0,bass:0,drums:0}, g=G.state;
   if(audOut||splashHold||g==='pause') return t;
   const cardEl=$('wrap');
-  if((g==='card'||g==='title')&&cardEl&&!cardEl.hidden){ t.pad=1; t.pluck=.7; return t; }
+  if((g==='card'||g==='title')&&cardEl&&!cardEl.hidden){
+    const m=MUS.mood;
+    if(m==='win'){ t.pad=.9; t.pluck=.8; if(MUS.mbar<8){ t.bass=.8; t.drums=.7; } }
+    else if(m==='lose'){ t.pad=1; t.pluck=.5; t.bass=.5; }
+    else if(m==='dossier'){ t.pad=.8; t.pluck=.5; t.bass=.5; }
+    else { t.pad=1; t.pluck=.7; }
+    return t;
+  }
   if(g==='ko'){ t.pad=.7; return t; }
   if(g==='fight'&&P&&E){
     const lo=Math.min(P.hp/P.maxHp,E.hp/E.maxHp);
@@ -1236,10 +1293,6 @@ function musicSting(kind){
   } else if(kind==='ko'){
     vKick(t,1); const o=ac.createOscillator(); o.frequency.setValueAtTime(48,t); o.frequency.exponentialRampToValueAtTime(30,t+1.2); o.connect(mEnv(MUS.layer.bass,t,1.3,.55,.01)); o.start(t); o.stop(t+1.35);
     [0,3,7].forEach((n,j)=>{ const q=ac.createOscillator(), f=ac.createBiquadFilter(); q.type='sawtooth'; q.frequency.setValueAtTime(mhz(root+24+deg(n)),t); q.frequency.exponentialRampToValueAtTime(mhz(root+12+deg(n)),t+1.4); f.type='lowpass'; f.frequency.value=1100; q.connect(f); f.connect(mEnv(MUS.layer.pad,t+.02*j,1.6,.12,.02)); q.start(t); q.stop(t+1.65); });
-  } else if(kind==='win'){
-    [0,2,4,7].forEach((d,j)=>vPluck(t+j*.16,root+24+deg(d),1,P.lead==='bell')); vPad(t,[root+12+deg(0),root+12+deg(2),root+12+deg(4)],3);
-  } else if(kind==='lose'){
-    [0,1].forEach(j=>{ const q=ac.createOscillator(), f=ac.createBiquadFilter(); q.type='sawtooth'; q.frequency.setValueAtTime(mhz(root+12+deg(j)),t); q.frequency.exponentialRampToValueAtTime(mhz(root+deg(j)),t+1.6); f.type='lowpass'; f.frequency.value=600; q.connect(f); f.connect(mEnv(MUS.layer.pad,t,1.8,.1,.05)); q.start(t); q.stop(t+1.85); });
   }
 }
 /* The bed is quiet and the music is for moments. room and crowd are low and drift slowly (two incommensurate sines), so their 1.5 s loops do
@@ -2282,6 +2335,7 @@ function showCard(c){
   $('cRows').hidden=!(c.rows&&c.rows.length);
   $('avatarBox').hidden=!c.avatar; $('goTxt').textContent=c.btn;
   $('go').onclick=()=>{ audioInit('click'); SFX.ui(); wrapEl.hidden=true; c.go(); };
+  musicMoodSet(c.mood||'card',c.moodArg);
   cardEsc=!!c.esc; if($('cardLinks')) $('cardLinks').hidden=!c.links; if(!c.noRemember) G.lastCard=c; if($('cardMenu')) $('cardMenu').hidden=!!c.esc;
   if(G.menuOpen) closeMenu();
   G.showcase=c.showcase?true:null; wrapEl.classList.toggle('dossier',!!c.showcase);
@@ -2324,7 +2378,7 @@ function showcaseOpponent(i){
 function introCard(i,lead){
   const c=BOUTS[i]; showcaseOpponent(i);
   showCard({stamp:L('bout_stamp')+' '+(i+1)+' / '+BOUTS.length,kick:lead||L('company_kick'),title:c.foe,body:boutPlace(c)+' · '+boutRole(c)+'. '+L(c.introKey),
-    rows:dossierRows(c),btn:L('bout_btn'),showcase:true,go:()=>{ maybeAutoFullscreen(); startBout(i); }});
+    rows:dossierRows(c),btn:L('bout_btn'),showcase:true,mood:'dossier',moodArg:i,go:()=>{ maybeAutoFullscreen(); startBout(i); }});
 }
 function titleCard(){
   showCard({stamp:L('card_title_stamp'),kick:L('company_form'),title:L('card_title_name'),
@@ -2346,7 +2400,6 @@ function showFinalCard(){
     rows:[[L('row_next'),L('final_next')],[L('row_you'),fightLine()]],btn:L('final_btn'),go:()=>{ G.bout=0; titleCard(); }});
 }
 function winCard(){
-  musicSting('win');
   const i=G.bout, next=i+1, uLabel=unlockLabel(i);
   grantWin(i);
   const rows=[[L('row_you'),fightLine()]];
@@ -2358,13 +2411,13 @@ function winCard(){
     else showFinalCard();
   };
   showCard({stamp:L('win_stamp'),kick:L('bout_stamp')+' '+(i+1)+' · '+L('win_kick'),title:BOUTS[i].foe+L('win_down'),body:L(BOUTS[i].afterKey),
-    rows,btn:L('win_btn_hub'),go:goNext});
+    rows,btn:L('win_btn_hub'),go:goNext,mood:'win'});
 }
 
 /* ---------- flow ---------- */
 function startBout(i){
   if(G.state==='splash') splashHold=false; /* a bout started by a probe from the splash, which the interface cannot do */
-  if($('splash')) $('splash').hidden=true; audOut=false; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
+  musicMoodSet('card'); if($('splash')) $('splash').hidden=true; audOut=false; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
   G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i]);
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
@@ -2386,9 +2439,8 @@ function fightLine(){
 function afterKO(){
   if(G.winner===P) winCard();
   else {
-    musicSting('lose');
     showCard({stamp:L('lose_stamp'),kick:L('bout_stamp')+' '+(G.bout+1),title:L('lose_title'),body:L('lose_body'),
-      rows:[[L('row_retry'),BOUTS[G.bout].foe+', '+boutPlace(BOUTS[G.bout])],[L('row_you'),fightLine()]],btn:L('lose_btn'),go:()=>{ G.retry=true; startBout(G.bout); }});
+      rows:[[L('row_retry'),BOUTS[G.bout].foe+', '+boutPlace(BOUTS[G.bout])],[L('row_you'),fightLine()]],btn:L('lose_btn'),go:()=>{ G.retry=true; startBout(G.bout); },mood:'lose'});
   }
 }
 
@@ -3405,7 +3457,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
