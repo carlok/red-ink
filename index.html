@@ -412,9 +412,10 @@ const SAVE_KEY='sublevel-progress';
 let progress={wins:0,outfit:'auditor',arena:0,dock:0};
 /* fight camera. frac: share of the screen height a fighter fills at close range (portrait uses fracPortrait).
    pad: metres of floor kept visible beside each fighter. lead: seconds of walking speed the aim runs ahead, so a chase stays in frame.
-   follow: how fast the camera catches up, per second. A phone in portrait sees under 5 m across and needs the faster one.
+   yaw: how far the camera slides toward the player's back, so the opponent turns his face to it (0 is square on the side); follow: how fast the camera catches up, per second. A phone in portrait sees under 5 m across and needs the faster one.
    ref: the old camera distance, which words and shake scale from. */
-const CAM={fovV:.85,fovH:1,wide:1.25,frac:.34,fracPortrait:.2,pad:1.7,padPortrait:1.5,pitch:.47,aimY:1.1,body:1.9,lead:.25,follow:3.2,followPortrait:8,ref:8.56};
+const KICK_K=220, KICK_C=22; /* camera kick spring: stiffness and damping, about a quarter of a second to settle */
+const CAM={fovV:.85,fovH:1,wide:1.25,frac:.40,fracPortrait:.2,pad:1.7,padPortrait:1.5,pitch:.40,pitchPortrait:.47,yaw:.15,yawPortrait:0,reveal:.15,aimY:1.1,body:1.9,lead:.25,follow:4.5,followPortrait:8,ref:8.56};
 
 /* ---------- engine, scene ---------- */
 const canvas=$('view');
@@ -1353,7 +1354,7 @@ function applyPose(f,dt){
 }
 
 /* ---------- combat ---------- */
-const G={state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
+const G={state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
 function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0}; }
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
@@ -1375,6 +1376,12 @@ function startDodge(f,I,dirO){
   if(f.isPlayer) G.log.dodges++;
   f.dodgeSide=(dirO.x*dz-dirO.z*dx)>0?1:-1; SFX.whoosh();
 }
+/* A hit pushes the camera along the blow and rolls it a little. Impulses go into two springs (see updateCamera) that settle in about a
+   quarter of a second. amt is the peak push in metres at the reference distance. */
+function camKick(dir,amt){
+  G.kickV.x+=dir.x*amt*25; G.kickV.z+=dir.z*amt*25;
+  G.rollV+=(dir.x*G.camR.x+dir.z*G.camR.z)*amt*1.2;
+}
 function strike(a,d,D){
   if(d.state==='ko') return;
   const mid=a.pos.add(d.pos).scale(.5); mid.y=1.25;
@@ -1383,7 +1390,7 @@ function strike(a,d,D){
   if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
   if(d.state==='block'){
     d.hp=Math.max(1,d.hp-D.dmg*.1); d.stam-=D.dmg*.95; d.vel.addInPlace(dir.scale(D.kb*3)); a.stam=Math.max(0,a.stam-4);
-    fxWord('BLOK',mid); SFX.block(); G.shake=Math.max(G.shake,.25); G.hitstop=.035; G.cheer=Math.max(G.cheer,.4);
+    camKick(dir,.03); fxWord('BLOK',mid); SFX.block(); G.shake=Math.max(G.shake,.25); G.hitstop=.035; G.cheer=Math.max(G.cheer,.4);
     if(d.stam<=0){ d.stam=0; d.state='hit'; d.stunT=d.stunMax=.7; }
     return;
   }
@@ -1398,11 +1405,12 @@ function strike(a,d,D){
   hitPS.emitter.copyFrom(mid); hitPS.manualEmitCount=D.dmg>10?26:14;
   if(a.isPlayer) rumble(.3,.6,90); if(d.isPlayer) rumble(D.dmg>10?1:.6,.5,D.dmg>10?240:130);
   fxWord(D.word,mid); SFX[a.atk?a.atk.type:'jab'](); G.shake=Math.max(G.shake,D.dmg>10?.9:.45); G.hitstop=D.dmg>10?.09:.05; G.cheer=1;
-  if(d.hp<=0&&G.state==='fight') endBout(a,d,mid);
+  camKick(dir,D.dmg>10?.14:.07);
+  if(d.hp<=0&&G.state==='fight'){ camKick(dir,.12); endBout(a,d,mid); }
 }
 function endBout(w,l,mid){
   l.state='ko'; l.koT=0; l.atk=null; w.state='win'; w.atk=null; w.t=0;
-  rumble(1,1,420); G.state='ko'; G.koTimer=2.4; G.winner=w; fxWord('KO',mid); SFX.ko(); G.cheer=1.4; G.shake=1.1; G.hitstop=.14;
+  rumble(1,1,420); G.state='ko'; G.koTimer=2.4; G.koSlow=.45; G.koClock=0; G.winner=w; fxWord('KO',mid); SFX.ko(); G.cheer=1.4; G.shake=1.1; G.hitstop=.14;
   banner(w.isPlayer?'K.O.':'DOWN');
 }
 
@@ -1775,7 +1783,8 @@ if($('lessMotion2')) $('lessMotion2').addEventListener('change',()=>setLessMotio
 if($('tutorGo')) $('tutorGo').addEventListener('click',hideTutor);
 if($('resume')) $('resume').addEventListener('click',resumeFight);
 if($('restart')) $('restart').addEventListener('click',restartBout);
-function updateCamera(dt){
+function updateCamera(dt,real){
+  real=real||dt;
   const asp=engine.getAspectRatio(cam), portrait=asp<CAM.wide;
   if(portrait){ cam.fovMode=B.Camera.FOVMODE_HORIZONTAL_FIXED; cam.fov=CAM.fovH; } else { cam.fovMode=B.Camera.FOVMODE_VERTICAL_FIXED; cam.fov=CAM.fovV; }
   let dp,dt2;
@@ -1786,22 +1795,35 @@ function updateCamera(dt){
     mid.x+=(P.mv.x+E.mv.x)*.5*CAM.lead; mid.z+=(P.mv.z+E.mv.z)*.5*CAM.lead;
     const ax=E.pos.subtract(P.pos); ax.y=0; if(ax.length()>1e-3) ax.normalize();
     const n=new V3(-ax.z,0,ax.x); if(n.z>0) n.scaleInPlace(-1);
-    const dv=new V3(0,0,-.55).add(n.scale(.45)); dv.normalize();
+    const dv=new V3(0,0,-.55).add(n.scale(.45)).add(ax.scale(-(portrait?CAM.yawPortrait:CAM.yaw))); dv.normalize();
     /* far enough that a fighter fills `frac` of the height, and that both fit with `pad` metres beside them */
     const tanH=portrait?Math.tan(CAM.fovH/2):Math.tan(CAM.fovV/2)*asp, tanV=portrait?tanH/asp:Math.tan(CAM.fovV/2);
     const D=Math.max(CAM.body/(2*tanV*(portrait?CAM.fracPortrait:CAM.frac)),(d+2*(portrait?CAM.padPortrait:CAM.pad))/(2*tanH));
-    dp=mid.add(dv.scale(D*Math.cos(CAM.pitch))); dp.y=CAM.aimY+D*Math.sin(CAM.pitch); dt2=mid.add(new V3(0,CAM.aimY,0));
+    /* the ready phase opens wider and lower and settles into the fight frame; a knockout pushes in on the loser */
+    let Dm=D, pit=portrait?CAM.pitchPortrait:CAM.pitch; const sm=x=>x*x*(3-2*x);
+    if(!reduceMotion){
+      if(G.state==='ready'){ const e=sm(clamp(G.readyT/1.15,0,1)); Dm*=1+CAM.reveal*(1-e); pit-=CAM.reveal*.67*(1-e); }
+      else if(G.state==='ko'&&G.winner){
+        G.koClock+=real; const e=sm(clamp(G.koClock/.5,0,1)), lo=G.winner===P?E:P;
+        Dm*=1-.12*e; mid.x=lerp(mid.x,lo.pos.x,.3*e); mid.z=lerp(mid.z,lo.pos.z,.3*e);
+      }
+    }
+    dp=mid.add(dv.scale(Dm*Math.cos(pit))); dp.y=CAM.aimY+Dm*Math.sin(pit); dt2=mid.add(new V3(0,CAM.aimY,0));
     dp.x=clamp(dp.x,-15.5,15.5); dp.z=clamp(dp.z,-15.5,15.5);
   }
   const k=damp(G.state==='title'||G.state==='card'?1.5:portrait?CAM.followPortrait:CAM.follow,dt);
   camPos.x=lerp(camPos.x,dp.x,k); camPos.y=lerp(camPos.y,dp.y,k); camPos.z=lerp(camPos.z,dp.z,k);
   camTgt.x=lerp(camTgt.x,dt2.x,k); camTgt.y=lerp(camTgt.y,dt2.y,k); camTgt.z=lerp(camTgt.z,dt2.z,k);
   G.shake=Math.max(0,G.shake-dt*6);
-  const sh=G.shake*(reduceMotion?0:1)*.12*V3.Distance(camPos,camTgt)/CAM.ref;
-  const j=()=>Math.random()*2-1; /* render only: the gameplay rng stays out of the frame loop */
-  cam.position.set(camPos.x+j()*sh,camPos.y+j()*sh,camPos.z+j()*sh);
-  cam.setTarget(camTgt);
+  const mo=reduceMotion?0:1, sc=V3.Distance(camPos,camTgt)/CAM.ref, kd=Math.min(real,.05);
+  /* springs, x'' = -k x - c x', stepped semi-implicitly on real time so a hitstop does not freeze them */
+  G.kickV.x-=(KICK_K*G.kick.x+KICK_C*G.kickV.x)*kd; G.kickV.z-=(KICK_K*G.kick.z+KICK_C*G.kickV.z)*kd;
+  G.kick.x+=G.kickV.x*kd; G.kick.z+=G.kickV.z*kd;
+  G.rollV-=(KICK_K*G.roll+KICK_C*G.rollV)*kd; G.roll+=G.rollV*kd;
   const f=camTgt.subtract(camPos); f.y=0; f.normalize(); G.camF.copyFrom(f); G.camR.set(f.z,0,-f.x);
+  const rl=G.roll*mo; cam.upVector.set(G.camR.x*Math.sin(rl),Math.cos(rl),G.camR.z*Math.sin(rl));
+  cam.position.set(camPos.x+G.kick.x*sc*mo,camPos.y,camPos.z+G.kick.z*sc*mo);
+  cam.setTarget(camTgt);
 }
 
 /* ---------- HUD + cards ---------- */
@@ -1962,12 +1984,15 @@ function frame(){
   if(tutorLeft>0){ tutorLeft-=real; if(tutorLeft<=0) hideTutor(); }
   pollPad();
   simSync(P); simSync(E);
-  acc=Math.min(acc+snapDt(real),SIM*5);
+  /* the knockout runs at 0.35x for its first 0.45 s; the result is decided by then, so no score can change */
+  if(G.state!=='ko') G.koSlow=0;
+  const simReal=G.koSlow>0?real*.35:real; if(G.koSlow>0) G.koSlow-=real;
+  acc=Math.min(acc+snapDt(simReal),SIM*5);
   while(acc>=SIM-1e-9){ acc-=SIM; simTick(); }
   const a=Math.max(0,acc/SIM);
   simShow(P,a); simShow(E,a);
   if(SKIN.on){ updateSkin(P,real); updateSkin(E,real); }
-  updateFx(real); updateAmbient(dt); updateCamera(dt); updateHud();
+  updateFx(real); updateAmbient(dt); updateCamera(dt,real); updateHud();
 }
 
 /* ---------- custom avatar (GLB) ---------- */
