@@ -14,6 +14,7 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight.js";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight.js";
 import { PointLight } from "@babylonjs/core/Lights/pointLight.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
+import { FresnelParameters } from "@babylonjs/core/Materials/fresnelParameters.js";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration.js";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator.js";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture.js";
@@ -70,6 +71,7 @@ export {
   SpotLight,
   PointLight,
   StandardMaterial,
+  FresnelParameters,
   ImageProcessingConfiguration,
   ShadowGenerator,
   DynamicTexture,

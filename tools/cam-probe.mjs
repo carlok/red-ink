@@ -90,6 +90,7 @@ const LIB = `(async () => {
   const engine = B.Engine.LastCreatedEngine, scene = B.Engine.LastCreatedScene, cam = scene.activeCamera;
   const raf = () => new Promise((r) => requestAnimationFrame(r));
   const r3 = (n) => Math.round(n * 1000) / 1000;
+  S.CAM.reveal = 0; // the ready-phase reveal would otherwise change the framing being measured
   const hold = () => { S.G.readyT = 0; if (S.G.state !== "ready") S.G.state = "ready"; };
   async function frames(n) { for (let i = 0; i < n; i++) { hold(); await raf(); } }
   const dims = () => ({ W: engine.getRenderWidth(), H: engine.getRenderHeight() });

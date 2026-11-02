@@ -412,9 +412,10 @@ const SAVE_KEY='sublevel-progress';
 let progress={wins:0,outfit:'auditor',arena:0,dock:0};
 /* fight camera. frac: share of the screen height a fighter fills at close range (portrait uses fracPortrait).
    pad: metres of floor kept visible beside each fighter. lead: seconds of walking speed the aim runs ahead, so a chase stays in frame.
-   follow: how fast the camera catches up, per second. A phone in portrait sees under 5 m across and needs the faster one.
+   yaw: how far the camera slides toward the player's back, so the opponent turns his face to it (0 is square on the side); follow: how fast the camera catches up, per second. A phone in portrait sees under 5 m across and needs the faster one.
    ref: the old camera distance, which words and shake scale from. */
-const CAM={fovV:.85,fovH:1,wide:1.25,frac:.34,fracPortrait:.2,pad:1.7,padPortrait:1.5,pitch:.47,aimY:1.1,body:1.9,lead:.25,follow:3.2,followPortrait:8,ref:8.56};
+const KICK_K=220, KICK_C=22; /* camera kick spring: stiffness and damping, about a quarter of a second to settle */
+const CAM={fovV:.85,fovH:1,wide:1.25,frac:.40,fracPortrait:.2,pad:1.7,padPortrait:1.5,pitch:.40,pitchPortrait:.47,yaw:.15,yawPortrait:0,reveal:.15,aimY:1.1,body:1.9,lead:.25,follow:4.5,followPortrait:8,ref:8.56};
 
 /* ---------- engine, scene ---------- */
 const canvas=$('view');
@@ -689,6 +690,7 @@ function applyEnv(i){
   scene.fogColor.set(e.fog[0],e.fog[1],e.fog[2]); scene.fogDensity=e.fog[3]; scene.clearColor.set(e.fog[0],e.fog[1],e.fog[2],1);
   if(dustPS){ dustPS.color1.set(e.dust[0][0],e.dust[0][1],e.dust[0][2],e.dust[0][3]); dustPS.color2.set(e.dust[1][0],e.dust[1][1],e.dust[1][2],e.dust[1][3]); }
   Object.keys(propSets).forEach(k=>propSets[k].forEach(m=>m.setEnabled(k===e.props)));
+  [P,E].forEach(f=>{ if(f&&f.skin_fp) skinRim(f.skin_fp); });
   drawSigns();
   applyArena(progress.arena);
 }
@@ -1353,7 +1355,7 @@ function applyPose(f,dt){
 }
 
 /* ---------- combat ---------- */
-const G={state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
+const G={state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
 function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0}; }
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
@@ -1375,6 +1377,12 @@ function startDodge(f,I,dirO){
   if(f.isPlayer) G.log.dodges++;
   f.dodgeSide=(dirO.x*dz-dirO.z*dx)>0?1:-1; SFX.whoosh();
 }
+/* A hit pushes the camera along the blow and rolls it a little. Impulses go into two springs (see updateCamera) that settle in about a
+   quarter of a second. amt is the peak push in metres at the reference distance. */
+function camKick(dir,amt){
+  G.kickV.x+=dir.x*amt*25; G.kickV.z+=dir.z*amt*25;
+  G.rollV+=(dir.x*G.camR.x+dir.z*G.camR.z)*amt*1.2;
+}
 function strike(a,d,D){
   if(d.state==='ko') return;
   const mid=a.pos.add(d.pos).scale(.5); mid.y=1.25;
@@ -1383,7 +1391,7 @@ function strike(a,d,D){
   if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
   if(d.state==='block'){
     d.hp=Math.max(1,d.hp-D.dmg*.1); d.stam-=D.dmg*.95; d.vel.addInPlace(dir.scale(D.kb*3)); a.stam=Math.max(0,a.stam-4);
-    fxWord('BLOK',mid); SFX.block(); G.shake=Math.max(G.shake,.25); G.hitstop=.035; G.cheer=Math.max(G.cheer,.4);
+    camKick(dir,.03); fxWord('BLOK',mid); SFX.block(); G.shake=Math.max(G.shake,.25); G.hitstop=.035; G.cheer=Math.max(G.cheer,.4);
     if(d.stam<=0){ d.stam=0; d.state='hit'; d.stunT=d.stunMax=.7; }
     return;
   }
@@ -1398,11 +1406,12 @@ function strike(a,d,D){
   hitPS.emitter.copyFrom(mid); hitPS.manualEmitCount=D.dmg>10?26:14;
   if(a.isPlayer) rumble(.3,.6,90); if(d.isPlayer) rumble(D.dmg>10?1:.6,.5,D.dmg>10?240:130);
   fxWord(D.word,mid); SFX[a.atk?a.atk.type:'jab'](); G.shake=Math.max(G.shake,D.dmg>10?.9:.45); G.hitstop=D.dmg>10?.09:.05; G.cheer=1;
-  if(d.hp<=0&&G.state==='fight') endBout(a,d,mid);
+  camKick(dir,D.dmg>10?.14:.07); d.flashMax=d.flash=D.dmg>10?.11:.07;
+  if(d.hp<=0&&G.state==='fight'){ camKick(dir,.12); endBout(a,d,mid); }
 }
 function endBout(w,l,mid){
   l.state='ko'; l.koT=0; l.atk=null; w.state='win'; w.atk=null; w.t=0;
-  rumble(1,1,420); G.state='ko'; G.koTimer=2.4; G.winner=w; fxWord('KO',mid); SFX.ko(); G.cheer=1.4; G.shake=1.1; G.hitstop=.14;
+  rumble(1,1,420); G.state='ko'; G.koTimer=2.4; G.koSlow=.45; G.koClock=0; G.winner=w; fxWord('KO',mid); SFX.ko(); G.cheer=1.4; G.shake=1.1; G.hitstop=.14;
   banner(w.isPlayer?'K.O.':'DOWN');
 }
 
@@ -1775,7 +1784,8 @@ if($('lessMotion2')) $('lessMotion2').addEventListener('change',()=>setLessMotio
 if($('tutorGo')) $('tutorGo').addEventListener('click',hideTutor);
 if($('resume')) $('resume').addEventListener('click',resumeFight);
 if($('restart')) $('restart').addEventListener('click',restartBout);
-function updateCamera(dt){
+function updateCamera(dt,real){
+  real=real||dt;
   const asp=engine.getAspectRatio(cam), portrait=asp<CAM.wide;
   if(portrait){ cam.fovMode=B.Camera.FOVMODE_HORIZONTAL_FIXED; cam.fov=CAM.fovH; } else { cam.fovMode=B.Camera.FOVMODE_VERTICAL_FIXED; cam.fov=CAM.fovV; }
   let dp,dt2;
@@ -1786,22 +1796,35 @@ function updateCamera(dt){
     mid.x+=(P.mv.x+E.mv.x)*.5*CAM.lead; mid.z+=(P.mv.z+E.mv.z)*.5*CAM.lead;
     const ax=E.pos.subtract(P.pos); ax.y=0; if(ax.length()>1e-3) ax.normalize();
     const n=new V3(-ax.z,0,ax.x); if(n.z>0) n.scaleInPlace(-1);
-    const dv=new V3(0,0,-.55).add(n.scale(.45)); dv.normalize();
+    const dv=new V3(0,0,-.55).add(n.scale(.45)).add(ax.scale(-(portrait?CAM.yawPortrait:CAM.yaw))); dv.normalize();
     /* far enough that a fighter fills `frac` of the height, and that both fit with `pad` metres beside them */
     const tanH=portrait?Math.tan(CAM.fovH/2):Math.tan(CAM.fovV/2)*asp, tanV=portrait?tanH/asp:Math.tan(CAM.fovV/2);
     const D=Math.max(CAM.body/(2*tanV*(portrait?CAM.fracPortrait:CAM.frac)),(d+2*(portrait?CAM.padPortrait:CAM.pad))/(2*tanH));
-    dp=mid.add(dv.scale(D*Math.cos(CAM.pitch))); dp.y=CAM.aimY+D*Math.sin(CAM.pitch); dt2=mid.add(new V3(0,CAM.aimY,0));
+    /* the ready phase opens wider and lower and settles into the fight frame; a knockout pushes in on the loser */
+    let Dm=D, pit=portrait?CAM.pitchPortrait:CAM.pitch; const sm=x=>x*x*(3-2*x);
+    if(!reduceMotion){
+      if(G.state==='ready'){ const e=sm(clamp(G.readyT/1.15,0,1)); Dm*=1+CAM.reveal*(1-e); pit-=CAM.reveal*.67*(1-e); }
+      else if(G.state==='ko'&&G.winner){
+        G.koClock+=real; const e=sm(clamp(G.koClock/.5,0,1)), lo=G.winner===P?E:P;
+        Dm*=1-.12*e; mid.x=lerp(mid.x,lo.pos.x,.3*e); mid.z=lerp(mid.z,lo.pos.z,.3*e);
+      }
+    }
+    dp=mid.add(dv.scale(Dm*Math.cos(pit))); dp.y=CAM.aimY+Dm*Math.sin(pit); dt2=mid.add(new V3(0,CAM.aimY,0));
     dp.x=clamp(dp.x,-15.5,15.5); dp.z=clamp(dp.z,-15.5,15.5);
   }
   const k=damp(G.state==='title'||G.state==='card'?1.5:portrait?CAM.followPortrait:CAM.follow,dt);
   camPos.x=lerp(camPos.x,dp.x,k); camPos.y=lerp(camPos.y,dp.y,k); camPos.z=lerp(camPos.z,dp.z,k);
   camTgt.x=lerp(camTgt.x,dt2.x,k); camTgt.y=lerp(camTgt.y,dt2.y,k); camTgt.z=lerp(camTgt.z,dt2.z,k);
   G.shake=Math.max(0,G.shake-dt*6);
-  const sh=G.shake*(reduceMotion?0:1)*.12*V3.Distance(camPos,camTgt)/CAM.ref;
-  const j=()=>Math.random()*2-1; /* render only: the gameplay rng stays out of the frame loop */
-  cam.position.set(camPos.x+j()*sh,camPos.y+j()*sh,camPos.z+j()*sh);
-  cam.setTarget(camTgt);
+  const mo=reduceMotion?0:1, sc=V3.Distance(camPos,camTgt)/CAM.ref, kd=Math.min(real,.05);
+  /* springs, x'' = -k x - c x', stepped semi-implicitly on real time so a hitstop does not freeze them */
+  G.kickV.x-=(KICK_K*G.kick.x+KICK_C*G.kickV.x)*kd; G.kickV.z-=(KICK_K*G.kick.z+KICK_C*G.kickV.z)*kd;
+  G.kick.x+=G.kickV.x*kd; G.kick.z+=G.kickV.z*kd;
+  G.rollV-=(KICK_K*G.roll+KICK_C*G.rollV)*kd; G.roll+=G.rollV*kd;
   const f=camTgt.subtract(camPos); f.y=0; f.normalize(); G.camF.copyFrom(f); G.camR.set(f.z,0,-f.x);
+  const rl=G.roll*mo; cam.upVector.set(G.camR.x*Math.sin(rl),Math.cos(rl),G.camR.z*Math.sin(rl));
+  cam.position.set(camPos.x+G.kick.x*sc*mo,camPos.y,camPos.z+G.kick.z*sc*mo);
+  cam.setTarget(camTgt);
 }
 
 /* ---------- HUD + cards ---------- */
@@ -1962,12 +1985,15 @@ function frame(){
   if(tutorLeft>0){ tutorLeft-=real; if(tutorLeft<=0) hideTutor(); }
   pollPad();
   simSync(P); simSync(E);
-  acc=Math.min(acc+snapDt(real),SIM*5);
+  /* the knockout runs at 0.35x for its first 0.45 s; the result is decided by then, so no score can change */
+  if(G.state!=='ko') G.koSlow=0;
+  const simReal=G.koSlow>0?real*.35:real; if(G.koSlow>0) G.koSlow-=real;
+  acc=Math.min(acc+snapDt(simReal),SIM*5);
   while(acc>=SIM-1e-9){ acc-=SIM; simTick(); }
   const a=Math.max(0,acc/SIM);
   simShow(P,a); simShow(E,a);
   if(SKIN.on){ updateSkin(P,real); updateSkin(E,real); }
-  updateFx(real); updateAmbient(dt); updateCamera(dt); updateHud();
+  updateFx(real); updateAmbient(dt); updateCamera(dt,real); updateHud();
 }
 
 /* ---------- custom avatar (GLB) ---------- */
@@ -2039,7 +2065,7 @@ const SKIN_MODELS={
 };
 /* On by default. ?skin=0 turns it off for one load, localStorage 'sublevel-skin'='0' for good, ?skin=1 overrides that; ?skinseed=N pins
    the opponents' looks. If the model cannot be loaded the game falls back to the procedural fighters and stays there. */
-const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,shade:true,seed:(Math.random()*4294967296)>>>0};
+const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,shade:true,rim:true,outline:true,wraps:true,walkK:1.55,seed:(Math.random()*4294967296)>>>0};
 try{
   const q=new URLSearchParams(location.search), v=q.get('skin');
   if(v==='0'||(v!=='1'&&localStorage.getItem('sublevel-skin')==='0')) SKIN.on=false;
@@ -2142,21 +2168,62 @@ function randomLook(seed,base,others){
    interpolated across the triangles and multiplied into the texture. Each region gets [base, how much the up-facing normal adds,
    how much height inside the region adds]: tops catch light and undersides fall off, the hem of a shirt and the ankle of a trouser
    leg go darker, hair has a sheen on top. Skin also turns warmer where it falls off, like blood showing through. The eyes are left alone. */
+const SKIN_HAND_BONES=new Set([11,12,13,14,15,16,17,18,19,20,21,25,26,27,28,29,30,31,32,33,34,35]); /* LeftHand.. and RightHand.. with their fingers */
+const SKIN_CREASE=.22, SKIN_HEAD_BONE=5; /* bone 5 is Head in the Quaternius rig */
 const SKIN_SHADE={skin:[.80,.24,.10],hair:[.66,.46,.14],shirt:[.78,.26,.16],pants:[.80,.24,.14],shoes:[.62,.36,.24],eyes:[1,0,0]};
-function skinShade(m){
+function skinShade(m,L){
   const pos=m.getVerticesData('position'), nor=m.getVerticesData('normal'), uv=m.getVerticesData('uv'); if(!pos||!nor||!uv) return;
-  const n=pos.length/3, name=new Array(n), lo={}, hi={};
+  const wts=m.getVerticesData('matricesWeights'), idx=m.getVerticesData('matricesIndices');
+  const n=pos.length/3, name=new Array(n), lo={}, hi={}, head=[];
   for(let i=0;i<n;i++){
-    const row=Math.floor((1-uv[i*2+1])*32), b=SKIN_BANDS.find(b=>row>=b[1]&&row<b[1]+b[2]), k=b?b[0]:'skin', y=pos[i*3+1];
+    const row=Math.floor(uv[i*2+1]*32), b=SKIN_BANDS.find(b=>row>=b[1]&&row<b[1]+b[2]), k=b?b[0]:'skin', y=pos[i*3+1];
     name[i]=k; if(lo[k]===undefined||y<lo[k]) lo[k]=y; if(hi[k]===undefined||y>hi[k]) hi[k]=y;
   }
+  /* hand wraps: the hand bones take a tape colour, light tape on dark skin and dark tape on light skin, so a fist reads against the body.
+     The vertex colour multiplies the skin texel, so it is the tape colour over the skin colour. */
+  let tape=null;
+  if(L&&L.skin&&SKIN.wraps){ const sk=C3.FromHexString(L.skin), tp=C3.FromHexString(labOf(L.skin)[0]>62?'#27272b':'#e6e1d3'); tape=[tp.r/Math.max(.05,sk.r),tp.g/Math.max(.05,sk.g),tp.b/Math.max(.05,sk.b)]; }
   const col=new Float32Array(n*4);
   for(let i=0;i<n;i++){
-    const k=name[i], c=SKIN_SHADE[k], h=.5+.5*nor[i*3+1], t=((pos[i*3+1]-lo[k])/((hi[k]-lo[k])||1))*2-1, g=c[0]+c[1]*h+c[2]*t, w=k==='skin'?1-h:0;
+    const k=name[i], c=SKIN_SHADE[k], h=.5+.5*nor[i*3+1], t=((pos[i*3+1]-lo[k])/((hi[k]-lo[k])||1))*2-1, w=k==='skin'?1-h:0;
+    let g=c[0]+c[1]*h+c[2]*t;
+    /* creases: where two bones share a vertex about equally (elbow, knee, armpit, neck) the skin folds, so it goes a little darker */
+    if(wts&&k!=='eyes'){
+      let w0=0,w1=0,b0=-1; for(let j=0;j<4;j++){ const v=wts[i*4+j]; if(v>w0){ w1=w0; w0=v; b0=idx[i*4+j]; } else if(v>w1) w1=v; }
+      g*=1-SKIN_CREASE*Math.min(1,4*w0*w1);
+      if(k==='skin'&&b0===SKIN_HEAD_BONE) head.push(i);
+      if(k==='skin'&&tape&&SKIN_HAND_BONES.has(b0)){ col[i*4]=g*tape[0]; col[i*4+1]=g*tape[1]; col[i*4+2]=g*tape[2]; col[i*4+3]=1; continue; }
+    }
     col[i*4]=g; col[i*4+1]=g*(1-.07*w); col[i*4+2]=g*(1-.12*w); col[i*4+3]=1;
   }
-  m.setVerticesData('color',col,false,4); m.useVertexColors=true; /* 'color' is VertexBuffer.ColorKind, which the bundle does not export */
+  /* updatable, with the shaded colours kept, so skinMarks can tint the face as the fighter takes damage */
+  m.setVerticesData('color',col,true,4); m.useVertexColors=true; /* 'color' is VertexBuffer.ColorKind, which the bundle does not export */
+  m._sh={base:col.slice(),head,pos,marks:0,side:0};
 }
+/* Bruise and flush on the face from f.marks (0 to 1, grows with each hit): the whole face reddens, and the side that was hit goes purple.
+   Only the head vertices are rewritten, and only when the value moved. The procedural head has its own bruise; this is the skinned one. */
+function skinMarks(f){
+  const S=f.skin; if(!S) return;
+  const mk=f.marks||0, side=f.hitSide||1;
+  S.res.meshes.forEach(m=>{
+    const sh=m._sh; if(!sh||!sh.head.length) return;
+    if(Math.abs(sh.marks-mk)<.02&&sh.side===side) return;
+    sh.marks=mk; sh.side=side;
+    const col=m.getVerticesData('color'), base=sh.base, pos=sh.pos;
+    for(let q=0;q<sh.head.length;q++){
+      const i=sh.head[q], on=clamp(.5+.5*side*pos[i*3+2]/.25,0,1), b=mk*(.35+.65*on), r=mk*.25;
+      col[i*4]=base[i*4]*(1-.22*b)*(1+.06*r); col[i*4+1]=base[i*4+1]*(1-.42*b-.15*r); col[i*4+2]=base[i*4+2]*(1-.22*b-.2*r);
+    }
+    m.updateVerticesData('color',col);
+  });
+}
+/* Rim light: a Fresnel term on the emissive makes the edges of the body, where the normal turns away from the camera, brighter and tinted
+   by the place's key light, so the fighters separate from the dark crowd. It multiplies the emissive, so a dark region gets little of it. */
+function skinRim(fp){
+  const k=envNow.light.key, g=SKIN_RIM;
+  fp.leftColor.set(1+g*k[0],1+g*k[1],1+g*k[2]);
+}
+const SKIN_RIM=6, SKIN_OUTLINE=.05;
 async function skinFighter(f,look){
   /* the look's build is only visual: f.sx, the body size resolveBodies uses, stays the foe's own so the balance table does not move */
   if(look){ f.L=look; f.root.scaling.set(look.sx,look.sy,look.sx); }
@@ -2180,17 +2247,26 @@ async function skinFighter(f,look){
   if(f.alert){ if(!f.alertHome) f.alertHome={parent:f.alert.parent,y:f.alert.position.y,s:f.alert.scaling.x}; f.alert.parent=f.slot; f.alert.position.set(0,2.2,0); f.alert.scaling.setAll(.8); }
   /* the glTF loader builds PBR materials, which fall off with the inverse square of the light distance and stay black under
      this scene's lights. Rebuild them the way the procedural bodies are lit: a standard material with an emissive base. */
-  const pal=skinPalette(f.L);
+  const pal=skinPalette(f.L), mats=[]; f.skin_mats=mats; f.flash=0;
   res.meshes.forEach(m=>{
     const p=m.material; if(!p) return;
     const sm=new B.StandardMaterial('skinM',scene);
+    if(SKIN.rim&&B.FresnelParameters){ const fp=new B.FresnelParameters(); fp.bias=0; fp.power=2.5; fp.rightColor.set(1,1,1); skinRim(fp); sm.emissiveFresnelParameters=fp; f.skin_fp=fp; }
     sm.diffuseTexture=pal; sm.emissiveTexture=pal; sm.emissiveColor=new C3(.3,.3,.3); sm.specularColor=new C3(0,0,0);
-    m.material=sm; p.dispose(false,true);
-    if(SKIN.shade){ try{ skinShade(m); }catch(e){ if(window.console) console.warn('skin shade off:',e); } }
+    m.material=sm; p.dispose(false,true); mats.push(sm);
+    /* the same dark outline the procedural parts have, so the fighters match the comic words; the width is in model units (about 5.5 tall) */
+    if(SKIN.outline){ m.renderOutline=true; m.outlineWidth=SKIN_OUTLINE; m.outlineColor=new C3(.03,.03,.04); }
+    if(SKIN.shade){ try{ skinShade(m,f.L); }catch(e){ if(window.console) console.warn('skin shade off:',e); } }
   });
   f.skin_pal=pal;
   const groups={}; res.animationGroups.forEach(g=>{ groups[g.name.split('|').pop()]=g; });
   f.skin={res,anchor,groups,M,mirror,cur:null,lastClip:'',lastU:0};
+}
+/* The quality ladder's second step drops the skinned extras that cost draws and shader work: the outline and the rim. Fighters made
+   later (a new opponent each bout) are made without them. */
+function skinLite(){
+  SKIN.outline=false; SKIN.rim=false;
+  [P,E].forEach(f=>{ if(!f||!f.skin) return; f.skin.res.meshes.forEach(m=>{ m.renderOutline=false; }); (f.skin_mats||[]).forEach(sm=>{ sm.emissiveFresnelParameters=null; }); f.skin_fp=null; });
 }
 function skinPick(f,M){
   const C=M.clips, st=f.state, G=f.skin.groups;
@@ -2210,7 +2286,7 @@ function skinPick(f,M){
   if(st==='block'&&C.block) return [C.block,.99];
   if(st==='win'&&C.win) return [C.win,(f.t/dur(C.win))%1];
   if(st==='dodge'&&C.run) return [C.run,(f.dodgeT/.34)%1];
-  if((st==='idle'||st==='block')&&f.moveAmt>.12&&C.walk) return [C.walk,(f.phase/(Math.PI*2))%1];
+  if((st==='idle'||st==='block')&&f.moveAmt>.12&&C.walk) return [C.walk,(f.phase*SKIN.walkK/(Math.PI*2))%1]; /* the clip's stride is short for the sim's speed, so its cycle turns over faster than the procedural legs: foot-probe */
   return [C.idle,(f.t/dur(C.idle))%1];
 }
 /* When the clip changes, the bones blend from the pose they were in to the new clip. Fast clips fade fast: a jab has 0.15 s to reach
@@ -2240,6 +2316,10 @@ function updateSkin(f,dt){
     if(k>=1) S.fade=null;
   }
   S.lastClip=pick[0]; S.lastU=pick[1];
+  skinMarks(f);
+  /* hit flash: the body's emissive lifts for a moment on a blow that lands (set in strike) */
+  const fk=f.flash>0?f.flash/(f.flashMax||.07):0; if(f.flash>0) f.flash=Math.max(0,f.flash-(dt||0));
+  if(S.flashK!==fk&&f.skin_mats){ S.flashK=fk; const e=.3+.6*fk*fk; f.skin_mats.forEach(sm=>sm.emissiveColor.set(e,e,e)); }
   if(f.state==='ko'){ f.body.rotation.set(0,0,0); f.body.position.set(0,0,0); }
 }
 /* Put a skin on a fighter that has none. The procedural body is hidden at once so it never shows while the model loads; if the load
@@ -2284,7 +2364,7 @@ const Q={t:0,n:0,lvl:0,warm:2500,base:engine.getHardwareScalingLevel()};
 function qualityStep(){
   Q.lvl++;
   if(Q.lvl===1) engine.setHardwareScalingLevel(Q.base*1.35);
-  else if(Q.lvl===2){ sg.usePoissonSampling=false; sg.useBlurExponentialShadowMap=false; }
+  else if(Q.lvl===2){ sg.usePoissonSampling=false; sg.useBlurExponentialShadowMap=false; skinLite(); }
   else if(Q.lvl===3) engine.setHardwareScalingLevel(Q.base*1.8);
   else if(Q.lvl===4){ key.shadowEnabled=false; scene.imageProcessingConfiguration.vignetteEnabled=false; }
   else if(Q.lvl===5){ scene.imageProcessingConfiguration.toneMappingEnabled=false; engine.setHardwareScalingLevel(Q.base*2); }
@@ -2775,7 +2855,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

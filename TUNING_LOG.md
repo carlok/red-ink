@@ -1169,3 +1169,53 @@ Checked (`tools/env-probe.mjs`, `tools/look-probe.mjs`, regression, balance):
 Screenshots: `tuning/s17-env-b1.jpg` to `s17-env-b6.jpg`.
 
 Not done: the crowd is the same in every place, the back sign still reads SUBLEVEL 3 with its three rules everywhere, the tint of fighters under each light was only judged by eye, and nothing was checked on a real phone or an integrated GPU.
+
+## Sprint 18: camera angle, hit feel, and more believable fighters
+
+Goal: tune the camera angle, add weight to hits, and make the two skinned fighters read as real people (the gradient of Sprint 16 was the first of these tricks). Everything here is render-only: the bout table must not move.
+
+### Camera
+
+`tools/cam-sweep.mjs` renders a jab exchange over pitch, fighter size and a new yaw (how far the camera slides toward the player's back, so the opponent turns his face to it). The first idea, a side bias, did nothing: with the fighters on the x axis the camera is straight behind whatever the weight, so it became `CAM.yaw`.
+
+| | Before | After |
+| --- | --- | --- |
+| Landscape pitch / `frac` / yaw / follow | 0.47 / 0.34 / 0 / 3.2 | 0.40 / 0.40 / 0.15 / 4.5 |
+| Fighter height share, gap 2 m, 1920×1080 and 844×390 | 33.9% | 41.3% |
+| Clipped frames in chase, circle, knock runs (landscape) | 0 | 0 |
+| Nearest crowd or pillar, 1920×1080, tangent / radial rim | not run | 1.34 / 1.93 m, 0 blocked |
+| Portrait 390×844 | pitch 0.47, no turn | unchanged; knock runs clip 13 frames (14 before) |
+
+A lower pitch in portrait made the knock runs clip, and the faster `follow` and a smaller yaw were what kept the landscape circle run at zero clipped frames, so portrait keeps `pitchPortrait` 0.47 and `yawPortrait` 0.
+
+Hit feel. `camKick` pushes the camera along the blow through two springs (k 220, c 22, real time so a hitstop does not freeze them) and rolls it up to 0.4°; reduced motion zeroes both. A jab peaks at 0.035 m of offset at the working distance and settles in about 17 frames; the roll peaks at 0.1°. A heavy is twice the push by construction, not measured. The knockout runs at 0.35× for its first 0.45 s with a push-in on the loser; only state `ko` is touched, so the result cannot change. The ready phase opens 15% wider and 5.7° lower and settles over its 1.15 s (`CAM.reveal`; `cam-probe` holds it at 0).
+
+### Bodies
+
+| Change | Result |
+| --- | --- |
+| Face marks (`skinMarks`) | The skin shows no damage by default (the bruise lived on the hidden procedural head). 1,147 head vertices now flush and bruise on the hit side as `f.marks` grows (`tuning/s18-face-marks.jpg`) |
+| Joint creases | Elbow, knee, armpit and neck darken where two bones blend (up to −22%) |
+| Hit flash | Emissive 0.3 to 0.9 for 70 ms on a jab, 110 ms on a heavy, none on a block |
+| Rim (Fresnel, needs a bundle rebuild: +1,018 bytes, gzip +335; the unchanged build matches `lib/babylon.js` byte for byte) | Edges take the place's key light colour; clear on skin, shirts and hair, weak on near-black clothes because it multiplies the emissive |
+| Outline | Works under skinning and on the mirrored enemy; about 4 px at 1080p against about 5 for the procedural look |
+| Hand wraps | Light tape on dark skin, dark tape on light skin (`tuning/s18-wraps.jpg`) |
+| Walk cycle (`SKIN.walkK` 1.55) | `tools/foot-probe.mjs`: the speed the feet can match over the body's speed went from 0.47 to 0.66 sideways and 0.73 back and forth. The clip's stride is short for the sim's speed, so it cannot reach 1 without a frantic cadence |
+
+A bug found on the way: `skinShade` read the palette rows upside down, so the Sprint 16 gradient settings were applied to the wrong regions (the face got the pants setting). Rows are `floor(v * 32)` because the palette is uploaded unflipped. The shading now follows its table.
+
+Built and removed: a grounding blob under each fighter (instanced, one draw). Beside the shadow map it was barely visible.
+
+Checked:
+
+| Check | Result |
+| --- | --- |
+| `tools/regression.mjs` | 22 of 22 (one earlier run failed `bout_2_starts` on a timeout and passed twice after) |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, unchanged |
+| `tools/step-probe.mjs` | identical at 30 to 144 fps; the 20 fps run differs at tick 146 on master too |
+| `tools/combat-probe.mjs` | damage 7 / 16 / 0.7, counter 8.75, word readable 49–51 ms, unchanged |
+| `tools/env-probe.mjs`, six places, `file://` | no console errors; draws 31–34 (27–29 before), active 38–40 |
+| GPU, 1600×900 | about 2.08 ms in all six (1.4–1.9 before): 0.1–0.2 ms over the 2.0 target. The quality ladder's second step (`skinLite`) takes 6 draws back |
+| `?skin=0` | procedural fighters boot, no errors, 148 draws |
+
+Not done: head look-at and breathing (the Idle clip already moves and the bodies already face each other), rim separation was judged by eye and not measured as a luminance ratio, opponents' dark trousers nearly vanish on the black floor of The Reconciler (clothing is not checked against the floor), heavy-hit kick was not measured, and the feel of the new angle and the KO slow-motion on your monitor, a real phone and an integrated GPU are not checked.
