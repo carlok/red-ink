@@ -166,6 +166,22 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("opponent_dossier_every_bout", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = { bouts: [] };
+      for (let i = 0; i < S.BOUTS.length; i++) {
+        S.introCard(i); await sleep(250);
+        const rows = [...$("cRows").querySelectorAll("dd")].map((d) => d.textContent), keys = rows.filter((t) => /^(sw_|stl_|dos_)/.test(t));
+        o.bouts.push({ title: $("cTitle").textContent === S.BOUTS[i].foe, rows: rows.length === 10, noMissingStrings: keys.length === 0, showcase: G.showcase === true && $("wrap").classList.contains("dossier"), playerHidden: !S.P.root.isEnabled() });
+      }
+      $("go").click(); await sleep(300);
+      o.afterGo = { state: G.state, showcaseCleared: G.showcase === null && !$("wrap").classList.contains("dossier"), playerBack: S.P.root.isEnabled() };
+      return o; })()`, true);
+    const bad = r.bouts.filter((b) => !Object.values(b).every(Boolean)).length || !Object.values(r.afterGo).every((v) => v === true || typeof v === "string");
+    if (bad) throw new Error(JSON.stringify(r));
+    return { bouts: r.bouts.length, afterGo: r.afterGo };
+  });
+
   await test("reset_progress_two_clicks", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, b = document.getElementById("resetBtn"), o = {};

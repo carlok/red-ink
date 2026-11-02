@@ -120,6 +120,11 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .pauseCard button,.pauseCard label{font:600 13px/1 var(--f-data);letter-spacing:.06em;text-transform:uppercase}
 .pauseCard button{background:#111;color:var(--tape);border:0;padding:12px 14px;cursor:pointer;text-align:left}
 .pauseCard button.quiet{background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:10px 12px}
+.wrap.dossier{place-items:center end;padding-right:clamp(16px,6vw,96px);background:linear-gradient(to left,rgba(8,8,9,.74),rgba(8,8,9,.12) 64%)}
+.wrap.dossier .card{margin:auto 0 auto auto;max-height:calc(100% - 24px);overflow:auto}
+.wrap.dossier .go{position:sticky;bottom:8px;z-index:1}
+.pips{font:500 12px var(--f-data);letter-spacing:.12em;margin-right:6px}
+@media (max-aspect-ratio:1/1){.wrap.dossier{place-items:end center;padding:0;overflow:hidden;background:linear-gradient(to top,rgba(8,8,9,.7) 50%,rgba(8,8,9,0) 62%)}.wrap.dossier .card{margin:0;width:100%;max-height:56vh;overflow:auto}}
 .splash{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at center,rgba(8,8,9,.55),rgba(8,8,9,.92) 78%);text-align:center}
 .splash[hidden]{display:none}
 .splashIn{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:640px}
@@ -331,6 +336,30 @@ const STR={
   card_title_body:{en:'You audit pallet counts from ten to six. Totals always reconcile. You have not slept in eleven months. Pike slides you a keycard toward a door missing from the floor plan.',it:'Controlli i pallet dalle dieci alle sei. I totali tornano sempre. Non dormi da undici mesi. Pike ti passa una tessera verso una porta assente dalla pianta.'},
   card_title_btn:{en:'Take the stairs',it:'Scendi le scale'},
   credits_btn:{en:'Credits',it:'Crediti'},
+  dos_health:{en:'Health',it:'Salute'},
+  dos_speed:{en:'Speed',it:'Velocità'},
+  dos_reflex:{en:'Reaction',it:'Reazione'},
+  dos_power:{en:'Power',it:'Potenza'},
+  dos_guard:{en:'Guard',it:'Guardia'},
+  dos_reach:{en:'Reach',it:'Portata'},
+  dos_style:{en:'Style',it:'Stile'},
+  dos_strength:{en:'Strength',it:'Forza'},
+  dos_weak:{en:'Weakness',it:'Debolezza'},
+  stl_teach:{en:'Patient: winds up before he strikes',it:'Paziente: carica prima di colpire'},
+  stl_punish:{en:'Counter-puncher: waits for your misses',it:'Contrattaccante: aspetta i tuoi errori'},
+  stl_echo:{en:'Mirror: copies your last three moves',it:'Specchio: copia le tue ultime tre mosse'},
+  sw_b1_s:{en:'Sharp reactions: he answers a lazy jab at once.',it:'Reazioni pronte: risponde subito a un diretto pigro.'},
+  sw_b1_w:{en:'The least health of anyone, and a slow hand. Every jab is telegraphed.',it:'La salute più bassa di tutti e una mano lenta. Ogni diretto è annunciato.'},
+  sw_b2_s:{en:'Hits hard, reaches far, and swings heavy four times in ten.',it:'Colpisce forte, ha portata lunga e carica il potente quattro volte su dieci.'},
+  sw_b2_w:{en:'The slowest on his feet and slow to react. Dodge the red mark, then punish.',it:'Il più lento sulle gambe e a reagire. Schiva il segno rosso, poi punisci.'},
+  sw_b3_s:{en:'The fastest feet in the building, and he remembers your last three punches.',it:'Le gambe più veloci dell\'edificio, e ricorda i tuoi ultimi tre colpi.'},
+  sw_b3_w:{en:'His hits do about half damage. Change your rhythm and the echo misses.',it:'I suoi colpi fanno metà danno. Cambia ritmo e l\'eco sbaglia.'},
+  sw_b4_s:{en:'The most health, the best guard (four blocks in ten), and he hits hard.',it:'La salute maggiore, la guardia migliore (quattro parate su dieci) e colpisce forte.'},
+  sw_b4_w:{en:'He telegraphs every jab. Block the tell, then trade before he resets.',it:'Annuncia ogni diretto. Para il segnale, poi scambia prima che si ricomponga.'},
+  sw_b5_s:{en:'Swings heavy almost every other chance, with a long reach, and punishes a miss.',it:'Carica il potente quasi ogni occasione, con portata lunga, e punisce ogni errore.'},
+  sw_b5_w:{en:'The slowest reactions of the six. Hit first, then step out of range.',it:'Le reazioni più lente dei sei. Colpisci per primo, poi esci dalla portata.'},
+  sw_b6_s:{en:'Fast, mirrors your rhythm, and bends the tempo just before the echo lands.',it:'Veloce, specchia il tuo ritmo e cambia tempo poco prima che l\'eco arrivi.'},
+  sw_b6_w:{en:'The weakest guard (one block in six) and light hits. End it before the echo builds.',it:'La guardia più debole (una parata su sei) e colpi leggeri. Chiudi prima che l\'eco cresca.'},
   play_btn:{en:'Play',it:'Gioca'},
   reset_btn:{en:'Reset progress',it:'Azzera i progressi'},
   reset_confirm:{en:'Sure? Click again',it:'Sicuro? Clicca ancora'},
@@ -1577,7 +1606,7 @@ function applyPose(f,dt){
 }
 
 /* ---------- combat ---------- */
-const G={state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
+const G={showcase:null,state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
 function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0}; }
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
@@ -2052,7 +2081,7 @@ function toSplash(withNote){
   try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen(); else if(document.webkitFullscreenElement&&document.webkitExitFullscreen) document.webkitExitFullscreen(); }catch(e){}
   if($('pause')) $('pause').hidden=true; wrapEl.hidden=true; hudEl.hidden=true; $('touch').hidden=true;
   G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
-  G.state='splash'; splashHold=true; audOut=true;
+  G.state='splash'; splashHold=true; audOut=true; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
   if(ac&&ac.state!=='closed'){ try{ ac.suspend(); }catch(e){} }
   $('spNote').textContent=withNote?L('out_saved_v').replace('{n}',progress.wins).replace('{m}',BOUTS.length):'';
   $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus({preventScroll:true}); }catch(e){} },30);
@@ -2117,7 +2146,12 @@ function updateCamera(dt,real){
   const asp=engine.getAspectRatio(cam), portrait=asp<CAM.wide;
   if(portrait){ cam.fovMode=B.Camera.FOVMODE_HORIZONTAL_FIXED; cam.fov=CAM.fovH; } else { cam.fovMode=B.Camera.FOVMODE_VERTICAL_FIXED; cam.fov=CAM.fovV; }
   let dp,dt2;
-  if(G.state==='title'||G.state==='card'||G.state==='splash'){
+  if(G.showcase&&G.state==='card'&&E){
+    /* all the way round him, once every 12 s; the subject is moved off-centre so he stands beside the card (above it on a phone) */
+    const a=G.t*.52, R=portrait?4.2:3.9;
+    dp=new V3(E.pos.x+Math.sin(a)*R,portrait?1.4:1.5,E.pos.z-Math.cos(a)*R); dt2=new V3(E.pos.x,portrait?-1.7:1.0,E.pos.z);
+    if(!portrait){ const f=dt2.subtract(dp); f.y=0; f.normalize(); const rg=new V3(f.z,0,-f.x).scale(1.2); dp.addInPlace(rg); dt2.addInPlace(rg); }
+  } else if(G.state==='title'||G.state==='card'||G.state==='splash'){
     const a=G.t*.12; dp=new V3(Math.sin(a)*11.5,4.6,-Math.cos(a)*11.5); dt2=new V3(0,1.2,0);
   } else {
     const mid=P.pos.add(E.pos).scale(.5), d=V3.Distance(P.pos,E.pos);
@@ -2178,6 +2212,7 @@ function showCard(c){
   $('avatarBox').hidden=!c.avatar; $('goTxt').textContent=c.btn;
   $('go').onclick=()=>{ audioInit('click'); SFX.ui(); wrapEl.hidden=true; c.go(); };
   cardEsc=!!c.esc; if($('cardLinks')) $('cardLinks').hidden=!c.links;
+  G.showcase=c.showcase?true:null; wrapEl.classList.toggle('dossier',!!c.showcase);
   G.state='card'; wrapEl.hidden=false; hudEl.hidden=true; $('touch').hidden=true; wrapEl.scrollTop=0;
   setTimeout(()=>{ try{ $('go').focus({preventScroll:true}); }catch(e){} },30);
 }
@@ -2189,10 +2224,35 @@ function titleRows(){
   if(isTouch) return [[L('row_move'),L('move_touch')],[L('row_strike'),L('strike_touch')],[L('row_defend'),L('defend_touch')]];
   return [[L('row_move'),L('move_keys')],[L('row_strike'),keyLabel(binds.jab)+' jab, '+keyLabel(binds.heavy)+' heavy'],[L('row_defend'),keyLabel(binds.block)+' block (hold), '+keyLabel(binds.dodge)+' dodge'],[L('pad_row'),L('pad_hint')]];
 }
+/* The opponent dossier: shown before each bout. The next opponent stands in the place he will fight in, the camera walks all the way round him,
+   and the card lists what he is good and bad at. The numbers are the bout's own table (BOUTS), ranked against the six, so a retune shows up. */
+const DOSSIER=[
+  ['dos_health',b=>b.hp,b=>String(b.hp)],
+  ['dos_speed',b=>b.speed,b=>b.speed.toFixed(1)+' m/s'],
+  ['dos_reflex',b=>-b.react,b=>Math.round(b.react*1000)+' ms'],
+  ['dos_power',b=>b.dmg*(.6+b.heavy),b=>(b.dmg*(.6+b.heavy)).toFixed(2)],
+  ['dos_guard',b=>b.block,b=>Math.round(b.block*100)+'%'],
+  ['dos_reach',b=>b.reach,b=>b.reach.toFixed(2)+'x']
+];
+function dossierRows(c){
+  const rows=DOSSIER.map(d=>{
+    const all=BOUTS.map(d[1]), lo=Math.min.apply(null,all), hi=Math.max.apply(null,all), n=1+Math.round(4*(d[1](c)-lo)/((hi-lo)||1));
+    return [L(d[0]),'<span class="pips" role="img" aria-label="'+n+' / 5">'+'&#9632;'.repeat(n)+'&#9633;'.repeat(5-n)+'</span>'+d[2](c)];
+  }), k=c.introKey.replace('intro_','');
+  rows.push([L('dos_style'),L('stl_'+c.style)],[L('dos_strength'),L('sw_'+k+'_s')],[L('dos_weak'),L('sw_'+k+'_w')],[L('row_tip'),boutTip(c)]);
+  return rows;
+}
+function showcaseOpponent(i){
+  applyEnv(i);
+  const cfg=scaleCfg(BOUTS[i]);
+  disposeFighter(E); E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg; resetFighter(E,0,0,cfg.hp);
+  if(P) P.root.setEnabled(false);
+  skinEnsure(E,skinLooks(i)[i]);
+}
 function introCard(i,lead){
-  const c=BOUTS[i];
-  showCard({stamp:L('bout_stamp')+' '+(i+1),kick:lead||L('company_kick'),title:boutPlace(c),body:L(c.introKey),
-    rows:boutRows(i),btn:L('bout_btn'),go:()=>{ maybeAutoFullscreen(); startBout(i); }});
+  const c=BOUTS[i]; showcaseOpponent(i);
+  showCard({stamp:L('bout_stamp')+' '+(i+1)+' / '+BOUTS.length,kick:lead||L('company_kick'),title:c.foe,body:boutPlace(c)+' · '+boutRole(c)+'. '+L(c.introKey),
+    rows:dossierRows(c),btn:L('bout_btn'),showcase:true,go:()=>{ maybeAutoFullscreen(); startBout(i); }});
 }
 function titleCard(){
   showCard({stamp:L('card_title_stamp'),kick:L('company_form'),title:L('card_title_name'),
@@ -2232,7 +2292,7 @@ function winCard(){
 /* ---------- flow ---------- */
 function startBout(i){
   if(G.state==='splash') splashHold=false; /* a bout started by a probe from the splash, which the interface cannot do */
-  if($('splash')) $('splash').hidden=true; audOut=false;
+  if($('splash')) $('splash').hidden=true; audOut=false; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
   G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i]);
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
@@ -3273,7 +3333,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,CROWD,crowd,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,CROWD,crowd,introCard,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
