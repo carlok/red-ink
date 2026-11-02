@@ -1127,6 +1127,7 @@ function resetFighter(f,x,yaw,hp){
 function disposeFighter(f){
   if(!f) return;
   const rl=sg.getShadowMap().renderList;
+  disposeSkin(f);
   f.root.dispose(false,false);
   for(let i=rl.length-1;i>=0;i--){ if(rl[i].isDisposed()) rl.splice(i,1); }
 }
@@ -1764,6 +1765,7 @@ function startBout(i){
   showTutor();
   keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
   banner('BOUT '+(i+1));
+  if(SKIN.on) skinFighter(E).catch(e=>{ if(window.console) console.warn(e); });
 }
 function fightLine(){
   const L=G.log||{hits:0,blocks:0,dodges:0,corner:0};
@@ -1839,6 +1841,7 @@ function frame(){
   while(acc>=SIM-1e-9){ acc-=SIM; simTick(); }
   const a=Math.max(0,acc/SIM);
   simShow(P,a); simShow(E,a);
+  if(SKIN.on){ updateSkin(P); updateSkin(E); }
   updateFx(real); updateAmbient(dt); updateCamera(dt); updateHud();
 }
 
@@ -1897,6 +1900,87 @@ window.addEventListener('dragenter',e=>{ e.preventDefault(); dragDepth++; $('dro
 window.addEventListener('dragleave',()=>{ dragDepth=Math.max(0,dragDepth-1); if(!dragDepth) $('dropHint').hidden=true; });
 window.addEventListener('dragover',e=>e.preventDefault());
 window.addEventListener('drop',e=>{ e.preventDefault(); dragDepth=0; $('dropHint').hidden=true; const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) useAvatar(f); });
+
+/* ---------- skinned fighters (spike) ----------
+   A skinned CC0 model replaces the procedural body. Clips are scrubbed by sim time, not played, so hitstop, pause and
+   the fixed step stay exact. Hits and knockdowns have no clip: the procedural body lean and roll still apply on top. */
+const SKIN={url:'assets/quaternius-human/animated-human.glb',on:false,file:null,
+  impact:13/24, /* Punch: the left fist is fully extended at frame 14 of 25 (measured in Blender) */
+  koSeconds:2.2};
+async function skinFile(){
+  if(!SKIN.file){ const r=await fetch(SKIN.url); if(!r.ok) throw new Error('skin '+r.status); SKIN.file=new File([await r.blob()],'fighter.glb'); }
+  return SKIN.file;
+}
+function disposeSkin(f){
+  if(!f||!f.skin) return;
+  const S=f.skin; f.skin=null;
+  Object.keys(S.groups).forEach(k=>S.groups[k].dispose());
+  S.res.meshes.forEach(m=>m.dispose(false,true));
+  (S.res.skeletons||[]).forEach(s=>s.dispose());
+  S.anchor.dispose(false,true);
+  if(f.skin_pal){ f.skin_pal.dispose(); f.skin_pal=null; }
+}
+/* The model's UVs point at flat bands of one 32x32 palette: skin rows 0-5, eyes 6-10, hair 11-16, shirt 17-22, pants 23-31.
+   Painting the bands from a LOOKS row restyles the character; height and build come from the look's scale on the fighter root. */
+const SKIN_BANDS=[['skin',0,6],['eyes',6,5],['hair',11,6],['shirt',17,6],['pants',23,9]];
+function skinPalette(L){
+  const t=new B.DynamicTexture('skinPal',{width:32,height:32},scene,false,B.Texture.NEAREST_SAMPLINGMODE,undefined,false), g=t.getContext();
+  const col={skin:L.skin,eyes:'#292929',hair:L.hair||L.cap||'#2b1d15',shirt:L.shirt,pants:L.pants};
+  SKIN_BANDS.forEach(b=>{ g.fillStyle=col[b[0]]; g.fillRect(0,b[1],32,b[2]); });
+  t.update(false);
+  return t;
+}
+async function skinFighter(f){
+  const res=await importGlb(await skinFile());
+  if(f.root.isDisposed()){ res.meshes.forEach(m=>m.dispose(false,true)); res.animationGroups.forEach(g=>g.dispose()); (res.skeletons||[]).forEach(s=>s.dispose()); return; }
+  disposeSkin(f);
+  res.animationGroups.forEach(g=>g.stop());
+  const anchor=new B.TransformNode('skAnchor',scene), holder=new B.TransformNode('skHolder',scene);
+  holder.parent=anchor;
+  const root=res.meshes[0]; root.parent=holder;
+  const bb=root.getHierarchyBoundingVectors(true), h=(bb.max.y-bb.min.y)||1, s=1.8/h;
+  holder.scaling.setAll(s); holder.position.set(-(bb.min.x+bb.max.x)/2*s,-bb.min.y*s,-(bb.min.z+bb.max.z)/2*s);
+  anchor.parent=f.slot;
+  res.meshes.forEach(m=>{ m.isPickable=false; sg.addShadowCaster(m); m.alwaysSelectAsActiveMesh=true; });
+  /* the glTF loader builds PBR materials, which fall off with the inverse square of the light distance and stay black under
+     this scene's lights. Rebuild them the way the procedural bodies are lit: a standard material with an emissive base. */
+  const pal=skinPalette(f.L);
+  res.meshes.forEach(m=>{
+    const p=m.material; if(!p) return;
+    const sm=new B.StandardMaterial('skinM',scene);
+    sm.diffuseTexture=pal; sm.emissiveTexture=pal; sm.emissiveColor=new C3(.3,.3,.3); sm.specularColor=new C3(0,0,0);
+    m.material=sm; if(p.albedoTexture) p.dispose(false,true); else p.dispose();
+  });
+  f.skin_pal=pal;
+  f.vis.setEnabled(false);
+  const groups={}; res.animationGroups.forEach(g=>{ groups[g.name.split('|').pop()]=g; });
+  f.skin={res,anchor,groups,cur:null,lastClip:'',lastU:0};
+}
+function skinPick(f){
+  const st=f.state;
+  if(st==='ko') return ['Death',clamp(f.koT/SKIN.koSeconds,0,1)];
+  if(st==='attack'&&f.atk){
+    const D=f.atk.def, t=f.atk.t, tc=(D.a0+D.a1)/2, I=SKIN.impact;
+    return ['Punch',t<tc?(t/tc)*I:I+(Math.min(t,D.dur)-tc)/(D.dur-tc)*(1-I)];
+  }
+  if(st==='dodge') return ['Run',(f.dodgeT/.34)%1];
+  if((st==='idle'||st==='block')&&f.moveAmt>.12) return ['Walk',(f.phase/(Math.PI*2))%1];
+  return ['Idle',(f.t/10)%1];
+}
+function updateSkin(f){
+  const S=f&&f.skin; if(!S) return;
+  const pick=skinPick(f), g=S.groups[pick[0]]; if(!g) return;
+  if(S.cur!==g){ if(S.cur) S.cur.stop(); g.start(false,1,g.from,g.to,false); g.pause(); S.cur=g; }
+  g.goToFrame(g.from+(g.to-g.from)*clamp(pick[1],0,1));
+  S.lastClip=pick[0]; S.lastU=pick[1];
+  if(f.state==='ko'){ f.body.rotation.set(0,0,0); f.body.position.set(0,0,0); }
+}
+async function skinOn(on){
+  SKIN.on=!!on;
+  if(!on) return false;
+  await Promise.all([skinFighter(P),skinFighter(E)]);
+  return true;
+}
 
 /* ---------- boot ---------- */
 $('snd').addEventListener('click',()=>{ muted=!muted; saveAudioPrefs(); paintAudio(); audioInit('click'); if(!muted) SFX.ui(); });
@@ -2400,7 +2484,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,skinOn,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

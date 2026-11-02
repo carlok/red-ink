@@ -954,3 +954,69 @@ Hand check still open: 55 fps at 1080p on an iGPU, a real pad and phone, and how
 
 
 
+
+## Sprint 15 spike — a skinned CC0 fighter
+
+Goal: find out whether a free, skinned, animated human can replace the procedural body without breaking the fixed-step sim, and whether recolouring one model from `LOOKS` gives usable character variety. A spike on branch `s15-skinned-spike`, off by default (`__sublevel.skinOn(true)`), not for merging as it stands.
+
+Probes: `node tools/skin-probe.mjs` (budget, clip per state, frames), `node tools/skin-gallery.mjs` (one frame per opponent), `node tools/regression.mjs`, `node tools/step-probe.mjs`. The model loads with `fetch`, so the probes serve the repo over http; it will not load from `file://`.
+
+### The asset
+
+| | |
+| --- | --- |
+| Source | "Animated Human" by Quaternius, OpenGameArt, CC0 1.0 (`assets/quaternius-human/License.txt`) |
+| Zip | 5,010,069 bytes, sha256 `dcd72162…c24db3` |
+| Used | the FBX, converted to GLB in Blender 5.1.1 (`assets/quaternius-human/README.txt` lists the changes) |
+| GLB | 845,840 bytes, 346,384 gzipped; 48 bones; 791 vertices (4,492 after Babylon splits them) |
+| Actions | Death 85 frames, Idle 241, Jump 25, Punch 25, Run 16, Walk 25, Working 155, at 24 fps |
+| Skeleton | Mixamo-style bone names (`Hips`, `Spine1`, `LeftArm` …) |
+
+Two fixes were needed on the way. The FBX material has `Metallic = 1` and no texture, so it came out black; the zip's `ClothedLightSkin.png` was embedded and metallic set to 0. Even then Babylon's PBR material is black under this scene's lights, because PBR falls off with the inverse square of the distance and the key light is 8.4 m up. The skinned meshes get a `StandardMaterial` with an emissive base, the way the procedural bodies are lit.
+
+### How it is wired
+
+`updateSkin` runs once per drawn frame after `simShow`. It picks a clip from the fighter state and scrubs it with `goToFrame` from sim time, so hitstop, pause and the 1/60 s tick need nothing extra. The procedural body lean and roll still apply on top, which is all a hit reaction gets.
+
+| State | Clip | Mapping |
+| --- | --- | --- |
+| idle | Idle | `f.t` over the 10 s loop |
+| walking | Walk | `f.phase`, one cycle per 2π |
+| attack | Punch | piecewise on `atk.t`: the fist is fully out at 0.54 of the clip (frame 14 of 25, measured in Blender) and is pinned to the middle of the active window |
+| dodge | Run | stand-in, `dodgeT / 0.34` |
+| K.O. | Death | `koT / 2.2`, body lean and roll zeroed so the fall is not doubled |
+| block, hit, win | none | Idle plus the procedural lean |
+
+Punch retiming. The clip is 1.04 s and a left-hand punch. Jab (0.40 s, active 0.10–0.20): startup runs 3.6× faster than the clip and recovery 1.9×. Heavy (0.82 s, active 0.34–0.46): 1.4× and 1.1×. At `t = 0.158` the clip sits at 0.556, against 0.542 at full extension.
+
+### Variety from `LOOKS`
+
+The UVs point at five flat bands of one 32×32 palette: skin rows 0–5, eyes 6–10, hair 11–16, shirt 17–22, pants 23–31. `skinPalette` paints them from the look's `skin`, `hair` (or `cap`), `shirt` and `pants`, and height and build come from the look's `sx`, `sy` on the fighter root. All six opponents load and read as different people (`tuning/s15-skin-variants.jpg`: Dag, bigger, in orange). The look's `shoes`, `tie`, `stripe`, `pocket`, `wrap` and cap have nowhere to go: the model is barefoot and has no accessories.
+
+### Numbers
+
+Bout 1, camera settled, same frame, skin off then on.
+
+| | Procedural | Skinned |
+| --- | --- | --- |
+| Draw calls | 150–152 | 27–29 |
+| Active meshes | 117–119 | 39–41 |
+| Meshes | 182 | 186 |
+| GPU frame | 1.75–2.20 ms | 1.69–1.82 ms |
+| Load | — | 38–47 ms per fighter, local |
+
+Draws fall by about 120 because each procedural fighter is about 35 meshes drawn twice, once for the shadow map. The GPU numbers move more between runs than between the two builds, so no GPU gain is claimed. With the skin off, `tools/regression.mjs` is 22 of 22 and `tools/step-probe.mjs` is identical at 20 to 144 fps.
+
+### What is missing
+
+- No block, hit-reaction or victory clip in this pack. A hit is the Idle clip with a procedural lean, which reads weak (`tuning/s15-skin-impact.jpg`).
+- Reyes's jab mark, the feints and the other tells are drawn by the procedural joints, which are hidden. The teaching in bout 1 would need a clip or an overlay.
+- One punch, always the left hand. Both fighters use it, and the heavy is the same clip slower.
+- No crossfade between clips: they snap.
+- The player is skinned from `LOOKS.auditor` once; an outfit unlock after that does not repaint it.
+- The art style changes: flat low-poly people against the toon rig.
+- Not checked: portrait and touch layout, the quality ladder, the GLB drop path, retargeting (`AnimatorAvatar`, not in the bundle yet), and anything over `file://`.
+
+### Next
+
+`Characters Free.zip` from RG Poly (CC0, 14 MB, 17 characters on one skeleton, glTF, with Fight Punch A/B/C, Fight Combo, Fight Hit A/B/C and Fight Death) is the better candidate for hits and a second punch. It sits behind the itch download and was not fetched. KayKit's itch pack lists "unarmed" and "blocking", but no clip names could be read. Missing clips can be authored in Blender, which is installed here.
