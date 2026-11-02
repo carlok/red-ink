@@ -29,7 +29,7 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html README.md LICENSE NOTICE .nojekyll _site/
-          cp -R lib audio _site/
+          cp -R lib audio assets _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

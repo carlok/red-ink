@@ -235,6 +235,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 
 <script src="lib/babylon.js"></script>
 <script src="audio/samples.js"></script>
+<script src="assets/quaternius-human/animated-human.js"></script>
 <script>
 (function(){
 'use strict';
@@ -1765,7 +1766,7 @@ function startBout(i){
   showTutor();
   keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
   banner('BOUT '+(i+1));
-  if(SKIN.on) skinFighter(E).catch(e=>{ if(window.console) console.warn(e); });
+  skinBout(i);
 }
 function fightLine(){
   const L=G.log||{hits:0,blocks:0,dodges:0,corner:0};
@@ -1905,21 +1906,30 @@ window.addEventListener('drop',e=>{ e.preventDefault(); dragDepth=0; $('dropHint
    A skinned CC0 model replaces the procedural body. Clips are scrubbed by sim time, not played, so hitstop, pause and
    the fixed step stay exact. Block, hit and win fall back to the Idle clip plus the procedural lean where a model has no clip. */
 const SKIN_MODELS={
-  quaternius:{url:'assets/quaternius-human/animated-human.glb',palette:true,
+  quaternius:{key:'quaternius-human',url:'assets/quaternius-human/animated-human.glb',
     clips:{idle:'Idle',walk:'Walk',run:'Run',ko:'Death',block:'Guard',win:'Guard',tell:'TellJab',
            jab:['Punch'],heavy:['Punch'],hit:['HitA','HitB'],hitHeavy:'HitHeavy'},
     /* Guard, HitA, HitB, HitHeavy and TellJab were authored in Blender from the Punch clip's first pose (see assets/quaternius-human/README.txt).
        The fist is fully out at frame 14 of 25, measured in Blender. */
-    impact:{Punch:13/24}},
-  rg:{url:'assets/rgpoly-fighter/rgpoly-fighter.glb',palette:false,
-    clips:{idle:'FightM_Idle',walk:'Walk_A',run:'Runing_A',ko:'FightM_Death_A',block:'FightM_Pose',win:'FightM_Pose',
-           jab:['FightM_Punch_A','FightM_Punch_B'],heavy:['FightM_Punch_C'],hit:['FightM_Hit_A','FightM_Hit_B'],hitHeavy:'FightM_Hit_C'},
-    impact:{FightM_Punch_A:7/12,FightM_Punch_B:5/12,FightM_Punch_C:19/25}} /* furthest hand, measured in Blender */
+    impact:{Punch:13/24}}
 };
-const SKIN={on:false,model:'rg',files:{},koSeconds:2.2,fade:true};
+/* On by default. ?skin=0 turns it off for one load, localStorage 'sublevel-skin'='0' for good, ?skin=1 overrides that; ?skinseed=N pins
+   the opponents' looks. If the model cannot be loaded the game falls back to the procedural fighters and stays there. */
+const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,seed:(Math.random()*4294967296)>>>0};
+try{
+  const q=new URLSearchParams(location.search), v=q.get('skin');
+  if(v==='0'||(v!=='1'&&localStorage.getItem('sublevel-skin')==='0')) SKIN.on=false;
+  if(q.get('skinseed')) SKIN.seed=Number(q.get('skinseed'))>>>0;
+}catch(e){}
 async function skinFile(M){
-  if(!SKIN.files[M.url]){ const r=await fetch(M.url); if(!r.ok) throw new Error('skin '+r.status); SKIN.files[M.url]=new File([await r.blob()],'fighter.glb'); }
-  return SKIN.files[M.url];
+  if(!SKIN.files[M.key]){
+    const emb=window.SUBLEVEL_MODELS&&window.SUBLEVEL_MODELS[M.key];
+    let data;
+    if(emb){ const bin=atob(emb); data=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) data[i]=bin.charCodeAt(i); }
+    else { const r=await fetch(M.url); if(!r.ok) throw new Error('skin '+r.status); data=await r.blob(); }
+    SKIN.files[M.key]=new File([data],'fighter.glb');
+  }
+  return SKIN.files[M.key];
 }
 function disposeSkin(f){
   if(!f||!f.skin) return;
@@ -1960,11 +1970,12 @@ function lookOk(L){ const d=lookDeltas(L); return Object.keys(LOOK_MIN).every(k=
    Skin and hair start from lists of plausible tones and are nudged a little so no two people match; shirt is any hue, pants are
    quieter, shoes are black, brown, white, grey or a bright sneaker; height 0.92-1.12, build 0.94-1.3. Colours are drawn again
    until every pair in LOOK_MIN is far enough apart, so a person is never all one brown. */
-function randomLook(seed){
+function randomLook(seed,base){
   const r=mulberry32(seed>>>0), pick=a=>a[Math.floor(r()*a.length)];
   const hsl=(h,s,l)=>{ const a=s*Math.min(l,1-l), f=n=>{ const k=(n+h/30)%12; return l-a*Math.max(-1,Math.min(k-3,9-k,1)); }; return new C3(f(0),f(8),f(4)).toHexString(); };
   const nudge=(hex,amt)=>{ const c=C3.FromHexString(hex), k=1+(r()*2-1)*amt; return new C3(Math.min(1,c.r*k),Math.min(1,c.g*k),Math.min(1,c.b*k)).toHexString(); };
-  const sy=.92+r()*.2, sx=clamp(sy*(.94+r()*.3),.94,1.3);
+  /* with a base look (a LOOKS row) the build stays near it, so a big opponent stays big; without one the height and build are free */
+  const sy=base?base.sy*(.94+r()*.12):.92+r()*.2, sx=base?base.sx*(.94+r()*.12):clamp(sy*(.94+r()*.3),.94,1.3);
   const skins=['#ffe0c4','#ffdbac','#f1c8a5','#e6b88f','#e0ac81','#d9a679','#c68642','#b07a4f','#a9714b','#8d5524','#704214','#5c3a21','#3f2a1d'];
   const hairs=['#0e0b09','#1a1410','#2b1d15','#3a2618','#4a3020','#6b4423','#7a5230','#b07a3a','#d9b46a','#e8d4a0','#8a8a86','#c9c9c6','#a33b1f','#7d2a1a'];
   const shoes=['#17181b','#17181b','#2a2522','#4a3020','#6b4423','#e8e8e4','#9a9a96','#223a5e','#a52a2a'];
@@ -1981,7 +1992,8 @@ function randomLook(seed){
   return L;
 }
 async function skinFighter(f,look){
-  if(look){ f.L=look; f.sx=look.sx; f.root.scaling.set(look.sx,look.sy,look.sx); }
+  /* the look's build is only visual: f.sx, the body size resolveBodies uses, stays the foe's own so the balance table does not move */
+  if(look){ f.L=look; f.root.scaling.set(look.sx,look.sy,look.sx); }
   const M=SKIN_MODELS[SKIN.model];
   const res=await importGlb(await skinFile(M));
   if(f.root.isDisposed()){ res.meshes.forEach(m=>m.dispose(false,true)); res.animationGroups.forEach(g=>g.dispose()); (res.skeletons||[]).forEach(s=>s.dispose()); return; }
@@ -2002,14 +2014,12 @@ async function skinFighter(f,look){
   if(f.alert){ if(!f.alertHome) f.alertHome={parent:f.alert.parent,y:f.alert.position.y,s:f.alert.scaling.x}; f.alert.parent=f.slot; f.alert.position.set(0,2.2,0); f.alert.scaling.setAll(.8); }
   /* the glTF loader builds PBR materials, which fall off with the inverse square of the light distance and stay black under
      this scene's lights. Rebuild them the way the procedural bodies are lit: a standard material with an emissive base. */
-  const pal=M.palette?skinPalette(f.L):null;
-  const tint=(M.palette||f.isPlayer)?new C3(1,1,1):C3.FromHexString(mixHex('#ffffff',f.L.shirt,.55));
+  const pal=skinPalette(f.L);
   res.meshes.forEach(m=>{
     const p=m.material; if(!p) return;
-    const sm=new B.StandardMaterial('skinM',scene), tex=pal||p.albedoTexture;
-    if(tex){ sm.diffuseTexture=tex; sm.emissiveTexture=tex; }
-    sm.diffuseColor=tint; sm.emissiveColor=tint.scale(.3); sm.specularColor=new C3(0,0,0);
-    m.material=sm; p.dispose(false,false); /* the texture now belongs to sm */
+    const sm=new B.StandardMaterial('skinM',scene);
+    sm.diffuseTexture=pal; sm.emissiveTexture=pal; sm.emissiveColor=new C3(.3,.3,.3); sm.specularColor=new C3(0,0,0);
+    m.material=sm; p.dispose(false,true);
   });
   f.skin_pal=pal;
   const groups={}; res.animationGroups.forEach(g=>{ groups[g.name.split('|').pop()]=g; });
@@ -2065,6 +2075,21 @@ function updateSkin(f,dt){
   S.lastClip=pick[0]; S.lastU=pick[1];
   if(f.state==='ko'){ f.body.rotation.set(0,0,0); f.body.position.set(0,0,0); }
 }
+/* Put a skin on a fighter that has none. The procedural body is hidden at once so it never shows while the model loads; if the load
+   fails it comes back and the skin is switched off for the rest of the session. */
+function skinEnsure(f,look){
+  if(!SKIN.on||!f||f.skin||f.skinBusy) return;
+  f.skinBusy=true; f.vis.setEnabled(false);
+  skinFighter(f,look).catch(e=>{
+    SKIN.on=false; if(window.console) console.warn('skin off:',e);
+    [P,E].forEach(x=>{ if(x&&!x.skin) x.vis.setEnabled(true); });
+  }).then(()=>{ f.skinBusy=false; });
+}
+function skinBout(i){
+  if(!SKIN.on) return;
+  skinEnsure(P);
+  skinEnsure(E,randomLook(SKIN.seed+i*7919,LOOKS[E.cfg.look]));
+}
 async function skinOn(on,model){
   if(model) SKIN.model=model;
   SKIN.on=!!on;
@@ -2078,6 +2103,7 @@ $('snd').addEventListener('click',()=>{ muted=!muted; saveAudioPrefs(); paintAud
 buildWorld(); buildCrowd(); buildParticles(); buildWords();
 P=makeFighter(LOOKS.auditor,true); P.cfg={foe:'Auditor'}; P.speed0=4.4; P.reach=1; P.dmgMul=1; resetFighter(P,-2.3,Math.PI/2,100);
 E=makeFighter(LOOKS.reyes,false); E.cfg=BOUTS[0]; E.speed0=2.7; E.reach=1; E.dmgMul=.8; resetFighter(E,2.3,-Math.PI/2,70);
+skinBout(0);
 scene.onBeforeRenderObservable.add(frame);
 /* adaptive quality: if the machine can't hold ~45 fps, step resolution / shadow filtering / shadows / tone mapping down */
 const Q={t:0,n:0,lvl:0,warm:2500,base:engine.getHardwareScalingLevel()};

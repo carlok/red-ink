@@ -1034,7 +1034,7 @@ One character and twelve clips went into `assets/rgpoly-fighter/rgpoly-fighter.g
 | FightM_Idle, FightM_Pose | 20, 10 | 0.67, 0.33 | idle loop, guard and win poses |
 | Walk_A, Runing_A | 32, 25 | 1.07, 0.83 | walk, dodge stand-in |
 
-Every state has a clip: jabs alternate A and B, hits pick A or B by side and C for a heavy, block holds the end of Pose. In the harness (`node tools/skin-probe.mjs <prefix> rg`) draws go 152 → 29 and active meshes 118 → 45, with no errors. Two bugs on the way: the FBX material points at a texture file that is not in the zip (Blender exported an empty texture, so everything was white), and disposing the PBR material also disposed the texture the new material used.
+Every state has a clip: jabs alternate A and B, hits pick A or B by side and C for a heavy, block holds the end of Pose. In the harness (the RG Poly model was removed afterwards; see the last section) draws go 152 → 29 and active meshes 118 → 45, with no errors. Two bugs on the way: the FBX material points at a texture file that is not in the zip (Blender exported an empty texture, so everything was white), and disposing the PBR material also disposed the texture the new material used.
 
 What it costs: the rig is a simple 21-bone cartoon with no fingers, the bodies are chunky, and the look is far from the grim toon rig (`tuning/s15-skin-rgpoly-impact.jpg`). The colour atlas is shared by every character, so the five-band recolouring does not apply; variety would come from choosing among the 16 models, which was not tried.
 
@@ -1081,6 +1081,30 @@ Portrait and touch. At 390×844 with touch emulation both fighters stay fully in
 
 Not done: Death is still the only fall, the player keeps the left-hand lead, and nothing was checked on a real phone.
 
-### Next
+### Shipped: skin on by default, random opponents
 
-Pick the model and decide how the skin would ship: it needs http or https, since the model loads with `fetch`, and a switch (a setting, or on by default). Then the README text for the new look, and a decision on the RG Poly files in `assets/rgpoly-fighter/`, which are not needed if Quaternius is the choice.
+Decisions: the skinned Quaternius model is the default, the opponents get a random look each session with the colour contrast rule, and the RG Poly files are removed (`assets/rgpoly-fighter/` and its model entry). The branch is tagged `before-skinned-fighters` on the last commit before the experiment (`3a8d92a`) so the procedural version is one checkout away.
+
+What changed from the spike:
+
+- **Default and opt-out.** `SKIN.on` starts true. `?skin=0` turns it off for one load, `localStorage['sublevel-skin'] = '0'` for good, `?skin=1` overrides that, `?skinseed=N` pins the opponents' looks.
+- **Embedded model.** The GLB is also written as `assets/quaternius-human/animated-human.js` (`node tools/embed-glb.mjs`), loaded by a script tag next to the audio samples, so the skin works from `file://` with no server. That file is 1,276,609 bytes, 414,374 gzipped, so a first load is about 414 KB heavier gzipped. If the model cannot be loaded at all (checked with both the script and the GLB returning 404), the procedural fighters stay and the skin is off for the session, with one console warning.
+- **Pages.** The workflow copied only `lib` and `audio`; it now copies `assets` too.
+- **Random looks.** Each opponent's look is `randomLook(seed + bout × 7919, LOOKS[foe])`: skin, hair, shirt, pants and shoes drawn under the ΔE minimums, and height and build within ±6% of the foe's own, so Dag stays the big one (1.21–1.30 wide in the runs). The session seed is `Math.random` at load. The Auditor keeps his own look, and an outfit unlock re-skins him with the new look because `syncPlayerOutfit` builds a new fighter.
+- **No flash.** The procedural body is hidden the moment a fighter is created, before the model finishes loading.
+
+A bug caught on the way. With the skin on by default the six-bout table moved: Reyes 89.5, Dag 61.5, Pike 47, Voss 34, Chen 25, Halvorsen 23 (was 90.5 / 67.5 / 44 / 36 / 30 / 22). `resolveBodies` sets the minimum distance between the fighters from `E.sx`, and `skinFighter` was overwriting it with the random look's build. The look's scale is now visual only and `f.sx` stays the foe's own. The table is back to 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0 with the same medians, on two runs.
+
+Checked with the skin on by default:
+
+| | Result |
+| --- | --- |
+| `tools/regression.mjs` | 22 of 22 |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, twice |
+| `step-probe`, 600 ticks at 20 to 144 fps | identical, natural frames 600 of 600 single ticks |
+| Draws / active meshes / GPU | 27 / 39 / 1.2 ms (was 149 / 116 / 1.25) |
+| Damage, stamina, stun, hitstop, counter, word readable | unchanged, 50–51 ms |
+| `cam-probe`, bouts 2, 3 and 6 | head share 33.6–40% at 1920×1080 (Dag's head 18.3% from the top), 18.5–19.9% at 390×844, no clipped frame, nothing off screen |
+| Boot over `file://` and over http, default / `?skin=0` / `?skinseed=5` | skinned / procedural / skinned, no console errors |
+
+Not done: Death is the only fall; the Auditor always leads with the left hand; nothing was checked on a real phone or on an integrated GPU; the model is parsed again at each bout start (about 50 ms, hidden by the 1.15 s ready phase).
