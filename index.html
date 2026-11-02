@@ -768,7 +768,7 @@ function applyEnv(i){
   paintFloor(e); paintHaz(e.fix.hazA,e.fix.hazB);
   floorMat.emissiveColor.set(F.emis[0],F.emis[1],F.emis[2]); floorMat.specularColor.set(F.spec[0],F.spec[1],F.spec[2]);
   ['wall','pipe','pillar','crate'].forEach(k=>setEnvMat(k,e.fix[k]));
-  musicSetPlace(i); bedPlace(i);
+  musicSetPlace(i); bedPlace(i); if(typeof crowdRepaint==='function'&&CROWD.on) crowdRepaint(i);
   ARENA_BASE.exp=L.exp; ARENA_BASE.key=L.key.slice(); ARENA_BASE.bulbA=L.bulbA.slice(); ARENA_BASE.bulbB=L.bulbB.slice();
   hemi.diffuse.set(L.hemi[0],L.hemi[1],L.hemi[2]); hemi.groundColor.set(L.ground[0],L.ground[1],L.ground[2]);
   scene.fogColor.set(e.fog[0],e.fog[1],e.fog[2]); scene.fogDensity=e.fog[3]; scene.clearColor.set(e.fog[0],e.fog[1],e.fog[2],1);
@@ -2270,6 +2270,7 @@ function updateAmbient(dt){
   });
   const fl=.9+Math.sin(G.t*13)*.03+Math.sin(G.t*5.3+1)*.05+(Math.sin(G.t*.9)>.985?-.35:0);
   bulbA.intensity=.9*fl; bulbB.intensity=.8*(1.02-(fl-.9)*.8);
+  crowdUpdate(dt);
 }
 
 /* ---------- main loop ---------- */
@@ -2398,7 +2399,7 @@ const SKIN_MODELS={
 };
 /* On by default. ?skin=0 turns it off for one load, localStorage 'sublevel-skin'='0' for good, ?skin=1 overrides that; ?skinseed=N pins
    the opponents' looks. If the model cannot be loaded the game falls back to the procedural fighters and stays there. */
-const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,shade:true,rim:true,outline:true,wraps:true,walkK:1.55,seed:(Math.random()*4294967296)>>>0};
+const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,shade:true,rim:true,outline:true,wraps:true,crowd:true,walkK:1.55,seed:(Math.random()*4294967296)>>>0};
 try{
   const q=new URLSearchParams(location.search), v=q.get('skin');
   if(v==='0'||(v!=='1'&&localStorage.getItem('sublevel-skin')==='0')) SKIN.on=false;
@@ -2427,12 +2428,14 @@ function disposeSkin(f){
    pants 23-27, shoes 28-31 (the feet were re-pointed there in Blender). Painting the bands from a LOOKS row restyles it;
    height and build come from the look's scale on the root. */
 const SKIN_BANDS=[['skin',0,6],['eyes',6,5],['hair',11,6],['shirt',17,6],['pants',23,5],['shoes',28,4]];
-function skinPalette(L){
-  const t=new B.DynamicTexture('skinPal',{width:32,height:32},scene,false,B.Texture.NEAREST_SAMPLINGMODE,undefined,false), g=t.getContext();
-  const col={skin:L.skin,eyes:'#292929',hair:L.hair||L.cap||'#2b1d15',shirt:L.shirt,pants:L.pants,shoes:L.shoes||'#17181b'};
+function skinPaint(t,L){
+  const g=t.getContext(), col={skin:L.skin,eyes:'#292929',hair:L.hair||L.cap||'#2b1d15',shirt:L.shirt,pants:L.pants,shoes:L.shoes||'#17181b'};
   SKIN_BANDS.forEach(b=>{ g.fillStyle=col[b[0]]; g.fillRect(0,b[1],32,b[2]); });
   t.update(false);
-  return t;
+}
+function skinPalette(L){
+  const t=new B.DynamicTexture('skinPal',{width:32,height:32},scene,false,B.Texture.NEAREST_SAMPLINGMODE,undefined,false);
+  skinPaint(t,L); return t;
 }
 /* Colour distance in CIE Lab (ΔE76) between two hex colours. About 2 is the smallest difference an eye notices, 30 is clearly different. */
 function labOf(hex){
@@ -2511,7 +2514,8 @@ function randomLook(seed,base,others,floor){
 const SKIN_HAND_BONES=new Set([11,12,13,14,15,16,17,18,19,20,21,25,26,27,28,29,30,31,32,33,34,35]); /* LeftHand.. and RightHand.. with their fingers */
 const SKIN_CREASE=.22, SKIN_HEAD_BONE=5; /* bone 5 is Head in the Quaternius rig */
 const SKIN_SHADE={skin:[.80,.24,.10],hair:[.66,.46,.14],shirt:[.78,.26,.16],pants:[.80,.24,.14],shoes:[.62,.36,.24],eyes:[1,0,0]};
-function skinShade(m,L){
+function skinShade(m,L,o){
+  o=o||{}; const dim=o.dim||1;
   const pos=m.getVerticesData('position'), nor=m.getVerticesData('normal'), uv=m.getVerticesData('uv'); if(!pos||!nor||!uv) return;
   const wts=m.getVerticesData('matricesWeights'), idx=m.getVerticesData('matricesIndices');
   const n=pos.length/3, name=new Array(n), lo={}, hi={}, head=[];
@@ -2522,7 +2526,7 @@ function skinShade(m,L){
   /* hand wraps: the hand bones take a tape colour, light tape on dark skin and dark tape on light skin, so a fist reads against the body.
      The vertex colour multiplies the skin texel, so it is the tape colour over the skin colour. */
   let tape=null;
-  if(L&&L.skin&&SKIN.wraps){ const sk=C3.FromHexString(L.skin), tp=C3.FromHexString(labOf(L.skin)[0]>62?'#27272b':'#e6e1d3'); tape=[tp.r/Math.max(.05,sk.r),tp.g/Math.max(.05,sk.g),tp.b/Math.max(.05,sk.b)]; }
+  if(L&&L.skin&&SKIN.wraps&&!o.noTape){ const sk=C3.FromHexString(L.skin), tp=C3.FromHexString(labOf(L.skin)[0]>62?'#27272b':'#e6e1d3'); tape=[tp.r/Math.max(.05,sk.r),tp.g/Math.max(.05,sk.g),tp.b/Math.max(.05,sk.b)]; }
   const col=new Float32Array(n*4);
   for(let i=0;i<n;i++){
     const k=name[i], c=SKIN_SHADE[k], h=.5+.5*nor[i*3+1], t=((pos[i*3+1]-lo[k])/((hi[k]-lo[k])||1))*2-1, w=k==='skin'?1-h:0;
@@ -2532,9 +2536,9 @@ function skinShade(m,L){
       let w0=0,w1=0,b0=-1; for(let j=0;j<4;j++){ const v=wts[i*4+j]; if(v>w0){ w1=w0; w0=v; b0=idx[i*4+j]; } else if(v>w1) w1=v; }
       g*=1-SKIN_CREASE*Math.min(1,4*w0*w1);
       if(k==='skin'&&b0===SKIN_HEAD_BONE) head.push(i);
-      if(k==='skin'&&tape&&SKIN_HAND_BONES.has(b0)){ col[i*4]=g*tape[0]; col[i*4+1]=g*tape[1]; col[i*4+2]=g*tape[2]; col[i*4+3]=1; continue; }
+      if(k==='skin'&&tape&&SKIN_HAND_BONES.has(b0)){ col[i*4]=g*tape[0]*dim; col[i*4+1]=g*tape[1]*dim; col[i*4+2]=g*tape[2]*dim; col[i*4+3]=1; continue; }
     }
-    col[i*4]=g; col[i*4+1]=g*(1-.07*w); col[i*4+2]=g*(1-.12*w); col[i*4+3]=1;
+    col[i*4]=g*dim; col[i*4+1]=g*(1-.07*w)*dim; col[i*4+2]=g*(1-.12*w)*dim; col[i*4+3]=1;
   }
   /* updatable, with the shaded colours kept, so skinMarks can tint the face as the fighter takes damage */
   m.setVerticesData('color',col,true,4); m.useVertexColors=true; /* 'color' is VertexBuffer.ColorKind, which the bundle does not export */
@@ -2605,7 +2609,7 @@ async function skinFighter(f,look){
 /* The quality ladder's second step drops the skinned extras that cost draws and shader work: the outline and the rim. Fighters made
    later (a new opponent each bout) are made without them. */
 function skinLite(){
-  SKIN.outline=false; SKIN.rim=false;
+  SKIN.outline=false; SKIN.rim=false; crowdLite();
   [P,E].forEach(f=>{ if(!f||!f.skin) return; f.skin.res.meshes.forEach(m=>{ m.renderOutline=false; }); (f.skin_mats||[]).forEach(sm=>{ sm.emissiveFresnelParameters=null; }); f.skin_fp=null; });
 }
 function skinPick(f,M){
@@ -2672,10 +2676,82 @@ function skinEnsure(f,look){
     [P,E].forEach(x=>{ if(x&&!x.skin) x.vis.setEnabled(true); });
   }).then(()=>{ f.skinBusy=false; });
 }
+/* ---------- spectators: the fighters' model, a random look each ----------
+   The 14 spectators nearest the camera's usual view are the Quaternius person with a random look (and the place's style: hi-vis at the
+   dock, parkas in the cold store); the rest stay as boxes in the dark. They are clones of one loaded container, each with its own palette
+   and its own vertex colours, dimmed so the fighters stay the brightest thing on screen. */
+const CROWD={on:false,busy:false,members:[],boxes:[],n:14};
+const CROWD_STYLE=[
+  null,
+  {shirts:['#ff6a00','#f2c500','#e8e8e4','#ff6a00'],hivis:true},
+  {shirts:['#5a7fa8','#cfd8e3','#3f5873','#7aa0c8']},
+  {shirts:['#2c4a5c','#3a3f45','#7a8b99','#d8e4ea','#2c4a5c']},
+  {shirts:['#1e2a44','#232a38','#3a4256']},
+  {shirts:['#15161a','#26262e','#3a1a1e']}
+];
+function crowdLook(k,place){
+  const r=mulberry32((SKIN.seed>>>0)+k*40503+77), L=randomLook((SKIN.seed>>>0)+k*40503,undefined,[P.L],ENV[place%ENV.length].floor.base), st=CROWD_STYLE[place%CROWD_STYLE.length];
+  if(st&&r()<(st.hivis?.7:.85)) L.shirt=st.shirts[Math.floor(r()*st.shirts.length)];
+  if(st&&!st.hivis) L.pants=mixHex(L.pants,'#101216',.5);
+  L.shirt=mixHex(L.shirt,'#2a2c30',st&&st.hivis?.2:.4);  /* spectators sit back in the dark */
+  return L;
+}
+async function crowdEnsure(){
+  if(CROWD.on||CROWD.busy||!SKIN.on||!SKIN.crowd||!window.SUBLEVEL_MODELS&&false) return;
+  CROWD.busy=true;
+  try{
+    const M=SKIN_MODELS[SKIN.model], file=await skinFile(M);
+    const cont=await B.SceneLoader.LoadAssetContainerAsync('',file,scene,null,'.glb');
+    /* the spectators that see the most: on the far side and the sides, nearest the ring first */
+    const pick=crowd.map((c,i)=>({i,x:c.bd.position.x,z:c.bd.position.z,r:Math.hypot(c.bd.position.x,c.bd.position.z)})).filter(c=>c.z>-3).sort((a,b)=>a.r-b.r).slice(0,CROWD.n);
+    for(let k=0;k<pick.length;k++){
+      if(!SKIN.on) break;
+      const inst=cont.instantiateModelsToScene(n=>'cw'+k+n,false,{doNotInstantiate:true}), root=inst.rootNodes[0], c=pick[k], L=crowdLook(k,envIdx<0?0:envIdx);
+      const holder=new B.TransformNode('cwh'+k,scene), anchor=new B.TransformNode('cwa'+k,scene); root.parent=holder; holder.parent=anchor;
+      if(!CROWD.s){ const bb=root.getHierarchyBoundingVectors(true); CROWD.s=1.8/((bb.max.y-bb.min.y)||1); CROWD.off=[-(bb.min.x+bb.max.x)/2,-bb.min.y,-(bb.min.z+bb.max.z)/2]; }
+      const r2=mulberry32(5000+k), sc=CROWD.s*(.93+r2()*.15), mir=r2()<.5?-1:1;
+      holder.scaling.set(sc*mir,sc,sc); holder.position.set(CROWD.off[0]*sc*mir,CROWD.off[1]*sc,CROWD.off[2]*sc);
+      anchor.position.set(c.x,0,c.z); anchor.rotation.y=Math.atan2(-c.x,-c.z);
+      const pal=skinPalette(L);
+      root.getChildMeshes().forEach(m=>{
+        if(!m.getTotalVertices||!m.getTotalVertices()) return;
+        m.makeGeometryUnique(); m.isPickable=false; m.alwaysSelectAsActiveMesh=true;
+        const sm=new B.StandardMaterial('cwm'+k,scene); sm.diffuseTexture=pal; sm.emissiveTexture=pal; sm.emissiveColor=new C3(.12,.12,.12); sm.specularColor=new C3(0,0,0); m.material=sm;
+        try{ skinShade(m,L,{noTape:true,dim:.55}); }catch(e){}
+      });
+      const groups={}; inst.animationGroups.forEach(g=>{ g.stop(); groups[g.name.split('|').pop().replace(/^cw\d+/,'')]=g; });
+      const mem={k,anchor,pal,L,groups,idx:c.i,ph:r2()*5,rate:.8+r2()*.5,pump:r2()<.75,cur:null,flinch:0};
+      CROWD.members.push(mem); CROWD.boxes.push(c.i);
+      crowd[c.i].bd.setEnabled(false); crowd[c.i].hd.setEnabled(false);
+      if(k%2===1) await new Promise(r=>requestAnimationFrame(r)); /* two a frame, so no bout waits for the crowd */
+    }
+    CROWD.on=true;
+  }catch(e){ if(window.console) console.warn('crowd off:',e); CROWD.members.forEach(m=>m.anchor.dispose()); CROWD.members.length=0; CROWD.boxes.forEach(i=>{ crowd[i].bd.setEnabled(true); crowd[i].hd.setEnabled(true); }); CROWD.boxes.length=0; }
+  CROWD.busy=false;
+}
+function crowdRepaint(place){ CROWD.members.forEach(m=>{ m.L=crowdLook(m.k,place); skinPaint(m.pal,m.L); }); }
+function crowdUpdate(dt){
+  if(!CROWD.on) return;
+  const cheer=G.cheer||0, ko=G.state==='ko';
+  CROWD.members.forEach(m=>{
+    let name='Idle', u=(G.t*m.rate*.25+m.ph)%1;
+    if(ko){ m.flinch=Math.min(1,m.flinch+dt*2.2); name='HitA'; u=m.flinch*.6; }
+    else { m.flinch=0; if(cheer>.6&&m.pump){ name='Punch'; u=(G.t*m.rate*1.1+m.ph)%1; } }
+    const g=m.groups[name]; if(!g) return;
+    if(m.cur!==g){ if(m.cur) m.cur.stop(); g.start(false,1,g.from,g.to,false); g.pause(); m.cur=g; }
+    g.goToFrame(g.from+(g.to-g.from)*u);
+  });
+}
+/* the quality ladder: the boxes come back */
+function crowdLite(){
+  CROWD.on=false; SKIN.crowd=false;
+  CROWD.members.forEach(m=>{ m.anchor.setEnabled(false); }); CROWD.boxes.forEach(i=>{ crowd[i].bd.setEnabled(true); crowd[i].hd.setEnabled(true); });
+}
 function skinBout(i){
   if(!SKIN.on) return;
   skinEnsure(P);
   skinEnsure(E,skinLooks(i)[i]);
+  if(!CROWD.on&&!CROWD.busy) setTimeout(crowdEnsure,400);
 }
 /* The opponents of bouts 0..i. Each one is drawn clear of the Auditor and of every opponent before it, so no two of them match, and
    the same session seed gives the same people in the same order however the bouts are reached. */
@@ -3197,7 +3273,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,CROWD,crowd,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
