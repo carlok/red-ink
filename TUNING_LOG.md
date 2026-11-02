@@ -934,6 +934,20 @@ Review findings, left as they are. An independent read of the diff, by hand and 
 - A fighter in the `ko` state keeps its last walking `mv`, since `step` returns early. The camera lead then sits up to about 0.55 m off for the 2.4 s of the knockout.
 - A steady frame time within 8% of a snap point, 17.5 ms for example, runs one tick per frame. The sim then runs about 5% slow there, and about 8% fast near 65 or 130 Hz. Sim-time balance is not affected, only the wall-clock pace.
 
+The six-bout game from origin. Everything above was measured on the three-bout game, then rebased onto the S9 story and hub, the S12 QA work and the S13 bouts 4–6, audio and fullscreen. Checked again on the combined build:
+
+| | Result |
+| --- | --- |
+| Bout table, 200 fights, seed 1, 60 Hz, six bouts | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, the curve S13 logged |
+| `step-probe`, 900 ticks at 20, 30, 60, 120, 144 fps | identical; natural frames 600 of 600 single ticks |
+| `cam-probe --bout 1` to `5`, fighter height at gap 2.0 m | 33.9–37.6% at 1920×1080 (Dag tops out 21.6% from the top edge), 17.6–19.8% at 390×844 |
+| Same runs, clipped frames in the 1–6 m sweep / off screen in chase, circle, knockback | none / none |
+| `node tools/regression.mjs` | 22 of 22 |
+| Draws / active meshes / GPU | 149 / 116 / 1.25 ms |
+| Damage, stamina, stun, hitstop, counter | unchanged; word width 15.7–15.9%, K.O. 29.7% |
+
+The arena unlocks only change light and exposure, not geometry, so the rim clearance was not run again. `cam-probe` takes `--bout 0` to `5` for this. `balance-run` takes the step rate as its seventh argument, after the bouts list.
+
 Hand check still open: 55 fps at 1080p on an iGPU, a real pad and phone, and how the closer view feels on a real monitor. The headless runs measure draws, GPU time and pixels, not feel.
 
 

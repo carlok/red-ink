@@ -1,11 +1,12 @@
 /**
  * Camera framing: how big the fighters are, whether both stay in frame, outline thickness,
  * and how close the camera gets to the crowd and the pillars.
- * Usage: node tools/cam-probe.mjs [tag] [--close] [--norim] [--only 1920,844,390] [--cam key=value,...]
+ * Usage: node tools/cam-probe.mjs [tag] [--close] [--norim] [--only 1920,844,390] [--bout 0-5] [--cam key=value,...]
  *   tag      shot name part, default "after": tuning/s14-<tag>-<width>.jpg
  *   --close  also save a gap 1.2 shot per size
  *   --norim  skip the 24 rim placements
  *   --only   run some of the three sizes
+ *   --bout   which opponent to stage, 0 for Reyes up to 5 for Halvorsen (default 0)
  *   --cam    override CAM keys for this run, e.g. --cam padPortrait=1.8,follow=5 (shots are skipped)
  * Fighters are held in the ready state and placed by hand. Camera settle is 90 frames.
  * "Clipped" means a fighter's body (0.6 m either side of its centre) leaves the central 84% of the width,
@@ -27,6 +28,7 @@ const CLOSE = ARGS.includes("--close");
 const NORIM = ARGS.includes("--norim");
 const flag = (name) => { const i = ARGS.indexOf(name); return i >= 0 ? ARGS[i + 1] : ""; };
 const ONLY = flag("--only");
+const BOUT = Number(flag("--bout") || 0);
 const CAMSET = {};
 for (const kv of flag("--cam").split(",").filter(Boolean)) { const [k, v] = kv.split("="); CAMSET[k] = Number(v); }
 const SIZES = [
@@ -81,7 +83,7 @@ const LIB = `(async () => {
     await new Promise((r) => requestAnimationFrame(r));
   }
   const B = window.BABYLON, V = B.Vector3, S = window.__sublevel;
-  S.startBout(0);
+  S.startBout(${BOUT});
   Object.assign(S.CAM, ${JSON.stringify(CAMSET)});
   document.getElementById("wrap").hidden = true;
   const tut = document.getElementById("tutor"); if (tut) tut.hidden = true;
