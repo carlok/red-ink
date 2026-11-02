@@ -2262,6 +2262,12 @@ async function skinFighter(f,look){
   const groups={}; res.animationGroups.forEach(g=>{ groups[g.name.split('|').pop()]=g; });
   f.skin={res,anchor,groups,M,mirror,cur:null,lastClip:'',lastU:0};
 }
+/* The quality ladder's second step drops the skinned extras that cost draws and shader work: the outline and the rim. Fighters made
+   later (a new opponent each bout) are made without them. */
+function skinLite(){
+  SKIN.outline=false; SKIN.rim=false;
+  [P,E].forEach(f=>{ if(!f||!f.skin) return; f.skin.res.meshes.forEach(m=>{ m.renderOutline=false; }); (f.skin_mats||[]).forEach(sm=>{ sm.emissiveFresnelParameters=null; }); f.skin_fp=null; });
+}
 function skinPick(f,M){
   const C=M.clips, st=f.state, G=f.skin.groups;
   const dur=n=>G[n]?(G[n].to-G[n].from)/60:1;
@@ -2358,7 +2364,7 @@ const Q={t:0,n:0,lvl:0,warm:2500,base:engine.getHardwareScalingLevel()};
 function qualityStep(){
   Q.lvl++;
   if(Q.lvl===1) engine.setHardwareScalingLevel(Q.base*1.35);
-  else if(Q.lvl===2){ sg.usePoissonSampling=false; sg.useBlurExponentialShadowMap=false; }
+  else if(Q.lvl===2){ sg.usePoissonSampling=false; sg.useBlurExponentialShadowMap=false; skinLite(); }
   else if(Q.lvl===3) engine.setHardwareScalingLevel(Q.base*1.8);
   else if(Q.lvl===4){ key.shadowEnabled=false; scene.imageProcessingConfiguration.vignetteEnabled=false; }
   else if(Q.lvl===5){ scene.imageProcessingConfiguration.toneMappingEnabled=false; engine.setHardwareScalingLevel(Q.base*2); }
@@ -2849,7 +2855,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

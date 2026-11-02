@@ -1,6 +1,6 @@
 # Sublevel Three
 
-![A jab lands inside the yellow tape. The auditor, in a white shirt, snaps Reyes back, grey-haired in a purple shirt, with a POW burst and orange sparks between them and the crowd dark behind.](tuning/s16-hero.jpg)
+![A jab lands inside the yellow tape. The auditor, in a white shirt and black hand wraps, snaps Reyes back, red-haired in a green shirt, with a POW burst and orange sparks between them and the crowd dark behind.](tuning/s18-hero.jpg)
 
 Browser fighting game. One HTML file, no account, no build step to play.
 
@@ -63,7 +63,7 @@ Touch: move stick on the left, Jab in the bottom-right of the button cluster. Th
 
 Drop a `.glb` on the title screen to replace the auditor. Fighters are otherwise built in code (`makeFighter`). Tuning constants are at the top of the script: `ATK`, `LOOKS`, `BOUTS`, `CAM`.
 
-Fighters are skinned low-poly people (CC0, see Credits) animated by the fight state: each clip is scrubbed by sim time, so hitstop, pause, and the fixed step stay exact. Every opponent gets a random look each session: skin, hair, shirt, pants, and shoes are drawn so that neighbouring colours always differ clearly, and no two people in a session share a skin, hair, shirt, pants or shoe colour. The height and build stay near the opponent's own, and a soft gradient on skin, hair, clothes and shoes keeps arms and faces from reading flat. Add `?skin=0` to the address to play with the original procedural fighters, or `?skinseed=7` to repeat a set of looks. If the model cannot be loaded the game falls back to the procedural fighters by itself.
+Fighters are skinned low-poly people (CC0, see Credits) animated by the fight state: each clip is scrubbed by sim time, so hitstop, pause, and the fixed step stay exact. Every opponent gets a random look each session: skin, hair, shirt, pants, and shoes are drawn so that neighbouring colours always differ clearly, and no two people in a session share a skin, hair, shirt, pants or shoe colour. The height and build stay near the opponent's own, and a soft gradient on skin, hair, clothes and shoes keeps arms and faces from reading flat. Fighters have a dark outline, a rim of the place's key light on their edges, hand wraps, creases at the joints, and a face that flushes and bruises as they take hits. Add `?skin=0` to the address to play with the original procedural fighters, or `?skinseed=7` to repeat a set of looks. If the model cannot be loaded the game falls back to the procedural fighters by itself.
 
 Each bout is in its own part of the sublevel. It is the same room, but the floor, the colour of the fixtures, the light, the fog, the dust, the two side signs and a few props change: a wet concrete sump, a steel dock deck with containers, a survey-sheet floor, a frosted cold store with icicles, a gatehouse with pavers and red-and-white bollards, and a black-glass floor with a lit grid for the last bout. The yellow edge of the ring stays the same everywhere.
 
