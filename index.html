@@ -115,6 +115,10 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .pauseCard h2{margin:0;font:800 36px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
 .pauseCard button,.pauseCard label{font:600 13px/1 var(--f-data);letter-spacing:.06em;text-transform:uppercase}
 .pauseCard button{background:#111;color:var(--tape);border:0;padding:12px 14px;cursor:pointer;text-align:left}
+.pauseCard button.quiet{background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:10px 12px}
+.cardLinks{display:flex;gap:8px;justify-content:space-between;margin:10px 20px 0}
+dl.rows dd a{color:inherit}
+.is-touch #menuBtn{top:calc(112px + env(safe-area-inset-top,0px))}
 @media (max-height:500px){
   .card{max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px);display:flex;flex-direction:column}
   .card .in{overflow:auto;min-height:0;padding:10px 14px;gap:8px}
@@ -158,6 +162,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
     </div>
     <div class="foot">
       <button class="snd" id="snd" type="button">Sound on</button>
+      <button class="snd" id="menuBtn" type="button" hidden>Menu</button>
       <div class="keys" id="keys"><kbd>WASD</kbd> move <kbd>J</kbd> jab <kbd>K</kbd> heavy <kbd>L</kbd> block (hold) <kbd>Space</kbd> dodge</div>
     </div>
   </div>
@@ -169,9 +174,11 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
   </div>
   <div class="pause" id="pause" hidden>
     <div class="pauseCard">
-      <h2>Paused</h2>
+      <h2 id="pauseTitle">Paused</h2>
       <button id="resume" type="button">Resume</button>
       <button id="restart" type="button">Restart bout</button>
+      <button id="quitTitle" type="button" class="quiet">Quit to title</button>
+      <button id="pauseCredits" type="button" class="quiet">Credits</button>
       <label for="lessMotion2"><input id="lessMotion2" type="checkbox"> Less motion</label>
       <label for="pMusic"><input id="pMusic" type="checkbox" checked> Music</label>
       <label for="pAmb"><input id="pAmb" type="checkbox" checked> Ambience</label>
@@ -232,6 +239,10 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
         </div>
       </div>
       <button class="go" id="go" type="button"><span id="goTxt">Start</span><span aria-hidden="true">&rarr;</span></button>
+      <div class="cardLinks" id="cardLinks" hidden>
+        <button class="btn2" id="linkCredits" type="button">Credits</button>
+        <button class="btn2" id="linkOut" type="button">Clock out</button>
+      </div>
     </article>
   </div>
 
@@ -294,6 +305,35 @@ const STR={
   card_title_name:{en:'Sublevel Three',it:'Livello Tre'},
   card_title_body:{en:'You audit pallet counts from ten to six. Totals always reconcile. You have not slept in eleven months. Pike slides you a keycard toward a door missing from the floor plan.',it:'Controlli i pallet dalle dieci alle sei. I totali tornano sempre. Non dormi da undici mesi. Pike ti passa una tessera verso una porta assente dalla pianta.'},
   card_title_btn:{en:'Take the stairs',it:'Scendi le scale'},
+  credits_btn:{en:'Credits',it:'Crediti'},
+  out_btn:{en:'Clock out',it:'Timbra l\'uscita'},
+  quit_btn:{en:'Quit to title',it:'Torna al titolo'},
+  back_btn:{en:'Back',it:'Indietro'},
+  pause_title:{en:'Paused',it:'In pausa'},
+  resume_btn:{en:'Resume',it:'Riprendi'},
+  restart_btn:{en:'Restart bout',it:'Rigioca l\'incontro'},
+  menu_btn:{en:'Menu',it:'Menu'},
+  music_lbl:{en:'Music',it:'Musica'},
+  amb_lbl:{en:'Ambience',it:'Ambiente'},
+  motion_lbl:{en:'Less motion',it:'Meno movimento'},
+  credits_stamp:{en:'Credits',it:'Crediti'},
+  credits_title:{en:'Who made this',it:'Chi l\'ha fatto'},
+  credits_body:{en:'Sublevel Three is a small browser fighting game. These people and projects made it possible.',it:'Sublevel Three è un piccolo picchiaduro per browser. Questi progetti e queste persone lo hanno reso possibile.'},
+  cr_game:{en:'Game',it:'Gioco'},
+  cr_engine:{en:'Engine',it:'Motore'},
+  cr_fighters:{en:'Fighters',it:'Combattenti'},
+  cr_type:{en:'Type',it:'Caratteri'},
+  cr_sound:{en:'Sound',it:'Suono'},
+  cr_source:{en:'Source',it:'Codice'},
+  cr_by:{en:'by',it:'di'},
+  cr_fighters_v:{en:'CC0. Guard, hit and wind-up clips added in Blender.',it:'CC0. Guardia, colpi subiti e caricamento aggiunti in Blender.'},
+  out_saved_v:{en:'{n} of {m} bouts won',it:'{n} di {m} incontri vinti'},
+  cr_sound_v:{en:'Made for this game, CC0.',it:'Fatto per questo gioco, CC0.'},
+  out_stamp:{en:'Clocked out',it:'Turno finito'},
+  out_title:{en:'Shift over',it:'Turno finito'},
+  out_body:{en:'Your badge is back on the hook. The bouts you won are kept; nothing else needs saving. You can close this tab.',it:'Il badge è di nuovo sul gancio. Gli incontri vinti restano salvati; non c\'è altro da salvare. Puoi chiudere questa scheda.'},
+  out_back:{en:'Clock back in',it:'Rientra in turno'},
+  out_saved:{en:'Saved',it:'Salvato'},
   row_move:{en:'Move',it:'Movimento'},
   row_strike:{en:'Strike',it:'Colpi'},
   row_defend:{en:'Defend',it:'Difesa'},
@@ -394,7 +434,13 @@ function storyMetrics(){
 }
 function loadLang(){ try{ const v=localStorage.getItem('sublevel-lang'); if(v==='en'||v==='it') lang=v; }catch(e){} }
 function saveLang(){ try{ localStorage.setItem('sublevel-lang', lang); }catch(e){} }
-function paintLang(){ document.querySelectorAll('[data-lang]').forEach(b=>b.classList.toggle('on', b.dataset.lang===lang)); }
+function paintLang(){
+  document.querySelectorAll('[data-lang]').forEach(b=>b.classList.toggle('on', b.dataset.lang===lang));
+  const set=(id,k)=>{ const el=$(id); if(el) el.textContent=L(k); }, lab=(id,k)=>{ const el=$(id); if(el&&el.parentNode&&el.parentNode.lastChild) el.parentNode.lastChild.textContent=' '+L(k); };
+  set('pauseTitle','pause_title'); set('resume','resume_btn'); set('restart','restart_btn'); set('quitTitle','quit_btn'); set('pauseCredits','credits_btn');
+  set('linkCredits','credits_btn'); set('linkOut','out_btn'); set('menuBtn','menu_btn');
+  lab('pMusic','music_lbl'); lab('pAmb','amb_lbl'); lab('lessMotion2','motion_lbl');
+}
 function boutPlace(c){ return L(c.placeKey); }
 function boutRole(c){ return L(c.roleKey); }
 function boutTip(c){ return L(c.tipKey); }
@@ -994,7 +1040,7 @@ function audioTick(dt){
     if(duckGain) duckGain.gain.value=duck;
   }
   const cardEl=$('wrap'), onCard=(G.state==='card'||G.state==='title')&&cardEl&&!cardEl.hidden;
-  audPause=lerp(audPause, G.state==='pause'?1:0, Math.min(1,dt*8));
+  audPause=lerp(audPause, (G.state==='pause'||audOut)?1:0, Math.min(1,dt*8));
   audCardT=onCard?audCardT+dt:0;
   const quiet=onCard&&audCardT>MIX.cardQuiet;
   audFade=lerp(audFade, quiet?0:1, Math.min(1,dt*(quiet?.6:3)));
@@ -1625,7 +1671,7 @@ function paintBinds(){
     const kbd=el.querySelector('kbd'); if(kbd) kbd.textContent=keyLabel(binds[el.dataset.bind]);
     el.classList.toggle('listen', listenAct===el.dataset.bind);
   });
-  keysHtml='<kbd data-k="move">WASD</kbd> move <kbd data-k="jab">'+keyLabel(binds.jab)+'</kbd> jab <kbd data-k="heavy">'+keyLabel(binds.heavy)+'</kbd> heavy <kbd data-k="block">'+keyLabel(binds.block)+'</kbd> block (hold) <kbd data-k="dodge">'+keyLabel(binds.dodge)+'</kbd> dodge';
+  keysHtml='<kbd data-k="move">WASD</kbd> move <kbd data-k="jab">'+keyLabel(binds.jab)+'</kbd> jab <kbd data-k="heavy">'+keyLabel(binds.heavy)+'</kbd> heavy <kbd data-k="block">'+keyLabel(binds.block)+'</kbd> block (hold) <kbd data-k="dodge">'+keyLabel(binds.dodge)+'</kbd> dodge <kbd>Esc</kbd> menu';
   if(!padOn) $('keys').innerHTML=keysHtml;
   document.querySelectorAll('#cRows dt').forEach(dt=>{
     if(dt.textContent==='Strike') dt.nextElementSibling.textContent=keyLabel(binds.jab)+' jab, '+keyLabel(binds.heavy)+' heavy';
@@ -1681,6 +1727,7 @@ window.addEventListener('keydown',e=>{
   }
   if(k==='escape'){
     e.preventDefault();
+    if(G.state==='card'&&cardEsc&&!wrapEl.hidden){ $('go').click(); return; }
     if(G.state==='fight'||G.state==='ready') pauseFight();
     else if(G.state==='pause') resumeFight();
     return;
@@ -1845,6 +1892,44 @@ function restartBout(){
   if($('pause')) $('pause').hidden=true;
   startBout(G.bout||0);
 }
+/* Leave the fight for the title card. Wins are saved when they happen (grantWin), so nothing is lost. */
+function quitToTitle(){
+  if($('pause')) $('pause').hidden=true;
+  G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
+  titleCard();
+}
+const lnk=(u,t)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+'</a>';
+/* Credits as a card. back() says where Back goes: the title, or the pause menu it was opened from. */
+function creditsCard(back){
+  showCard({stamp:L('credits_stamp'),kick:L('company_form'),title:L('credits_title'),body:L('credits_body'),
+    rows:[[L('cr_game'),'Carlo Perassi, Apache-2.0'],
+          [L('cr_engine'),lnk('https://www.babylonjs.com','Babylon.js')+' 9.30, Apache-2.0'],
+          [L('cr_fighters'),lnk('https://opengameart.org/content/animated-human-low-poly','Animated Human')+' '+L('cr_by')+' '+lnk('https://quaternius.com','Quaternius')+', '+L('cr_fighters_v')],
+          [L('cr_type'),'Big Shoulders Stencil Display by Patric King; IBM Plex Mono by IBM. SIL OFL 1.1'],
+          [L('cr_sound'),L('cr_sound_v')],
+          [L('cr_source'),lnk('https://github.com/carlok/red-ink','github.com/carlok/red-ink')]],
+    btn:L('back_btn'),go:back,esc:true});
+}
+/* Clock out: the closest a web page gets to Exit. It leaves fullscreen, hushes the sound, says goodbye, and asks the browser to close the
+   tab, which it only does for a tab a script opened. */
+let audOut=false;
+function clockOut(){
+  try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen(); else if(document.webkitFullscreenElement&&document.webkitExitFullscreen) document.webkitExitFullscreen(); }catch(e){}
+  audOut=true;
+  showCard({stamp:L('out_stamp'),kick:L('company_form'),title:L('out_title'),body:L('out_body'),
+    rows:[[L('out_saved'),L('out_saved_v').replace('{n}',progress.wins).replace('{m}',BOUTS.length)]],
+    btn:L('out_back'),go:()=>{ audOut=false; titleCard(); },esc:true});
+  try{ window.close(); }catch(e){}
+}
+function openCreditsFromPause(){
+  if($('pause')) $('pause').hidden=true;
+  creditsCard(()=>{ wrapEl.hidden=true; G.state='pause'; if($('pause')) $('pause').hidden=false; hudEl.hidden=false; if(isTouch) $('touch').hidden=false; });
+}
+if($('quitTitle')) $('quitTitle').addEventListener('click',quitToTitle);
+if($('pauseCredits')) $('pauseCredits').addEventListener('click',openCreditsFromPause);
+if($('linkCredits')) $('linkCredits').addEventListener('click',()=>{ audioInit('click'); SFX.ui(); creditsCard(titleCard); });
+if($('linkOut')) $('linkOut').addEventListener('click',()=>{ audioInit('click'); SFX.ui(); clockOut(); });
+if($('menuBtn')) $('menuBtn').addEventListener('click',()=>{ if(G.state==='fight'||G.state==='ready') pauseFight(); });
 loadMotion(); paintMotion();
 if($('lessMotion')) $('lessMotion').addEventListener('change',()=>setLessMotion($('lessMotion').checked));
 if($('lessMotion2')) $('lessMotion2').addEventListener('change',()=>setLessMotion($('lessMotion2').checked));
@@ -1909,12 +1994,14 @@ function updateHud(){
 function banner(text){
   bannerEl.textContent=text; bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
 }
+let cardEsc=false;
 function showCard(c){
   $('cStamp').textContent=c.stamp; $('cKick').textContent=c.kick; $('cTitle').textContent=c.title; $('cBody').textContent=c.body;
   $('cRows').innerHTML=(c.rows||[]).map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('');
   $('cRows').hidden=!(c.rows&&c.rows.length);
   $('avatarBox').hidden=!c.avatar; $('goTxt').textContent=c.btn;
   $('go').onclick=()=>{ audioInit('click'); SFX.ui(); wrapEl.hidden=true; c.go(); };
+  cardEsc=!!c.esc; if($('cardLinks')) $('cardLinks').hidden=!c.links;
   G.state='card'; wrapEl.hidden=false; hudEl.hidden=true; $('touch').hidden=true; wrapEl.scrollTop=0;
   setTimeout(()=>{ try{ $('go').focus({preventScroll:true}); }catch(e){} },30);
 }
@@ -1933,7 +2020,7 @@ function introCard(i,lead){
 }
 function titleCard(){
   showCard({stamp:L('card_title_stamp'),kick:L('company_form'),title:L('card_title_name'),
-    body:L('card_title_body'),rows:titleRows(),avatar:true,btn:L('card_title_btn'),go:()=>introCard(0)});
+    body:L('card_title_body'),rows:titleRows(),avatar:true,links:true,btn:L('card_title_btn'),go:()=>introCard(0)});
 }
 function hubCard(nextIdx){
   const n=BOUTS[nextIdx];
@@ -2428,6 +2515,7 @@ async function skinOn(on,model){
 
 /* ---------- boot ---------- */
 wrapEl.addEventListener('pointerdown',()=>{ audCardT=0; });
+if(isTouch&&$('menuBtn')) $('menuBtn').hidden=false;
 $('snd').addEventListener('click',()=>{ muted=!muted; saveAudioPrefs(); paintAudio(); audioInit('click'); if(!muted) SFX.ui(); });
 buildWorld(); buildCrowd(); buildParticles(); buildWords(); applyEnv(0);
 P=makeFighter(LOOKS.auditor,true); P.cfg={foe:'Auditor'}; P.speed0=4.4; P.reach=1; P.dmgMul=1; resetFighter(P,-2.3,Math.PI/2,100);
