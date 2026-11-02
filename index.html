@@ -1058,8 +1058,9 @@ function playHit(kind){
   const name=pool[hitPick++%pool.length];
   playSample(name, HIT_RATE[hitPick%HIT_RATE.length]);
 }
-function duckHit(){
-  duck=.35; duckT=.4;
+let duckLen=.4;
+function duckHit(len){
+  duckLen=len||.4; duck=.35; duckT=duckLen;
   if(duckGain) duckGain.gain.value=duck;
 }
 /* ---------- music: a small live sequencer, no audio files ----------
@@ -1250,6 +1251,46 @@ function musicTick(){
     if(MUS.step%16===0){ MUS.bar++; MUS.mbar++; if(MUS.moment&&--MUS.momentBars<=0){ MUS.moment=false; MUS.cool=12; } else if(!MUS.moment&&MUS.cool>0) MUS.cool--; }
   }
 }
+/* ---------- the voice: a small formant synthesiser ----------
+   A sawtooth (a robotic 125 Hz falling to 98 Hz) goes through three band-pass filters whose frequencies glide from one vowel to the next
+   (F1, F2, F3), with noise bursts for F, T and K; a short comb delay and a reverb send give it the 80s vocoder sound. No files: it says
+   FIGHT at the start of a bout, K.O., and WIN or LOSE on the result card, in English whatever the language (the arcade way). Each segment is
+   [kind, seconds, F1, F2, F3 at the start, F1, F2, F3 at the end, level]; kinds: v voiced, f noise (fricative), p noise burst, s silence. */
+const VOICE={
+  fight:{gain:.58,f0:[128,96],segs:[['f',.11,4500,0,0,4500,0,0,.5],['v',.13,740,1250,2500,740,1250,2500,1],['v',.17,740,1250,2500,420,2000,2700,.95],['s',.05],['p',.06,4200,0,0,4200,0,0,.7]]},
+  ko:{gain:.62,f0:[120,100],segs:[['p',.05,2300,0,0,2300,0,0,.6],['v',.17,560,1800,2500,400,2200,2800,1],['s',.07],['v',.1,500,900,2400,500,900,2400,.95],['v',.14,500,900,2400,380,760,2300,.8]]},
+  win:{gain:1.3,f0:[122,100],segs:[['v',.07,300,610,2200,400,2000,2600,.8],['v',.15,400,2000,2600,400,2000,2600,1],['v',.14,250,1700,2500,250,1700,2500,.55]]},
+  lose:{gain:.7,f0:[118,92],segs:[['v',.07,360,1300,2500,500,900,2400,.8],['v',.2,500,900,2400,420,800,2300,1],['f',.17,5500,0,0,5500,0,0,.45]]}
+};
+const VOICE_GAIN=.9;
+function voiceSay(word,delay){
+  if(!ac||!MUS.bus||ac.state!=='running'||splashHold||audOut||muted||!sfxGain) return;
+  const W=VOICE[word]; if(!W) return;
+  if(MUS.log) MUS.log.push('voice:'+word);
+  const t0=ac.currentTime+.03+(delay||0), total=W.segs.reduce((a,b)=>a+b[1],0);
+  const out=ac.createGain(); out.gain.value=VOICE_GAIN*W.gain; out.connect(sfxGain); revSend(out,.22);
+  const cd=ac.createDelay(.05), cf=ac.createGain(), cw=ac.createGain(); cd.delayTime.value=.0095; cf.gain.value=.42; cw.gain.value=.5; out.connect(cd); cd.connect(cf); cf.connect(cd); cd.connect(cw); cw.connect(sfxGain);
+  const src=ac.createOscillator(), vg=ac.createGain(); src.type='sawtooth'; src.frequency.setValueAtTime(W.f0[0],t0); src.frequency.linearRampToValueAtTime(W.f0[1],t0+total); vg.gain.setValueAtTime(0,t0);
+  const fl=[[8,1],[10,.6],[12,.35]].map(q=>{ const f=ac.createBiquadFilter(), g=ac.createGain(); f.type='bandpass'; f.Q.value=q[0]; g.gain.value=q[1]; src.connect(f); f.connect(g); g.connect(vg); return f; });
+  vg.connect(out);
+  const ns=ac.createBufferSource(), nf=ac.createBiquadFilter(), ng=ac.createGain(); ns.buffer=MUS.noise; ns.loop=true; nf.type='highpass'; nf.Q.value=.8; nf.frequency.value=4000; ng.gain.setValueAtTime(0,t0); ns.connect(nf); nf.connect(ng); ng.connect(out);
+  let t=t0, F=[500,1500,2500];
+  W.segs.forEach(sg=>{
+    const k=sg[0], d=sg[1], te=t+d;
+    if(k==='v'){
+      const a=[sg[2],sg[3],sg[4]], b=[sg[5],sg[6],sg[7]];
+      fl.forEach((f,i)=>{ f.frequency.setValueAtTime(a[i],t); f.frequency.linearRampToValueAtTime(b[i],te); });
+      vg.gain.setValueAtTime(vg.gain.value,t); vg.gain.linearRampToValueAtTime(sg[8]*.9,t+Math.min(.02,d/3)); F=b;
+    } else {
+      vg.gain.setValueAtTime(k==='f'&&word==='lose'?.18:0,t);
+      if(k==='f'||k==='p'){ nf.frequency.setValueAtTime(sg[2],t); ng.gain.setValueAtTime(0,t); ng.gain.linearRampToValueAtTime(sg[8]*.6,t+Math.min(.012,d/3)); ng.gain.linearRampToValueAtTime(0,te); }
+    }
+    t=te;
+  });
+  vg.gain.setValueAtTime(vg.gain.value,t0+total-.02); vg.gain.linearRampToValueAtTime(0,t0+total);
+  src.start(t0); ns.start(t0); src.stop(t0+total+.05); ns.stop(t0+total+.05);
+  duckHit(total+.3);
+}
 /* what each layer should be doing now */
 function musicTargets(){
   const t={pad:0,pluck:0,bass:0,drums:0}, g=G.state;
@@ -1345,7 +1386,7 @@ function audioTick(dt){
   audClock+=dt;
   if(duckT>0){
     duckT=Math.max(0, duckT-dt);
-    duck=duckT<=0?1:lerp(.35,1,1-duckT/.4);
+    duck=duckT<=0?1:lerp(.35,1,1-duckT/duckLen);
     if(duckGain) duckGain.gain.value=duck;
   }
   const cardEl=$('wrap'), onCard=(G.state==='card'||G.state==='title')&&cardEl&&!cardEl.hidden;
@@ -1772,7 +1813,7 @@ function strike(a,d,D){
 }
 function endBout(w,l,mid){
   l.state='ko'; l.koT=0; l.atk=null; w.state='win'; w.atk=null; w.t=0;
-  rumble(1,1,420); G.state='ko'; G.koTimer=2.4; G.koSlow=.45; G.koClock=0; G.winner=w; fxWord('KO',mid); SFX.ko(); musicSting('ko'); G.cheer=1.4; G.shake=1.1; G.hitstop=.14;
+  rumble(1,1,420); G.state='ko'; G.koTimer=2.4; G.koSlow=.45; G.koClock=0; G.winner=w; fxWord('KO',mid); SFX.ko(); musicSting('ko'); voiceSay('ko',.2); G.cheer=1.4; G.shake=1.1; G.hitstop=.14;
   banner(w.isPlayer?'K.O.':'DOWN');
 }
 
@@ -2411,7 +2452,7 @@ function winCard(){
     else showFinalCard();
   };
   showCard({stamp:L('win_stamp'),kick:L('bout_stamp')+' '+(i+1)+' · '+L('win_kick'),title:BOUTS[i].foe+L('win_down'),body:L(BOUTS[i].afterKey),
-    rows,btn:L('win_btn_hub'),go:goNext,mood:'win'});
+    rows,btn:L('win_btn_hub'),go:goNext,mood:'win'}); voiceSay('win',.45);
 }
 
 /* ---------- flow ---------- */
@@ -2440,7 +2481,7 @@ function afterKO(){
   if(G.winner===P) winCard();
   else {
     showCard({stamp:L('lose_stamp'),kick:L('bout_stamp')+' '+(G.bout+1),title:L('lose_title'),body:L('lose_body'),
-      rows:[[L('row_retry'),BOUTS[G.bout].foe+', '+boutPlace(BOUTS[G.bout])],[L('row_you'),fightLine()]],btn:L('lose_btn'),go:()=>{ G.retry=true; startBout(G.bout); },mood:'lose'});
+      rows:[[L('row_retry'),BOUTS[G.bout].foe+', '+boutPlace(BOUTS[G.bout])],[L('row_you'),fightLine()]],btn:L('lose_btn'),go:()=>{ G.retry=true; startBout(G.bout); },mood:'lose'}); voiceSay('lose',.5);
   }
 }
 
@@ -2483,7 +2524,7 @@ function simTick(){
   if(G.hitstop>0){ G.hitstop-=dt; dt*=.12; }
   buf.jab=Math.max(0,buf.jab-dt); buf.heavy=Math.max(0,buf.heavy-dt); buf.dodge=Math.max(0,buf.dodge-dt);
   const live=G.state==='fight';
-  if(G.state==='ready'){ G.readyT+=dt; if(G.readyT>1.15){ G.state='fight'; banner('FIGHT!'); } }
+  if(G.state==='ready'){ G.readyT+=dt; if(G.readyT>1.15){ G.state='fight'; banner('FIGHT!'); voiceSay('fight'); } }
   const Ip=live?playerIntent():IDLE, Ie=live?aiIntent(E,P,dt):IDLE;
   P.prev.copyFrom(P.pos); E.prev.copyFrom(E.pos);
   step(P,E,Ip,dt); if(P.started&&buf[P.started]!==undefined) buf[P.started]=0;
@@ -3457,7 +3498,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,voiceSay,musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
