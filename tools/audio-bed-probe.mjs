@@ -48,6 +48,8 @@ await withPage(async (cdp) => {
     S.pauseFight(); await sleep(800); res.paused = await rms(1500); S.resumeFight();
     S.E.hp = 1; E = S.E; key("j", true); key("j", false); await sleep(700); res.ko = await rms(1200);
     const st = S.audioState(); res.state = { crowd: st.crowd, duck: st.duck };
+    /* a suspended context keeps its last buffer in the analyser, so silence is read as the clock standing still */
+    S.toSplash(true); await sleep(600); const c0 = g.ac.currentTime; await sleep(2000); res.splash = { ctx: g.ac.state, state: G.state, clockAdvancedSeconds: Math.round((g.ac.currentTime - c0) * 100) / 100 };
     return JSON.stringify(res); })()`, true);
   console.log(out);
 }, { args: ["--autoplay-policy=no-user-gesture-required"] });

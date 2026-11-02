@@ -120,6 +120,16 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .pauseCard button,.pauseCard label{font:600 13px/1 var(--f-data);letter-spacing:.06em;text-transform:uppercase}
 .pauseCard button{background:#111;color:var(--tape);border:0;padding:12px 14px;cursor:pointer;text-align:left}
 .pauseCard button.quiet{background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:10px 12px}
+.splash{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at center,rgba(8,8,9,.55),rgba(8,8,9,.92) 78%);text-align:center}
+.splash[hidden]{display:none}
+.splashIn{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:640px}
+.splash .kick{font:600 11px/1.4 var(--f-data);letter-spacing:.18em;text-transform:uppercase;color:var(--paper)}
+.splash h1{margin:0;font:800 clamp(52px,13vw,150px)/.88 var(--f-display);letter-spacing:.02em;text-transform:uppercase;color:var(--tape);text-shadow:5px 5px 0 #111}
+.splash .note{margin:0;font:500 13px/1.4 var(--f-data);color:var(--paper);min-height:1.4em}
+.spPlay{display:flex;align-items:center;gap:18px;font:800 clamp(24px,6vw,32px)/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:var(--tape);color:#111;border:0;padding:14px 34px;cursor:pointer;box-shadow:6px 6px 0 #111}
+.spPlay:hover{background:#ffd633}
+.spPlay:focus-visible,.spCredits:focus-visible{outline:3px solid var(--paper);outline-offset:3px}
+.spCredits{font:600 11px var(--f-data);letter-spacing:.14em;text-transform:uppercase;background:transparent;color:var(--paper);border:1px solid var(--mute);padding:7px 12px;cursor:pointer}
 .cardLinks{display:flex;gap:8px;justify-content:space-between;margin:10px 20px 0}
 dl.rows dd a{color:inherit}
 .is-touch #menuBtn{top:calc(112px + env(safe-area-inset-top,0px))}
@@ -251,6 +261,16 @@ dl.rows dd a{color:inherit}
     </article>
   </div>
 
+  <div class="splash" id="splash" hidden>
+    <div class="splashIn">
+      <div class="kick" id="spKick">Halvorsen Freight &middot; Form 7-B</div>
+      <h1 id="spTitle">Sublevel Three</h1>
+      <p class="note" id="spNote" aria-live="polite"></p>
+      <button class="spPlay" id="spPlay" type="button"><span id="spPlayTxt">Play</span><span aria-hidden="true">&rarr;</span></button>
+      <button class="spCredits" id="spCredits" type="button">Credits</button>
+    </div>
+  </div>
+
   <div class="drop" id="dropHint" hidden>Drop your .glb to replace the fighter</div>
   <p class="fail" id="fail" hidden>The 3D engine could not be loaded. Check your connection and reload the page.</p>
 </div>
@@ -311,11 +331,12 @@ const STR={
   card_title_body:{en:'You audit pallet counts from ten to six. Totals always reconcile. You have not slept in eleven months. Pike slides you a keycard toward a door missing from the floor plan.',it:'Controlli i pallet dalle dieci alle sei. I totali tornano sempre. Non dormi da undici mesi. Pike ti passa una tessera verso una porta assente dalla pianta.'},
   card_title_btn:{en:'Take the stairs',it:'Scendi le scale'},
   credits_btn:{en:'Credits',it:'Crediti'},
+  play_btn:{en:'Play',it:'Gioca'},
   reset_btn:{en:'Reset progress',it:'Azzera i progressi'},
   reset_confirm:{en:'Sure? Click again',it:'Sicuro? Clicca ancora'},
   reset_done:{en:'Progress reset',it:'Progressi azzerati'},
-  out_btn:{en:'Clock out',it:'Timbra l\'uscita'},
-  quit_btn:{en:'Quit to title',it:'Torna al titolo'},
+  out_btn:{en:'Quit',it:'Esci'},
+  quit_btn:{en:'Quit',it:'Esci'},
   back_btn:{en:'Back',it:'Indietro'},
   pause_title:{en:'Paused',it:'In pausa'},
   resume_btn:{en:'Resume',it:'Riprendi'},
@@ -447,6 +468,7 @@ function paintLang(){
   const set=(id,k)=>{ const el=$(id); if(el) el.textContent=L(k); }, lab=(id,k)=>{ const el=$(id); if(el&&el.parentNode&&el.parentNode.lastChild) el.parentNode.lastChild.textContent=' '+L(k); };
   set('pauseTitle','pause_title'); set('resume','resume_btn'); set('restart','restart_btn'); set('quitTitle','quit_btn'); set('pauseCredits','credits_btn');
   if(!resetArmed) set('resetBtn','reset_btn');
+  set('spPlayTxt','play_btn'); set('spCredits','credits_btn'); set('spKick','company_form'); set('spTitle','card_title_name');
   set('linkCredits','credits_btn'); set('linkOut','out_btn'); set('menuBtn','menu_btn');
   lab('pMusic','music_lbl'); lab('pAmb','amb_lbl'); lab('lessMotion2','motion_lbl');
 }
@@ -953,7 +975,9 @@ function applyBus(){
   if(master) master.gain.value=muted?0:1;
   if(duckGain) duckGain.gain.value=duck;
 }
+let splashHold=true; /* true from the page opening, and after Quit, until Play: no audio context, no sound */
 function audioInit(src){
+  if(splashHold) return Promise.resolve();
   if(src&&!unlock) unlock=src;
   if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ ac=null; } }
   if(!ac) return Promise.resolve();
@@ -1020,7 +1044,7 @@ function startLoop(name, dest){
   try{ s.start(); loopSrc[name]=s; }catch(e){}
 }
 function playSample(name, rate){
-  if(!ac||muted||!bufs[name]||!sfxGain) return;
+  if(splashHold||!ac||muted||!bufs[name]||!sfxGain) return;
   const s=ac.createBufferSource(), g=ac.createGain();
   g.gain.value=gains[name]||1;
   s.buffer=bufs[name]; s.playbackRate.value=rate||1;
@@ -1049,7 +1073,7 @@ function audioTick(dt){
     if(duckGain) duckGain.gain.value=duck;
   }
   const cardEl=$('wrap'), onCard=(G.state==='card'||G.state==='title')&&cardEl&&!cardEl.hidden;
-  audPause=lerp(audPause, (G.state==='pause'||audOut)?1:0, Math.min(1,dt*8));
+  audPause=lerp(audPause, (G.state==='pause'||audOut||G.state==='splash')?1:0, Math.min(1,dt*8));
   audCardT=onCard?audCardT+dt:0;
   const quiet=onCard&&audCardT>MIX.cardQuiet;
   audFade=lerp(audFade, quiet?0:1, Math.min(1,dt*(quiet?.6:3)));
@@ -1723,8 +1747,9 @@ function denyCue(){
   playSample('ui',.55);
 }
 window.addEventListener('keydown',e=>{
-  audioInit('key'); audCardT=0;
   const k=keyName(e);
+  if(G.state==='splash'){ if((k==='enter'||k==='space')&&e.target!==$('spCredits')){ e.preventDefault(); playGame(); } return; }
+  audioInit('key'); audCardT=0;
   if(listenAct){
     e.preventDefault();
     if(!RESERVED.has(k)){
@@ -1901,11 +1926,24 @@ function restartBout(){
   if($('pause')) $('pause').hidden=true;
   startBout(G.bout||0);
 }
-/* Leave the fight for the title card. Wins are saved when they happen (grantWin), so nothing is lost. */
-function quitToTitle(){
-  if($('pause')) $('pause').hidden=true;
+/* Quit: leave the fight, the fullscreen and the sound, and show the splash. Wins are saved when they happen (grantWin), so nothing is lost.
+   Nothing plays and the audio context stays suspended until Play. */
+function toSplash(withNote){
+  try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen(); else if(document.webkitFullscreenElement&&document.webkitExitFullscreen) document.webkitExitFullscreen(); }catch(e){}
+  if($('pause')) $('pause').hidden=true; wrapEl.hidden=true; hudEl.hidden=true; $('touch').hidden=true;
   G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
-  titleCard();
+  G.state='splash'; splashHold=true; audOut=true;
+  if(ac&&ac.state!=='closed'){ try{ ac.suspend(); }catch(e){} }
+  $('spNote').textContent=withNote?L('out_saved_v').replace('{n}',progress.wins).replace('{m}',BOUTS.length):'';
+  $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus({preventScroll:true}); }catch(e){} },30);
+}
+function quitToTitle(){ toSplash(true); }
+/* Play: the click that starts everything, audio included. */
+function playGame(){
+  if(G.state!=='splash') return;
+  $('splash').hidden=true; splashHold=false; audOut=false;
+  audioInit('click'); if(ac&&ac.state==='suspended'){ try{ ac.resume(); }catch(e){} }
+  SFX.ui(); titleCard();
 }
 const lnk=(u,t)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+'</a>';
 /* Credits as a card. back() says where Back goes: the title, or the pause menu it was opened from. */
@@ -1919,17 +1957,10 @@ function creditsCard(back){
           [L('cr_source'),lnk('https://github.com/carlok/red-ink','github.com/carlok/red-ink')]],
     btn:L('back_btn'),go:back,esc:true});
 }
-/* Clock out: the closest a web page gets to Exit. It leaves fullscreen, hushes the sound, says goodbye, and asks the browser to close the
-   tab, which it only does for a tab a script opened. */
+/* Clock out is Quit from the title card; the browser cannot close a tab it did not open, so the splash is the exit. window.close() is
+   tried anyway and works for a tab a script opened. */
 let audOut=false;
-function clockOut(){
-  try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen(); else if(document.webkitFullscreenElement&&document.webkitExitFullscreen) document.webkitExitFullscreen(); }catch(e){}
-  audOut=true;
-  showCard({stamp:L('out_stamp'),kick:L('company_form'),title:L('out_title'),body:L('out_body'),
-    rows:[[L('out_saved'),L('out_saved_v').replace('{n}',progress.wins).replace('{m}',BOUTS.length)]],
-    btn:L('out_back'),go:()=>{ audOut=false; titleCard(); },esc:true});
-  try{ window.close(); }catch(e){}
-}
+function clockOut(){ toSplash(true); try{ window.close(); }catch(e){} }
 /* Reset progress: bouts won, unlocked outfits and arena grades, and the dock mission. Two clicks, because it cannot be undone; the second
    has to come within four seconds. Settings (keys, sound, language) stay. */
 let resetArmed=false, resetTimer=0;
@@ -1951,7 +1982,9 @@ function openCreditsFromPause(){
 if($('quitTitle')) $('quitTitle').addEventListener('click',quitToTitle);
 if($('pauseCredits')) $('pauseCredits').addEventListener('click',openCreditsFromPause);
 if($('linkCredits')) $('linkCredits').addEventListener('click',()=>{ audioInit('click'); SFX.ui(); creditsCard(titleCard); });
-if($('linkOut')) $('linkOut').addEventListener('click',()=>{ audioInit('click'); SFX.ui(); clockOut(); });
+if($('linkOut')) $('linkOut').addEventListener('click',()=>{ clockOut(); });
+if($('spPlay')) $('spPlay').addEventListener('click',playGame);
+if($('spCredits')) $('spCredits').addEventListener('click',()=>{ $('splash').hidden=true; creditsCard(()=>{ wrapEl.hidden=true; G.state='splash'; $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus(); }catch(e){} },30); }); });
 if($('menuBtn')) $('menuBtn').addEventListener('click',()=>{ if(G.state==='fight'||G.state==='ready') pauseFight(); });
 loadMotion(); paintMotion();
 if($('lessMotion')) $('lessMotion').addEventListener('change',()=>setLessMotion($('lessMotion').checked));
@@ -1964,7 +1997,7 @@ function updateCamera(dt,real){
   const asp=engine.getAspectRatio(cam), portrait=asp<CAM.wide;
   if(portrait){ cam.fovMode=B.Camera.FOVMODE_HORIZONTAL_FIXED; cam.fov=CAM.fovH; } else { cam.fovMode=B.Camera.FOVMODE_VERTICAL_FIXED; cam.fov=CAM.fovV; }
   let dp,dt2;
-  if(G.state==='title'||G.state==='card'){
+  if(G.state==='title'||G.state==='card'||G.state==='splash'){
     const a=G.t*.12; dp=new V3(Math.sin(a)*11.5,4.6,-Math.cos(a)*11.5); dt2=new V3(0,1.2,0);
   } else {
     const mid=P.pos.add(E.pos).scale(.5), d=V3.Distance(P.pos,E.pos);
@@ -1987,7 +2020,7 @@ function updateCamera(dt,real){
     dp=mid.add(dv.scale(Dm*Math.cos(pit))); dp.y=CAM.aimY+Dm*Math.sin(pit); dt2=mid.add(new V3(0,CAM.aimY,0));
     dp.x=clamp(dp.x,-15.5,15.5); dp.z=clamp(dp.z,-15.5,15.5);
   }
-  const k=damp(G.state==='title'||G.state==='card'?1.5:portrait?CAM.followPortrait:CAM.follow,dt);
+  const k=damp(G.state==='title'||G.state==='card'||G.state==='splash'?1.5:portrait?CAM.followPortrait:CAM.follow,dt);
   camPos.x=lerp(camPos.x,dp.x,k); camPos.y=lerp(camPos.y,dp.y,k); camPos.z=lerp(camPos.z,dp.z,k);
   camTgt.x=lerp(camTgt.x,dt2.x,k); camTgt.y=lerp(camTgt.y,dt2.y,k); camTgt.z=lerp(camTgt.z,dt2.z,k);
   G.shake=Math.max(0,G.shake-dt*6);
@@ -2077,6 +2110,8 @@ function winCard(){
 
 /* ---------- flow ---------- */
 function startBout(i){
+  if(G.state==='splash') splashHold=false; /* a bout started by a probe from the splash, which the interface cannot do */
+  if($('splash')) $('splash').hidden=true; audOut=false;
   G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i]);
   applyBoutMusic(i);
   disposeFighter(E);
@@ -2570,7 +2605,7 @@ fontsDone();
 if(document.fonts&&document.fonts.load){
   Promise.all([document.fonts.load('800 40px "Big Shoulders Stencil Display"'),document.fonts.load('600 20px "IBM Plex Mono"')]).then(fontsDone).catch(()=>{});
 }
-titleCard();
+wrapEl.hidden=true; hudEl.hidden=true; G.state='splash'; $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus({preventScroll:true}); }catch(e){} },60);
 const SKILL={easy:1.45,normal:1,hard:.72};
 const DIFF={
   easy:{hp:.85,speed:.92,react:1.18,dmg:.88,guard:.75,cd:1.12},
@@ -3041,7 +3076,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,stemGain,hubGain,loopSrc}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,stemGain,hubGain,loopSrc}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

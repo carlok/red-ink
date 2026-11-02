@@ -140,7 +140,8 @@ export function fileIndexUrl() {
   return pathToFileURL(join(ROOT, "index.html")).href;
 }
 
-export async function bootSublevel(cdp, ms = 15000) {
+/** Waits for the game to boot. The page opens on a silent splash; unless keepSplash is true this presses Play, so a probe finds the title card (and audio) as before. */
+export async function bootSublevel(cdp, ms = 15000, keepSplash = false) {
   await cdp.eval(
     `(async () => {
     const t = performance.now();
@@ -148,6 +149,7 @@ export async function bootSublevel(cdp, ms = 15000) {
       if (performance.now() - t > ${ms}) throw new Error("boot timeout");
       await new Promise((r) => requestAnimationFrame(r));
     }
+    ${keepSplash ? "" : "if (window.__sublevel.G.state === 'splash') window.__sublevel.play();"}
   })()`,
     true,
   );
