@@ -80,5 +80,5 @@ The same list is in the game: Credits on the title card and in the pause menu.
 - Game by Carlo Perassi, Apache-2.0.
 - [Babylon.js](https://www.babylonjs.com) 9.30 (`lib/babylon.js` is a tree-shaken build), Apache-2.0.
 - [Animated Human](https://opengameart.org/content/animated-human-low-poly) by [Quaternius](https://quaternius.com), CC0 1.0. Nothing requires attribution, but it deserves it. `assets/quaternius-human/` says how the files were converted and which clips (Guard, HitA, HitB, HitHeavy, TellJab) were added in Blender with `tools/blender/author-clips.py`.
-- Big Shoulders Stencil Display (Patric King) and IBM Plex Mono (IBM), SIL Open Font License 1.1. They are loaded from Google Fonts, so the first load makes a request to fonts.googleapis.com; without it the game falls back to Impact and a system monospace.
+- Big Shoulders Stencil Display (the Big Shoulders Project Authors), IBM Plex Mono and IBM Plex Sans Condensed (IBM), SIL Open Font License 1.1. They are served from `assets/fonts/` (Latin subset, licences and notes there), so the page makes no request to any other host and `file://` works offline.
 - Sound generated for the game by `tools/make-audio.mjs`, CC0 (`audio/CC0.txt`).

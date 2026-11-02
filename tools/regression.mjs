@@ -145,6 +145,20 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("reset_progress_two_clicks", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, b = document.getElementById("resetBtn"), o = {};
+      S.progress.wins = 3; S.progress.outfit = "sanitation"; S.progress.arena = 2; S.progress.dock = 1;
+      b.click(); o.armed = /sure|sicuro/i.test(b.textContent) && S.progress.wins === 3;
+      b.click(); await sleep(50);
+      o.cleared = S.progress.wins === 0 && S.progress.outfit === "auditor" && S.progress.arena === 0 && S.progress.dock === 0;
+      o.saved = JSON.parse(localStorage.getItem("sublevel-progress")).wins === 0;
+      b.click(); await sleep(4300); o.disarms = !/sure|sicuro/i.test(b.textContent);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("key_cap_light_and_layout", async () => {
     await waitFight(cdp, 0);
     const r = await cdp.eval(`(async () => {

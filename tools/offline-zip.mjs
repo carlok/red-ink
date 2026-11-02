@@ -21,6 +21,9 @@ const files = [
   "lib/babylon.Apache-2.0.txt",
   "audio/samples.js",
   "audio/CC0.txt",
+  "assets/quaternius-human/animated-human.js",
+  "assets/quaternius-human/License.txt",
+  "assets/fonts",
 ];
 
 for (const f of files) {
