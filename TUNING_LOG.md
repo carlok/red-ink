@@ -1135,3 +1135,37 @@ The first version drew the whole look and kept the best of 150: 1,832 of 2,000 s
 | Bout table, 200 fights, seed 1 | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0% |
 
 Not done: the crowd is not checked against the fighters, the shading is baked in the bind pose and does not respond to the lights, and the floors are tuned by eye.
+
+## Sprint 17: a different place for each bout
+
+Goal: the six bouts all happened in the same grey room. They now look like six places (the bout names were already The Sump, Dock Four, The Blind Map, Cold Storage, The Gatehouse and The Reconciler), with the same geometry, so nothing in the sim or the camera moves.
+
+What changes per bout (`ENV`, applied by `applyEnv(i)` from `startBout`, and for bout 1 at boot):
+
+| Bout | Floor | Light and fog | Fixtures and props | Side signs |
+| --- | --- | --- | --- | --- |
+| 1 The Sump | wet concrete, teal grey, a little gloss | the original warm bulbs, green-grey fog | green-grey walls and pipes, oil drums | THE SUMP / DRAIN LEVEL |
+| 2 Dock Four | steel deck with tread ticks and rivets | sodium orange, brown fog | rust fixtures, orange hazard bands, shipping containers on the back wall | DOCK 4 / MAINTENANCE |
+| 3 The Blind Map | survey sheet: metre grid, heavier every 5 m, contour rings | cool blue fluorescents | blue-grey fixtures, drafting tables | BLIND MAP / SECTION 0 |
+| 4 Cold Storage | frosted, pale ice patches, light cracks | pale blue key, bright blue-white fog, white dust | frosted pipes, white crates, icicles under the pipes | COLD STORE / DOOR 3 |
+| 5 The Gatehouse | offset stone pavers | amber, brown fog | red-and-white hazard bands, red-and-white bollards | GATE 5 / CHECKPOINT |
+| 6 The Reconciler | black glass with a cyan grid every 2 m, strong gloss | red bulbs, red-black fog | near-black fixtures, red and cyan light strips on the pillars | RECONCILER / AUDIT |
+
+How it is done. The floor is one 2048 px texture repainted at each bout (26–46 ms, `paintFloor(e)`); the wall, pipe, pillar and crate materials and the hazard texture are recoloured in place; props are built once, merged by colour and enabled per place; the side signs are redrawn from the table. The floor has its own random stream per place, so it is the same every time and the gameplay rng is not touched. The yellow ring that marks the edge is painted in every place. Props stand outside the crowd ring and beyond the 15.5 m the camera can reach.
+
+The arena unlocks (sodium lights, cold key, full exposure) used to replace the key and bulb colours with fixed values. They now multiply the place's own values (bulbs warmer, key cooler, exposure up), which gives the old numbers for the Sump and keeps each place's character.
+
+Checked (`tools/env-probe.mjs`, `tools/look-probe.mjs`, regression, balance):
+
+| Check | Result |
+| --- | --- |
+| Room change per bout | 26–46 ms, in the ready phase |
+| Draws / active meshes | 27–29 / 34–42 (was 27 / 40) |
+| GPU, 1600×900 | 1.4–1.9 ms; the same probe on the previous build read 1.4–2.7 ms, so it is noise on this machine |
+| `tools/regression.mjs` | 22 of 22 |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, unchanged |
+| Console errors, all six bouts over `file://`, also 390×844 for bouts 2 and 5 | none |
+
+Screenshots: `tuning/s17-env-b1.jpg` to `s17-env-b6.jpg`.
+
+Not done: the crowd is the same in every place, the back sign still reads SUBLEVEL 3 with its three rules everywhere, the tint of fighters under each light was only judged by eye, and nothing was checked on a real phone or an integrated GPU.
