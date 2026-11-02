@@ -128,6 +128,38 @@ async function runHttpSuite(cdp) {
     return w;
   });
 
+  await test("menu_credits_quit_clockout", async () => {
+    const v = await waitFight(cdp, 0);
+    if (v.state !== "fight") throw new Error(JSON.stringify(v));
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })), o = {};
+      for (let i = 0; i < 30; i++) await raf();
+      kd("Escape"); await raf(); o.paused = G.state === "pause" && !$("pause").hidden;
+      $("pauseCredits").click(); await sleep(120); o.credits = $("cTitle").textContent === "Who made this" && $("cRows").querySelectorAll("dt").length === 6;
+      $("go").click(); await sleep(120); o.backToPause = G.state === "pause" && !$("pause").hidden;
+      $("quitTitle").click(); await sleep(150); o.quit = G.state === "card" && $("pause").hidden && !$("cardLinks").hidden;
+      $("linkOut").click(); await sleep(150); o.clockOut = $("cTitle").textContent === "Shift over";
+      kd("Escape"); await sleep(150); o.escBack = !$("cardLinks").hidden;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("key_cap_light_and_layout", async () => {
+    await waitFight(cdp, 0);
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, o = {};
+      for (let i = 0; i < 60; i++) await raf();
+      const kd = (x) => window.dispatchEvent(new KeyboardEvent("keydown", Object.assign({ bubbles: true }, x))), ku = (x) => window.dispatchEvent(new KeyboardEvent("keyup", Object.assign({ bubbles: true }, x)));
+      const lit = () => [...document.querySelectorAll("#keys kbd.on")].map((k) => k.dataset.k).join(",");
+      kd({ key: "l", code: "KeyL" }); await raf(); o.lit = lit() === "block"; ku({ key: "l", code: "KeyL" }); await raf(); o.off = lit() === "";
+      S.E.ai.cd = 99; S.E.cfg.cd = 99; S.P.stam = 100; S.P.state = "idle";
+      kd({ key: "\u043b", code: "KeyK" }); ku({ key: "\u043b", code: "KeyK" }); await raf(); await raf(); o.cyrillicK = S.P.state === "attack" && S.P.atk.type === "heavy";
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("lose_card", async () => {
     await waitFight(cdp, 0);
     const w = await cdp.eval(`window.__sublevel.qaEndBout(false)`);

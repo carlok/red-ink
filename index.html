@@ -53,6 +53,9 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
 .keys{font:500 11px/1.7 var(--f-data);color:var(--paper);text-align:right;background:#0a0a0b;padding:6px 8px}
 .keys kbd{font:inherit;color:var(--paper);border:1px solid var(--mute);padding:0 5px;margin:0 2px}
+.keys kbd.on{background:var(--tape);color:#111;border-color:var(--tape)}
+.bar i.st.deny{background:var(--stain);animation:deny .25s}
+@keyframes deny{0%,60%{opacity:.35}30%,100%{opacity:1}}
 .snd{pointer-events:auto;font:600 11px var(--f-data);letter-spacing:.12em;text-transform:uppercase;background:rgba(10,10,11,.55);color:var(--paper);border:1px solid var(--mute);padding:7px 10px;cursor:pointer}
 .is-touch .keys{display:none}
 .is-touch .snd{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:calc(76px + env(safe-area-inset-top,0px));padding:5px 8px;font-size:10px}
@@ -112,6 +115,10 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .pauseCard h2{margin:0;font:800 36px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
 .pauseCard button,.pauseCard label{font:600 13px/1 var(--f-data);letter-spacing:.06em;text-transform:uppercase}
 .pauseCard button{background:#111;color:var(--tape);border:0;padding:12px 14px;cursor:pointer;text-align:left}
+.pauseCard button.quiet{background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:10px 12px}
+.cardLinks{display:flex;gap:8px;justify-content:space-between;margin:10px 20px 0}
+dl.rows dd a{color:inherit}
+.is-touch #menuBtn{top:calc(112px + env(safe-area-inset-top,0px))}
 @media (max-height:500px){
   .card{max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px);display:flex;flex-direction:column}
   .card .in{overflow:auto;min-height:0;padding:10px 14px;gap:8px}
@@ -155,6 +162,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
     </div>
     <div class="foot">
       <button class="snd" id="snd" type="button">Sound on</button>
+      <button class="snd" id="menuBtn" type="button" hidden>Menu</button>
       <div class="keys" id="keys"><kbd>WASD</kbd> move <kbd>J</kbd> jab <kbd>K</kbd> heavy <kbd>L</kbd> block (hold) <kbd>Space</kbd> dodge</div>
     </div>
   </div>
@@ -166,10 +174,14 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
   </div>
   <div class="pause" id="pause" hidden>
     <div class="pauseCard">
-      <h2>Paused</h2>
+      <h2 id="pauseTitle">Paused</h2>
       <button id="resume" type="button">Resume</button>
       <button id="restart" type="button">Restart bout</button>
+      <button id="quitTitle" type="button" class="quiet">Quit to title</button>
+      <button id="pauseCredits" type="button" class="quiet">Credits</button>
       <label for="lessMotion2"><input id="lessMotion2" type="checkbox"> Less motion</label>
+      <label for="pMusic"><input id="pMusic" type="checkbox" checked> Music</label>
+      <label for="pAmb"><input id="pAmb" type="checkbox" checked> Ambience</label>
     </div>
   </div>
 
@@ -219,6 +231,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
             <label class="tuneRow rumble" for="rumble">Rumble <input id="rumble" type="range" min="0" max="100" value="100"></label>
             <label class="tuneRow rumble" for="sfxVol">Hits <input id="sfxVol" type="range" min="0" max="100" value="100"></label>
             <label class="tuneRow rumble" for="musVol">Music <input id="musVol" type="range" min="0" max="100" value="100"></label>
+            <label class="tuneRow rumble" for="ambVol">Ambience <input id="ambVol" type="range" min="0" max="100" value="100"></label>
             <label class="tuneRow rumble" for="lessMotion"><input id="lessMotion" type="checkbox"> Less motion</label>
             <label class="tuneRow rumble" for="autoFs"><input id="autoFs" type="checkbox" checked> Auto fullscreen on phone</label>
           </div>
@@ -226,6 +239,10 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
         </div>
       </div>
       <button class="go" id="go" type="button"><span id="goTxt">Start</span><span aria-hidden="true">&rarr;</span></button>
+      <div class="cardLinks" id="cardLinks" hidden>
+        <button class="btn2" id="linkCredits" type="button">Credits</button>
+        <button class="btn2" id="linkOut" type="button">Clock out</button>
+      </div>
     </article>
   </div>
 
@@ -288,6 +305,35 @@ const STR={
   card_title_name:{en:'Sublevel Three',it:'Livello Tre'},
   card_title_body:{en:'You audit pallet counts from ten to six. Totals always reconcile. You have not slept in eleven months. Pike slides you a keycard toward a door missing from the floor plan.',it:'Controlli i pallet dalle dieci alle sei. I totali tornano sempre. Non dormi da undici mesi. Pike ti passa una tessera verso una porta assente dalla pianta.'},
   card_title_btn:{en:'Take the stairs',it:'Scendi le scale'},
+  credits_btn:{en:'Credits',it:'Crediti'},
+  out_btn:{en:'Clock out',it:'Timbra l\'uscita'},
+  quit_btn:{en:'Quit to title',it:'Torna al titolo'},
+  back_btn:{en:'Back',it:'Indietro'},
+  pause_title:{en:'Paused',it:'In pausa'},
+  resume_btn:{en:'Resume',it:'Riprendi'},
+  restart_btn:{en:'Restart bout',it:'Rigioca l\'incontro'},
+  menu_btn:{en:'Menu',it:'Menu'},
+  music_lbl:{en:'Music',it:'Musica'},
+  amb_lbl:{en:'Ambience',it:'Ambiente'},
+  motion_lbl:{en:'Less motion',it:'Meno movimento'},
+  credits_stamp:{en:'Credits',it:'Crediti'},
+  credits_title:{en:'Who made this',it:'Chi l\'ha fatto'},
+  credits_body:{en:'Sublevel Three is a small browser fighting game. These people and projects made it possible.',it:'Sublevel Three è un piccolo picchiaduro per browser. Questi progetti e queste persone lo hanno reso possibile.'},
+  cr_game:{en:'Game',it:'Gioco'},
+  cr_engine:{en:'Engine',it:'Motore'},
+  cr_fighters:{en:'Fighters',it:'Combattenti'},
+  cr_type:{en:'Type',it:'Caratteri'},
+  cr_sound:{en:'Sound',it:'Suono'},
+  cr_source:{en:'Source',it:'Codice'},
+  cr_by:{en:'by',it:'di'},
+  cr_fighters_v:{en:'CC0. Guard, hit and wind-up clips added in Blender.',it:'CC0. Guardia, colpi subiti e caricamento aggiunti in Blender.'},
+  out_saved_v:{en:'{n} of {m} bouts won',it:'{n} di {m} incontri vinti'},
+  cr_sound_v:{en:'Made for this game, CC0.',it:'Fatto per questo gioco, CC0.'},
+  out_stamp:{en:'Clocked out',it:'Turno finito'},
+  out_title:{en:'Shift over',it:'Turno finito'},
+  out_body:{en:'Your badge is back on the hook. The bouts you won are kept; nothing else needs saving. You can close this tab.',it:'Il badge è di nuovo sul gancio. Gli incontri vinti restano salvati; non c\'è altro da salvare. Puoi chiudere questa scheda.'},
+  out_back:{en:'Clock back in',it:'Rientra in turno'},
+  out_saved:{en:'Saved',it:'Salvato'},
   row_move:{en:'Move',it:'Movimento'},
   row_strike:{en:'Strike',it:'Colpi'},
   row_defend:{en:'Defend',it:'Difesa'},
@@ -388,7 +434,13 @@ function storyMetrics(){
 }
 function loadLang(){ try{ const v=localStorage.getItem('sublevel-lang'); if(v==='en'||v==='it') lang=v; }catch(e){} }
 function saveLang(){ try{ localStorage.setItem('sublevel-lang', lang); }catch(e){} }
-function paintLang(){ document.querySelectorAll('[data-lang]').forEach(b=>b.classList.toggle('on', b.dataset.lang===lang)); }
+function paintLang(){
+  document.querySelectorAll('[data-lang]').forEach(b=>b.classList.toggle('on', b.dataset.lang===lang));
+  const set=(id,k)=>{ const el=$(id); if(el) el.textContent=L(k); }, lab=(id,k)=>{ const el=$(id); if(el&&el.parentNode&&el.parentNode.lastChild) el.parentNode.lastChild.textContent=' '+L(k); };
+  set('pauseTitle','pause_title'); set('resume','resume_btn'); set('restart','restart_btn'); set('quitTitle','quit_btn'); set('pauseCredits','credits_btn');
+  set('linkCredits','credits_btn'); set('linkOut','out_btn'); set('menuBtn','menu_btn');
+  lab('pMusic','music_lbl'); lab('pAmb','amb_lbl'); lab('lessMotion2','motion_lbl');
+}
 function boutPlace(c){ return L(c.placeKey); }
 function boutRole(c){ return L(c.roleKey); }
 function boutTip(c){ return L(c.tipKey); }
@@ -845,8 +897,8 @@ function updateFx(dt){
 
 /* ---------- sound ---------- */
 let ac=null, muted=false, unlock='';
-let volSfx=1, volMusic=1;
-let master=null, sfxGain=null, musicGain=null, duckGain=null, roomGain=null, crowdGain=null;
+let volSfx=1, volMusic=1, volAmb=1;
+let master=null, sfxGain=null, musicGain=null, duckGain=null, roomGain=null, crowdGain=null, ambGain=null;
 const stemGain={calm:null,tense:null,finish:null};
 const stemNow={calm:1,tense:0,finish:0};
 let duck=1, duckT=0, bufs={}, gains={}, audioP=null;
@@ -864,6 +916,8 @@ function loadAudioPrefs(){
     if(s!==null&&s!=='') volSfx=clamp(Number(s),0,1);
     const u=localStorage.getItem('sublevel-music');
     if(u!==null&&u!=='') volMusic=clamp(Number(u),0,1);
+    const a=localStorage.getItem('sublevel-amb');
+    if(a!==null&&a!=='') volAmb=clamp(Number(a),0,1);
   }catch(e){}
 }
 function saveAudioPrefs(){
@@ -871,17 +925,22 @@ function saveAudioPrefs(){
     localStorage.setItem('sublevel-mute', muted?'1':'0');
     localStorage.setItem('sublevel-sfx', String(volSfx));
     localStorage.setItem('sublevel-music', String(volMusic));
+    localStorage.setItem('sublevel-amb', String(volAmb));
   }catch(e){}
 }
 function paintAudio(){
-  const s=$('sfxVol'), m=$('musVol'), b=$('snd');
+  const s=$('sfxVol'), m=$('musVol'), a=$('ambVol'), b=$('snd');
   if(s) s.value=String(Math.round(volSfx*100));
   if(m) m.value=String(Math.round(volMusic*100));
+  if(a) a.value=String(Math.round(volAmb*100));
+  if($('pMusic')) $('pMusic').checked=volMusic>0;
+  if($('pAmb')) $('pAmb').checked=volAmb>0;
   if(b) b.textContent=muted?'Sound off':'Sound on';
 }
 function applyBus(){
   if(sfxGain) sfxGain.gain.value=volSfx;
   if(musicGain) musicGain.gain.value=volMusic;
+  if(ambGain) ambGain.gain.value=volAmb;
   if(master) master.gain.value=muted?0:1;
   if(duckGain) duckGain.gain.value=duck;
 }
@@ -895,8 +954,9 @@ function audioInit(src){
     sfxGain=ac.createGain(); sfxGain.connect(master);
     musicGain=ac.createGain(); duckGain=ac.createGain();
     musicGain.connect(duckGain); duckGain.connect(master);
-    roomGain=ac.createGain(); roomGain.connect(master);
-    crowdGain=ac.createGain(); crowdGain.connect(master);
+    ambGain=ac.createGain(); ambGain.connect(master);
+    roomGain=ac.createGain(); roomGain.connect(ambGain);
+    crowdGain=ac.createGain(); crowdGain.connect(ambGain);
     stemGain.calm=ac.createGain(); stemGain.tense=ac.createGain(); stemGain.finish=ac.createGain();
     stemGain.calm.connect(musicGain); stemGain.tense.connect(musicGain); stemGain.finish.connect(musicGain);
     hubGain=ac.createGain(); hubGain.gain.value=0; hubGain.connect(musicGain);
@@ -967,37 +1027,46 @@ function duckHit(){
   duck=.35; duckT=.4;
   if(duckGain) duckGain.gain.value=duck;
 }
+/* The bed is quiet and the music is for moments. room and crowd are low and drift slowly (two incommensurate sines), so their 1.5 s loops do
+   not read as loops; the crowd rises with G.cheer. The calm stem plays on cards and fades out after cardQuiet seconds of nobody pressing
+   anything; the tense stem only when a fighter is under 40% hp; the finish stem on the knockout. Pause hushes everything. */
+const MIX={room:1.2,crowdBase:.45,crowdSwell:1.1,calmCard:.5,calmReady:.3,hubCard:.5,tense:.8,cardQuiet:40};
+let audPause=0, audCardT=0, audClock=0, audFade=1;
 function audioTick(dt){
+  audClock+=dt;
   if(duckT>0){
     duckT=Math.max(0, duckT-dt);
     duck=duckT<=0?1:lerp(.35,1,1-duckT/.4);
     if(duckGain) duckGain.gain.value=duck;
   }
-  let calm=1, tense=0, finish=0;
-  if(G.state==='ko'){ calm=0; finish=1; }
-  else if(G.state==='fight'){
-    const low=P&&E&&(P.hp/P.maxHp<.4||E.hp/E.maxHp<.4);
-    if(low||G.cheer>.7){ calm=0; tense=1; }
-    else { calm=.25; tense=.75; }
-  }
-  const k=Math.min(1, dt*3);
+  const cardEl=$('wrap'), onCard=(G.state==='card'||G.state==='title')&&cardEl&&!cardEl.hidden;
+  audPause=lerp(audPause, (G.state==='pause'||audOut)?1:0, Math.min(1,dt*8));
+  audCardT=onCard?audCardT+dt:0;
+  const quiet=onCard&&audCardT>MIX.cardQuiet;
+  audFade=lerp(audFade, quiet?0:1, Math.min(1,dt*(quiet?.6:3)));
+  let calm=0, tense=0, finish=0;
+  if(G.state==='ko') finish=1;
+  else if(G.state==='fight'){ if(P&&E&&(P.hp/P.maxHp<.4||E.hp/E.maxHp<.4)) tense=MIX.tense; }
+  else if(onCard) calm=MIX.calmCard;
+  else if(G.state==='ready') calm=MIX.calmReady;
+  const k=Math.min(1, dt*3), live=(1-audPause)*audFade;
   stemNow.calm=lerp(stemNow.calm, calm, k);
   stemNow.tense=lerp(stemNow.tense, tense, k);
   stemNow.finish=lerp(stemNow.finish, finish, k);
   if(stemGain.calm){
-    stemGain.calm.gain.value=stemNow.calm;
-    stemGain.tense.gain.value=stemNow.tense;
-    stemGain.finish.gain.value=stemNow.finish;
+    stemGain.calm.gain.value=stemNow.calm*live;
+    stemGain.tense.gain.value=stemNow.tense*(1-audPause);
+    stemGain.finish.gain.value=stemNow.finish*(1-audPause);
   }
+  const drift=(a,b)=>.5+.5*Math.sin(audClock*a)*Math.sin(audClock*b+1.7), hush=1-.85*audPause, cheer=clamp(G.cheer||0,0,1.4);
+  if(roomGain) roomGain.gain.value=MIX.room*(.75+.25*drift(.37,.11))*hush;
   if(crowdGain){
-    crowdGain.gain.value=.4+1.1*clamp(G.cheer||0,0,1.4)/1.4;
+    crowdGain.gain.value=(MIX.crowdBase+MIX.crowdSwell*cheer/1.4)*(.8+.2*drift(.29,.13))*hush;
     if(loopSrc.crowd) loopSrc.crowd.playbackRate.value=.92+.18*clamp(G.cheer||0,0,1.2);
   }
-  const cardEl=$('wrap');
-  const onCard=G.state==='card'&&cardEl&&!cardEl.hidden;
   const hubT=onCard?(progress.dock?1:.55):0;
   hubNow=lerp(hubNow, hubT, Math.min(1, dt*2));
-  if(hubGain) hubGain.gain.value=hubNow*(gains.hub||1)*.7;
+  if(hubGain) hubGain.gain.value=hubNow*(gains.hub||1)*.7*MIX.hubCard*live;
   if(loopSrc.hub) loopSrc.hub.playbackRate.value=.94+boutMusicRate*.06;
   if(loopSrc.dock) loopSrc.dock.playbackRate.value=progress.dock?1.05:.88;
 }
@@ -1602,7 +1671,7 @@ function paintBinds(){
     const kbd=el.querySelector('kbd'); if(kbd) kbd.textContent=keyLabel(binds[el.dataset.bind]);
     el.classList.toggle('listen', listenAct===el.dataset.bind);
   });
-  keysHtml='<kbd>WASD</kbd> move <kbd>'+keyLabel(binds.jab)+'</kbd> jab <kbd>'+keyLabel(binds.heavy)+'</kbd> heavy <kbd>'+keyLabel(binds.block)+'</kbd> block (hold) <kbd>'+keyLabel(binds.dodge)+'</kbd> dodge';
+  keysHtml='<kbd data-k="move">WASD</kbd> move <kbd data-k="jab">'+keyLabel(binds.jab)+'</kbd> jab <kbd data-k="heavy">'+keyLabel(binds.heavy)+'</kbd> heavy <kbd data-k="block">'+keyLabel(binds.block)+'</kbd> block (hold) <kbd data-k="dodge">'+keyLabel(binds.dodge)+'</kbd> dodge <kbd>Esc</kbd> menu';
   if(!padOn) $('keys').innerHTML=keysHtml;
   document.querySelectorAll('#cRows dt').forEach(dt=>{
     if(dt.textContent==='Strike') dt.nextElementSibling.textContent=keyLabel(binds.jab)+' jab, '+keyLabel(binds.heavy)+' heavy';
@@ -1619,9 +1688,33 @@ function actionFor(k){
 }
 loadBinds();
 loadRumble();
-function keyName(e){ return e.key===' '?'space':e.key.toLowerCase(); }
+/* The key as it is labelled on the keycap, and for a layout whose letters are not Latin (Cyrillic, Greek, Arabic, Hebrew) the key in that
+   position, so J K L and WASD are in the same place on any keyboard. */
+function keyName(e){
+  if(e.key===' ') return 'space';
+  const k=e.key.toLowerCase();
+  if(k.length===1&&/[a-z0-9]/.test(k)) return k;
+  const m=/^Key([A-Z])$/.exec(e.code||''); if(m) return m[1].toLowerCase();
+  return k;
+}
+const INPUT={buf:.22}; /* seconds a press of jab, heavy or dodge waits for the fighter to be free */
+/* The key hint under the arena lights a key as the game receives it, so a press that does nothing can be told from a key that never arrived. */
+const MOVE_KEYS=new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']);
+function capLight(k,on){
+  const el=$('keys'); if(!el||padOn) return;
+  const act=MOVE_KEYS.has(k)?'move':actionFor(k); if(!act) return;
+  const kb=el.querySelector('kbd[data-k="'+act+'"]'); if(!kb) return;
+  if(act==='move'){ const down=[...keys].some(q=>MOVE_KEYS.has(q)); kb.classList.toggle('on',down); } else kb.classList.toggle('on',on);
+}
+/* A press that cannot start (not enough stamina) says so: the stamina bar blinks and a low tick plays. */
+let denyT=0;
+function denyCue(){
+  const now=performance.now(); if(now-denyT<250) return; denyT=now;
+  const st=$('pSt'); if(st){ st.classList.remove('deny'); void st.offsetWidth; st.classList.add('deny'); }
+  playSample('ui',.55);
+}
 window.addEventListener('keydown',e=>{
-  audioInit('key');
+  audioInit('key'); audCardT=0;
   const k=keyName(e);
   if(listenAct){
     e.preventDefault();
@@ -1634,6 +1727,7 @@ window.addEventListener('keydown',e=>{
   }
   if(k==='escape'){
     e.preventDefault();
+    if(G.state==='card'&&cardEsc&&!wrapEl.hidden){ $('go').click(); return; }
     if(G.state==='fight'||G.state==='ready') pauseFight();
     else if(G.state==='pause') resumeFight();
     return;
@@ -1641,14 +1735,25 @@ window.addEventListener('keydown',e=>{
   if(k==='enter'&&!$('wrap').hidden){ e.preventDefault(); $('go').click(); return; }
   if(['space','arrowup','arrowdown','arrowleft','arrowright'].includes(k)&&$('wrap').hidden) e.preventDefault();
   if(e.repeat) return;
-  keys.add(k);
+  keys.add(k); capLight(k,true);
   const act=actionFor(k);
-  if(act==='jab') buf.jab=.22;
-  else if(act==='heavy') buf.heavy=.22;
-  else if(act==='dodge') buf.dodge=.22;
+  if(act==='jab') buf.jab=INPUT.buf;
+  else if(act==='heavy') buf.heavy=INPUT.buf;
+  else if(act==='dodge') buf.dodge=INPUT.buf;
+  if(P&&(G.state==='fight')&&(act==='jab'||act==='heavy'||act==='dodge')&&P.stam<(act==='dodge'?16:ATK[act].cost)) denyCue();
 });
-window.addEventListener('keyup',e=>keys.delete(keyName(e)));
-window.addEventListener('blur',()=>{keys.clear();touchBlock=false;});
+window.addEventListener('keyup',e=>{
+  const k=keyName(e); keys.delete(k); capLight(k,false);
+  if(e.key==='Meta'){ keys.clear(); document.querySelectorAll('#keys kbd.on').forEach(x=>x.classList.remove('on')); } /* macOS sends no keyup for keys released under Cmd */
+});
+const dropKeys=()=>{ keys.clear(); touchBlock=false; document.querySelectorAll('#keys kbd.on').forEach(x=>x.classList.remove('on')); };
+window.addEventListener('blur',()=>{ dropKeys(); if(G.state==='fight'||G.state==='ready') pauseFight(); });
+let audWasRunning=false;
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){ dropKeys(); if(G.state==='fight'||G.state==='ready') pauseFight(); }
+  /* a background tab is silent: the context stops while the page is hidden and starts again, if it was running, when it comes back */
+  if(ac){ if(document.hidden){ audWasRunning=ac.state==='running'; ac.suspend(); } else if(audWasRunning){ audWasRunning=false; ac.resume(); } }
+});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 function playerIntent(){
   let ix=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
@@ -1677,6 +1782,15 @@ function wireVol(id, set){
 }
 wireVol('sfxVol', v=>{ volSfx=v; });
 wireVol('musVol', v=>{ volMusic=v; });
+wireVol('ambVol', v=>{ volAmb=v; });
+/* pause-menu switches: off is 0, on is the level it had (or full) */
+let musLast=1, ambLast=1;
+function wireSwitch(id, get, set, last){
+  const el=$(id); if(!el) return;
+  el.addEventListener('change',()=>{ if(el.checked) set(last()||1); else { last(get()); set(0); } saveAudioPrefs(); applyBus(); paintAudio(); });
+}
+wireSwitch('pMusic',()=>volMusic,v=>{ volMusic=v; },v=>{ if(v!==undefined) musLast=v; return musLast; });
+wireSwitch('pAmb',()=>volAmb,v=>{ volAmb=v; },v=>{ if(v!==undefined) ambLast=v; return ambLast; });
 paintAudio();
 function rumble(strong,weak,ms){
   if(rumbleAmt<=0||padIdx<0||!navigator.getGamepads) return;
@@ -1778,6 +1892,44 @@ function restartBout(){
   if($('pause')) $('pause').hidden=true;
   startBout(G.bout||0);
 }
+/* Leave the fight for the title card. Wins are saved when they happen (grantWin), so nothing is lost. */
+function quitToTitle(){
+  if($('pause')) $('pause').hidden=true;
+  G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
+  titleCard();
+}
+const lnk=(u,t)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+'</a>';
+/* Credits as a card. back() says where Back goes: the title, or the pause menu it was opened from. */
+function creditsCard(back){
+  showCard({stamp:L('credits_stamp'),kick:L('company_form'),title:L('credits_title'),body:L('credits_body'),
+    rows:[[L('cr_game'),'Carlo Perassi, Apache-2.0'],
+          [L('cr_engine'),lnk('https://www.babylonjs.com','Babylon.js')+' 9.30, Apache-2.0'],
+          [L('cr_fighters'),lnk('https://opengameart.org/content/animated-human-low-poly','Animated Human')+' '+L('cr_by')+' '+lnk('https://quaternius.com','Quaternius')+', '+L('cr_fighters_v')],
+          [L('cr_type'),'Big Shoulders Stencil Display by Patric King; IBM Plex Mono by IBM. SIL OFL 1.1'],
+          [L('cr_sound'),L('cr_sound_v')],
+          [L('cr_source'),lnk('https://github.com/carlok/red-ink','github.com/carlok/red-ink')]],
+    btn:L('back_btn'),go:back,esc:true});
+}
+/* Clock out: the closest a web page gets to Exit. It leaves fullscreen, hushes the sound, says goodbye, and asks the browser to close the
+   tab, which it only does for a tab a script opened. */
+let audOut=false;
+function clockOut(){
+  try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen(); else if(document.webkitFullscreenElement&&document.webkitExitFullscreen) document.webkitExitFullscreen(); }catch(e){}
+  audOut=true;
+  showCard({stamp:L('out_stamp'),kick:L('company_form'),title:L('out_title'),body:L('out_body'),
+    rows:[[L('out_saved'),L('out_saved_v').replace('{n}',progress.wins).replace('{m}',BOUTS.length)]],
+    btn:L('out_back'),go:()=>{ audOut=false; titleCard(); },esc:true});
+  try{ window.close(); }catch(e){}
+}
+function openCreditsFromPause(){
+  if($('pause')) $('pause').hidden=true;
+  creditsCard(()=>{ wrapEl.hidden=true; G.state='pause'; if($('pause')) $('pause').hidden=false; hudEl.hidden=false; if(isTouch) $('touch').hidden=false; });
+}
+if($('quitTitle')) $('quitTitle').addEventListener('click',quitToTitle);
+if($('pauseCredits')) $('pauseCredits').addEventListener('click',openCreditsFromPause);
+if($('linkCredits')) $('linkCredits').addEventListener('click',()=>{ audioInit('click'); SFX.ui(); creditsCard(titleCard); });
+if($('linkOut')) $('linkOut').addEventListener('click',()=>{ audioInit('click'); SFX.ui(); clockOut(); });
+if($('menuBtn')) $('menuBtn').addEventListener('click',()=>{ if(G.state==='fight'||G.state==='ready') pauseFight(); });
 loadMotion(); paintMotion();
 if($('lessMotion')) $('lessMotion').addEventListener('change',()=>setLessMotion($('lessMotion').checked));
 if($('lessMotion2')) $('lessMotion2').addEventListener('change',()=>setLessMotion($('lessMotion2').checked));
@@ -1842,12 +1994,14 @@ function updateHud(){
 function banner(text){
   bannerEl.textContent=text; bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
 }
+let cardEsc=false;
 function showCard(c){
   $('cStamp').textContent=c.stamp; $('cKick').textContent=c.kick; $('cTitle').textContent=c.title; $('cBody').textContent=c.body;
   $('cRows').innerHTML=(c.rows||[]).map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('');
   $('cRows').hidden=!(c.rows&&c.rows.length);
   $('avatarBox').hidden=!c.avatar; $('goTxt').textContent=c.btn;
   $('go').onclick=()=>{ audioInit('click'); SFX.ui(); wrapEl.hidden=true; c.go(); };
+  cardEsc=!!c.esc; if($('cardLinks')) $('cardLinks').hidden=!c.links;
   G.state='card'; wrapEl.hidden=false; hudEl.hidden=true; $('touch').hidden=true; wrapEl.scrollTop=0;
   setTimeout(()=>{ try{ $('go').focus({preventScroll:true}); }catch(e){} },30);
 }
@@ -1866,7 +2020,7 @@ function introCard(i,lead){
 }
 function titleCard(){
   showCard({stamp:L('card_title_stamp'),kick:L('company_form'),title:L('card_title_name'),
-    body:L('card_title_body'),rows:titleRows(),avatar:true,btn:L('card_title_btn'),go:()=>introCard(0)});
+    body:L('card_title_body'),rows:titleRows(),avatar:true,links:true,btn:L('card_title_btn'),go:()=>introCard(0)});
 }
 function hubCard(nextIdx){
   const n=BOUTS[nextIdx];
@@ -1978,7 +2132,7 @@ function simTick(){
 function frame(){
   let dt=Math.min(engine.getDeltaTime()/1000,.05);
   const real=dt;
-  if(G.state==='pause'){ acc=0; pollPad(); updateHud(); return; }
+  if(G.state==='pause'){ acc=0; audioTick(real); pollPad(); updateHud(); return; }
   if(G.hitstop>0) dt*=.12;
   G.t+=dt;
   audioTick(real);
@@ -2360,6 +2514,8 @@ async function skinOn(on,model){
 }
 
 /* ---------- boot ---------- */
+wrapEl.addEventListener('pointerdown',()=>{ audCardT=0; });
+if(isTouch&&$('menuBtn')) $('menuBtn').hidden=false;
 $('snd').addEventListener('click',()=>{ muted=!muted; saveAudioPrefs(); paintAudio(); audioInit('click'); if(!muted) SFX.ui(); });
 buildWorld(); buildCrowd(); buildParticles(); buildWords(); applyEnv(0);
 P=makeFighter(LOOKS.auditor,true); P.cfg={foe:'Auditor'}; P.speed0=4.4; P.reach=1; P.dmgMul=1; resetFighter(P,-2.3,Math.PI/2,100);
@@ -2862,7 +3018,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,stemGain,hubGain,loopSrc}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

@@ -84,7 +84,7 @@ export class CDP {
 
 /**
  * @param {(cdp: CDP) => Promise<void>} fn
- * @param {{ file?: boolean, url?: string }} [opts]
+ * @param {{ file?: boolean, url?: string, args?: string[] }} [opts]  args: extra Chrome flags, e.g. --autoplay-policy=no-user-gesture-required
  */
 export async function withPage(fn, opts = {}) {
   const server = opts.url ? null : await createStaticServer();
@@ -102,6 +102,7 @@ export async function withPage(fn, opts = {}) {
       "--disable-background-networking",
       "--hide-scrollbars",
       ...(opts.file ? ["--allow-file-access-from-files"] : []),
+      ...(opts.args || []),
       "about:blank",
     ],
     { stdio: "ignore" },

@@ -1238,3 +1238,63 @@ The Auditor's black trousers had the same problem in the last place: ΔE 3.9 fro
 Screenshot: `tuning/s19-reconciler-floor.jpg`.
 
 Not done: shirts are not checked against the floor or the crowd, the floor ΔE uses the base colour and not what the lights make of it, and the Auditor's 13.6 is under the 22 the opponents get (his look is fixed).
+
+## Sprint 20: exit, credits, a calmer sound, and K and L
+
+Asked for: an exit option, credits, less constant noise and music, and a check that K and L always work. Decisions: Quit to title plus a Clock out card; music only at moments; measure the keys first, then fix.
+
+### K and L
+
+`step()` only reads jab, heavy, dodge and block while the fighter is idle or blocking, a press waits 0.22 s in a buffer, and nothing tells the player when one is dropped. `tools/key-probe.mjs` sends a seeded stream of real keydown and keyup events during a bout, logs every sim tick, and counts a press as accepted when its action starts inside the buffer window (L: block up within 3 ticks).
+
+| Pace | Buffer | Accepted, passive opponent | Accepted, against Reyes | Dropped for |
+| --- | --- | --- | --- | --- |
+| Mashing, a press every 90–610 ms | 0.22 s | 38.7% (a second run 36.2%) | 34.4% (36.8%) | stamina about half, then recovery, stun |
+| One a second | 0.22 s | 80% | 66% | stun after a hit, stamina, a few in recovery |
+| One a second | 0.30 s | 79% | 67% | the same |
+| One a second | 0.40 s | 78% | 67% | the same |
+
+A longer buffer does not help (0.40 s is no better than 0.22 s), so it stays at 0.22 s. What is dropped is being stunned by a hit (by design), pressing without the stamina (heavy needs 24, jab 10, dodge 16, with no sign before), and a few presses during attack recovery. So the fix is feedback and robustness:
+
+- The key hint lights a key on keydown (`capLight`), so "the game got it but did nothing" can be told from "the key never arrived".
+- A press without the stamina blinks the stamina bar and plays a low tick, at most four a second.
+- `keyName` uses the keycap label, and for a layout whose letters are not Latin the key in that position (`e.code`), so J, K, L and WASD sit in the same place on Cyrillic, Greek or Arabic keyboards. Checked with a keydown of `л` on `KeyK`: heavy starts.
+- Keys are cleared on Meta keyup (macOS sends no keyup for keys released under Cmd) and when the tab is hidden; losing focus pauses a fight in progress.
+
+Not fixable here: a keyboard that ghosts on W+D+K+L+Space. The alternates (Z, X, C, V, Shift) already exist and keys can be remapped.
+
+### Sound
+
+Nine loops (room, crowd, calm, calm2, tense, tense2, finish, hub, dock) of 1.5–2 s started on the first key press and never stopped; the audio tick did not even run while paused. `tools/audio-bed-probe.mjs` reads an analyser on the master bus (rms dBFS):
+
+| | Before | After |
+| --- | --- | --- |
+| Title card | −20.6 | −26.1 |
+| Fight, nothing happening | −25.4 | −40.7 |
+| Paused | −24.9 | −54.2 |
+| Rally (a punch every 0.6 s), rms / peak | −23.4 / −3.8 | −26.5 / −4.0 |
+| Knockout | −25.3 | −25.0 |
+
+The first try put the idle fight at −51.7, which is silence, so the room and crowd bases went up to land at −40.7: still there, 15 dB under what it was.
+
+- Music is for moments: calm on cards (fading out after 40 s of nobody pressing anything, and lower in the ready phase), tense only when a fighter is under 40% hp, finish on the knockout; nothing during an ordinary rally.
+- Room and crowd are low (`MIX`), and drift with two incommensurate sines so their short loops do not read as loops; the crowd still rises with `G.cheer`.
+- Pause hushes everything over 0.3 s; a hidden tab suspends the audio context and resumes it.
+- Ambience has its own bus, slider and a pause-menu switch; the pause menu also has a Music switch.
+
+### Menus
+
+The pause card had Resume and Restart only, and on a phone it could not be opened at all (Esc and the pad's Start were the only ways). Now: pause has Quit to title and Credits; the title card has Credits and Clock out; a Menu button on touch opens the pause card; Esc goes back one card. Clock out leaves fullscreen, hushes the sound, shows the bouts won, and calls `window.close()`, which the browser honours only for a tab a script opened, so the card says the tab can be closed. Credits lists the game, Babylon.js, Animated Human by Quaternius, the two fonts (SIL OFL 1.1) and the sound, with links; `README.md` and `NOTICE` now carry the fonts too. English and Italian, and the pause labels follow the language.
+
+### Checked
+
+| Check | Result |
+| --- | --- |
+| `tools/regression.mjs` | 24 of 24 (two new: menus, key lighting and layout) |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, unchanged |
+| `tools/step-probe.mjs` | identical at 30 to 144 fps (the 20 fps difference is also on master) |
+| `tools/ui-probe.mjs`, `tools/input-probe.mjs` | no failures |
+
+Screenshots: `tuning/s20-credits.jpg`, `s20-pause.jpg`, `s20-clockout.jpg`, `s20-pause-phone.jpg`.
+
+Not done: how the new sound feels over speakers (the numbers say quieter, not better), a real keyboard that ghosts, a real phone, a screen-reader pass over the new cards, and the 1.5 s room and crowd loops are still 1.5 s (the drift hides them, it does not lengthen them). The fonts still come from Google; self-hosting them would make `file://` fully offline.
