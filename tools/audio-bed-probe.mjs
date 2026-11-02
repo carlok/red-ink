@@ -42,7 +42,7 @@ await withPage(async (cdp) => {
     while (G.state !== "fight") await raf();
     S.E.ai.cd = 99; S.E.cfg.cd = 99; S.E.speed0 = 0; S.E.cfg.block = 0; S.E.cfg.dodge = 0; S.P.pos.set(-0.7, 0, 0); S.E.pos.set(0.7, 0, 0); S.P.hp = S.P.maxHp = 1e6; S.E.hp = S.E.maxHp = 1e6;
     await sleep(2500); res.fightIdle = await rms(2000);
-    const hp = [S.P.hp, S.E.hp, S.E.maxHp]; S.E.maxHp = 100; S.E.hp = 30; await sleep(2500); res.tenseShape = await shape(8000); res.tensePitches = await pitches(8000); S.E.maxHp = hp[2]; S.E.hp = hp[1];
+    const hp = [S.P.hp, S.E.hp, S.E.maxHp]; S.E.maxHp = 100; S.E.hp = 30; await sleep(2500); res.tenseShape = await shape(8000); res.tensePitches = await pitches(8000); res.tense = await rms(4000); S.E.maxHp = hp[2]; S.E.hp = hp[1];
     let go = true; const spam = (async () => { while (go) { key("j", true); key("j", false); await sleep(600); } })();
     await sleep(1500); res.rally = await rms(3000); go = false; await spam;
     S.pauseFight(); await sleep(800); res.paused = await rms(1500); S.resumeFight();
