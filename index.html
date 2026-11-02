@@ -2065,7 +2065,7 @@ const SKIN_MODELS={
 };
 /* On by default. ?skin=0 turns it off for one load, localStorage 'sublevel-skin'='0' for good, ?skin=1 overrides that; ?skinseed=N pins
    the opponents' looks. If the model cannot be loaded the game falls back to the procedural fighters and stays there. */
-const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,shade:true,rim:true,outline:true,seed:(Math.random()*4294967296)>>>0};
+const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,shade:true,rim:true,outline:true,wraps:true,walkK:1.55,seed:(Math.random()*4294967296)>>>0};
 try{
   const q=new URLSearchParams(location.search), v=q.get('skin');
   if(v==='0'||(v!=='1'&&localStorage.getItem('sublevel-skin')==='0')) SKIN.on=false;
@@ -2168,9 +2168,10 @@ function randomLook(seed,base,others){
    interpolated across the triangles and multiplied into the texture. Each region gets [base, how much the up-facing normal adds,
    how much height inside the region adds]: tops catch light and undersides fall off, the hem of a shirt and the ankle of a trouser
    leg go darker, hair has a sheen on top. Skin also turns warmer where it falls off, like blood showing through. The eyes are left alone. */
+const SKIN_HAND_BONES=new Set([11,12,13,14,15,16,17,18,19,20,21,25,26,27,28,29,30,31,32,33,34,35]); /* LeftHand.. and RightHand.. with their fingers */
 const SKIN_CREASE=.22, SKIN_HEAD_BONE=5; /* bone 5 is Head in the Quaternius rig */
 const SKIN_SHADE={skin:[.80,.24,.10],hair:[.66,.46,.14],shirt:[.78,.26,.16],pants:[.80,.24,.14],shoes:[.62,.36,.24],eyes:[1,0,0]};
-function skinShade(m){
+function skinShade(m,L){
   const pos=m.getVerticesData('position'), nor=m.getVerticesData('normal'), uv=m.getVerticesData('uv'); if(!pos||!nor||!uv) return;
   const wts=m.getVerticesData('matricesWeights'), idx=m.getVerticesData('matricesIndices');
   const n=pos.length/3, name=new Array(n), lo={}, hi={}, head=[];
@@ -2178,6 +2179,10 @@ function skinShade(m){
     const row=Math.floor(uv[i*2+1]*32), b=SKIN_BANDS.find(b=>row>=b[1]&&row<b[1]+b[2]), k=b?b[0]:'skin', y=pos[i*3+1];
     name[i]=k; if(lo[k]===undefined||y<lo[k]) lo[k]=y; if(hi[k]===undefined||y>hi[k]) hi[k]=y;
   }
+  /* hand wraps: the hand bones take a tape colour, light tape on dark skin and dark tape on light skin, so a fist reads against the body.
+     The vertex colour multiplies the skin texel, so it is the tape colour over the skin colour. */
+  let tape=null;
+  if(L&&L.skin&&SKIN.wraps){ const sk=C3.FromHexString(L.skin), tp=C3.FromHexString(labOf(L.skin)[0]>62?'#27272b':'#e6e1d3'); tape=[tp.r/Math.max(.05,sk.r),tp.g/Math.max(.05,sk.g),tp.b/Math.max(.05,sk.b)]; }
   const col=new Float32Array(n*4);
   for(let i=0;i<n;i++){
     const k=name[i], c=SKIN_SHADE[k], h=.5+.5*nor[i*3+1], t=((pos[i*3+1]-lo[k])/((hi[k]-lo[k])||1))*2-1, w=k==='skin'?1-h:0;
@@ -2187,6 +2192,7 @@ function skinShade(m){
       let w0=0,w1=0,b0=-1; for(let j=0;j<4;j++){ const v=wts[i*4+j]; if(v>w0){ w1=w0; w0=v; b0=idx[i*4+j]; } else if(v>w1) w1=v; }
       g*=1-SKIN_CREASE*Math.min(1,4*w0*w1);
       if(k==='skin'&&b0===SKIN_HEAD_BONE) head.push(i);
+      if(k==='skin'&&tape&&SKIN_HAND_BONES.has(b0)){ col[i*4]=g*tape[0]; col[i*4+1]=g*tape[1]; col[i*4+2]=g*tape[2]; col[i*4+3]=1; continue; }
     }
     col[i*4]=g; col[i*4+1]=g*(1-.07*w); col[i*4+2]=g*(1-.12*w); col[i*4+3]=1;
   }
@@ -2250,7 +2256,7 @@ async function skinFighter(f,look){
     m.material=sm; p.dispose(false,true); mats.push(sm);
     /* the same dark outline the procedural parts have, so the fighters match the comic words; the width is in model units (about 5.5 tall) */
     if(SKIN.outline){ m.renderOutline=true; m.outlineWidth=SKIN_OUTLINE; m.outlineColor=new C3(.03,.03,.04); }
-    if(SKIN.shade){ try{ skinShade(m); }catch(e){ if(window.console) console.warn('skin shade off:',e); } }
+    if(SKIN.shade){ try{ skinShade(m,f.L); }catch(e){ if(window.console) console.warn('skin shade off:',e); } }
   });
   f.skin_pal=pal;
   const groups={}; res.animationGroups.forEach(g=>{ groups[g.name.split('|').pop()]=g; });
@@ -2274,7 +2280,7 @@ function skinPick(f,M){
   if(st==='block'&&C.block) return [C.block,.99];
   if(st==='win'&&C.win) return [C.win,(f.t/dur(C.win))%1];
   if(st==='dodge'&&C.run) return [C.run,(f.dodgeT/.34)%1];
-  if((st==='idle'||st==='block')&&f.moveAmt>.12&&C.walk) return [C.walk,(f.phase/(Math.PI*2))%1];
+  if((st==='idle'||st==='block')&&f.moveAmt>.12&&C.walk) return [C.walk,(f.phase*SKIN.walkK/(Math.PI*2))%1]; /* the clip's stride is short for the sim's speed, so its cycle turns over faster than the procedural legs: foot-probe */
   return [C.idle,(f.t/dur(C.idle))%1];
 }
 /* When the clip changes, the bones blend from the pose they were in to the new clip. Fast clips fade fast: a jab has 0.15 s to reach
