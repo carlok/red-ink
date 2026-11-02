@@ -35,6 +35,25 @@ await withPage(async (cdp) => {
       let ch = 0; for (let i = 1; i < seq.length; i++) if (seq[i] !== null && seq[i - 1] !== null && Math.abs(seq[i] - seq[i - 1]) > 1) ch++;
       return { pitchChangesPer10s: Math.round(ch / (ms / 10000) * 10) / 10, distinctPitches: new Set(seq.filter((x) => x !== null)).size };
     };
+    /* the tail of a snare: the master output is recorded for 0.8 s after one hit (layers frozen, the ambience bus muted) and the rms in
+       10 ms windows is read at the hit, 100 ms and 300 ms later, in dB relative to the loudest window */
+    const snareTail = async () => {
+      const sp = g.ac.createScriptProcessor(1024, 1, 1), chunks = []; g.master.connect(sp); sp.connect(g.ac.destination);
+      sp.onaudioprocess = (e) => { chunks.push([g.ac.currentTime, Float32Array.from(e.inputBuffer.getChannelData(0))]); };
+      const amb = g.ambGain.gain.value; g.ambGain.gain.value = 0; g.MUS.hold = true; Object.keys(g.MUS.layer).forEach((k) => { g.MUS.layer[k].gain.value = k === "drums" ? 1 : 0; });
+      await sleep(300); chunks.length = 0; const t0 = g.ac.currentTime + 0.15; g.voices().snare(t0, 1, false); await sleep(1100);
+      g.master.disconnect(sp); sp.disconnect(); g.MUS.hold = false; g.ambGain.gain.value = amb;
+      const sr = g.ac.sampleRate, all = []; chunks.forEach(([t, d]) => d.forEach((v, i) => all.push([t - d.length / sr + i / sr, v])));
+      const win = (a, b) => { const r = all.filter(([t]) => t >= t0 + a && t < t0 + b).map((x) => x[1]); return r.length ? Math.sqrt(r.reduce((x, y) => x + y * y, 0) / r.length) : 0; };
+      const peak = Math.max(win(0, .01), win(.01, .02), win(.02, .04)), db = (v) => Math.round(20 * Math.log10(v / peak + 1e-9) * 10) / 10;
+      return { at100ms: db(win(.09, .11)), at300ms: db(win(.29, .31)), peakRms: Math.round(20 * Math.log10(peak + 1e-9) * 10) / 10 };
+    };
+    /* nodes created while a layer set plays: the node factories are counted for 10 s */
+    const nodeCount = async (ms) => {
+      const P = g.ac.constructor.prototype, names = ["createGain", "createOscillator", "createBufferSource", "createBiquadFilter", "createDelay", "createConvolver"], n = { total: 0 }, orig = {};
+      names.forEach((k) => { orig[k] = P[k]; P[k] = function (...a) { n.total++; return orig[k].apply(this, a); }; });
+      await sleep(ms); names.forEach((k) => { P[k] = orig[k]; }); return Math.round(n.total / (ms / 10000));
+    };
     const res = { ctx: g.ac.state, sampleLoops: 0, liveBed: !!g.BED.ready };
     res.titleShape = await shape(8000); res.titlePitches = await pitches(8000);
     res.title = await rms(1500);
@@ -42,7 +61,8 @@ await withPage(async (cdp) => {
     while (G.state !== "fight") await raf();
     S.E.ai.cd = 99; S.E.cfg.cd = 99; S.E.speed0 = 0; S.E.cfg.block = 0; S.E.cfg.dodge = 0; S.P.pos.set(-0.7, 0, 0); S.E.pos.set(0.7, 0, 0); S.P.hp = S.P.maxHp = 1e6; S.E.hp = S.E.maxHp = 1e6;
     await sleep(2500); res.fightIdle = await rms(2000);
-    const hp = [S.P.hp, S.E.hp, S.E.maxHp]; S.E.maxHp = 100; S.E.hp = 30; await sleep(2500); res.tenseShape = await shape(8000); res.tensePitches = await pitches(8000); res.tense = await rms(4000); S.E.maxHp = hp[2]; S.E.hp = hp[1];
+    res.snareTail = await snareTail();
+    const hp = [S.P.hp, S.E.hp, S.E.maxHp]; S.E.maxHp = 100; S.E.hp = 30; await sleep(2500); res.tenseShape = await shape(8000); res.tensePitches = await pitches(8000); res.tense = await rms(4000); res.tenseNodesPer10s = await nodeCount(10000); S.E.maxHp = hp[2]; S.E.hp = hp[1];
     let go = true; const spam = (async () => { while (go) { key("j", true); key("j", false); await sleep(600); } })();
     await sleep(1500); res.rally = await rms(3000); go = false; await spam;
     S.pauseFight(); await sleep(800); res.paused = await rms(1500); S.resumeFight();
