@@ -1992,6 +1992,9 @@ async function skinFighter(f,look){
   anchor.parent=f.slot;
   res.meshes.forEach(m=>{ m.isPickable=false; sg.addShadowCaster(m); m.alwaysSelectAsActiveMesh=true; });
   f.vis.setEnabled(false);
+  /* the red "!" tell hangs on the procedural head, which is now hidden: move it onto the slot, above the avatar's head.
+     It was built inside the 0.8 scaled vis node, so it is scaled to match. */
+  if(f.alert){ if(!f.alertHome) f.alertHome={parent:f.alert.parent,y:f.alert.position.y,s:f.alert.scaling.x}; f.alert.parent=f.slot; f.alert.position.set(0,2.2,0); f.alert.scaling.setAll(.8); }
   /* the glTF loader builds PBR materials, which fall off with the inverse square of the light distance and stay black under
      this scene's lights. Rebuild them the way the procedural bodies are lit: a standard material with an emissive base. */
   const pal=M.palette?skinPalette(f.L):null;
