@@ -690,6 +690,7 @@ function applyEnv(i){
   scene.fogColor.set(e.fog[0],e.fog[1],e.fog[2]); scene.fogDensity=e.fog[3]; scene.clearColor.set(e.fog[0],e.fog[1],e.fog[2],1);
   if(dustPS){ dustPS.color1.set(e.dust[0][0],e.dust[0][1],e.dust[0][2],e.dust[0][3]); dustPS.color2.set(e.dust[1][0],e.dust[1][1],e.dust[1][2],e.dust[1][3]); }
   Object.keys(propSets).forEach(k=>propSets[k].forEach(m=>m.setEnabled(k===e.props)));
+  [P,E].forEach(f=>{ if(f&&f.skin_fp) skinRim(f.skin_fp); });
   drawSigns();
   applyArena(progress.arena);
 }
@@ -2064,7 +2065,7 @@ const SKIN_MODELS={
 };
 /* On by default. ?skin=0 turns it off for one load, localStorage 'sublevel-skin'='0' for good, ?skin=1 overrides that; ?skinseed=N pins
    the opponents' looks. If the model cannot be loaded the game falls back to the procedural fighters and stays there. */
-const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,shade:true,seed:(Math.random()*4294967296)>>>0};
+const SKIN={on:true,model:'quaternius',files:{},koSeconds:2.2,fade:true,shade:true,rim:true,outline:true,seed:(Math.random()*4294967296)>>>0};
 try{
   const q=new URLSearchParams(location.search), v=q.get('skin');
   if(v==='0'||(v!=='1'&&localStorage.getItem('sublevel-skin')==='0')) SKIN.on=false;
@@ -2210,6 +2211,13 @@ function skinMarks(f){
     m.updateVerticesData('color',col);
   });
 }
+/* Rim light: a Fresnel term on the emissive makes the edges of the body, where the normal turns away from the camera, brighter and tinted
+   by the place's key light, so the fighters separate from the dark crowd. It multiplies the emissive, so a dark region gets little of it. */
+function skinRim(fp){
+  const k=envNow.light.key, g=SKIN_RIM;
+  fp.leftColor.set(1+g*k[0],1+g*k[1],1+g*k[2]);
+}
+const SKIN_RIM=6, SKIN_OUTLINE=.05;
 async function skinFighter(f,look){
   /* the look's build is only visual: f.sx, the body size resolveBodies uses, stays the foe's own so the balance table does not move */
   if(look){ f.L=look; f.root.scaling.set(look.sx,look.sy,look.sx); }
@@ -2237,8 +2245,11 @@ async function skinFighter(f,look){
   res.meshes.forEach(m=>{
     const p=m.material; if(!p) return;
     const sm=new B.StandardMaterial('skinM',scene);
+    if(SKIN.rim&&B.FresnelParameters){ const fp=new B.FresnelParameters(); fp.bias=0; fp.power=2.5; fp.rightColor.set(1,1,1); skinRim(fp); sm.emissiveFresnelParameters=fp; f.skin_fp=fp; }
     sm.diffuseTexture=pal; sm.emissiveTexture=pal; sm.emissiveColor=new C3(.3,.3,.3); sm.specularColor=new C3(0,0,0);
     m.material=sm; p.dispose(false,true); mats.push(sm);
+    /* the same dark outline the procedural parts have, so the fighters match the comic words; the width is in model units (about 5.5 tall) */
+    if(SKIN.outline){ m.renderOutline=true; m.outlineWidth=SKIN_OUTLINE; m.outlineColor=new C3(.03,.03,.04); }
     if(SKIN.shade){ try{ skinShade(m); }catch(e){ if(window.console) console.warn('skin shade off:',e); } }
   });
   f.skin_pal=pal;
