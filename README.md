@@ -61,6 +61,10 @@ Esc pauses a bout. The first fight shows a 12-second control strip.
 
 Touch: move stick on the left, Jab in the bottom-right of the button cluster. The view does not scroll or zoom.
 
-Drop a `.glb` on the title screen to replace the auditor. Fighters are otherwise built in code (`makeFighter`). Tuning constants are at the top of the script: `ATK`, `LOOKS`, `BOUTS`.
+Drop a `.glb` on the title screen to replace the auditor. Fighters are otherwise built in code (`makeFighter`). Tuning constants are at the top of the script: `ATK`, `LOOKS`, `BOUTS`, `CAM`.
+
+The camera is sized from the frame: a fighter fills about a third of the screen height at close range, and both stay in view during a chase or a knockback. On a phone held upright the width limits it: only about 5 m of floor fits across, so the fighters fill about 18% of the height. `CAM` holds the numbers.
+
+The fight steps at a fixed 60 Hz and the view interpolates, so reaction times and hit windows run on the same clock on a 30, 60, or 144 Hz screen.
 
 Quality steps down resolution, then shadow filtering, then shadows, when the frame rate stays under 44 for 1.8 seconds. The floor is half the starting resolution.

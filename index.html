@@ -409,6 +409,11 @@ const UNLOCK_CHAIN=[
 ];
 const SAVE_KEY='sublevel-progress';
 let progress={wins:0,outfit:'auditor',arena:0,dock:0};
+/* fight camera. frac: share of the screen height a fighter fills at close range (portrait uses fracPortrait).
+   pad: metres of floor kept visible beside each fighter. lead: seconds of walking speed the aim runs ahead, so a chase stays in frame.
+   follow: how fast the camera catches up, per second. A phone in portrait sees under 5 m across and needs the faster one.
+   ref: the old camera distance, which words and shake scale from. */
+const CAM={fovV:.85,fovH:1,wide:1.25,frac:.34,fracPortrait:.2,pad:1.7,padPortrait:1.5,pitch:.47,aimY:1.1,body:1.9,lead:.25,follow:3.2,followPortrait:8,ref:8.56};
 
 /* ---------- engine, scene ---------- */
 const canvas=$('view');
@@ -695,15 +700,18 @@ function fxWord(k,pos){
   const w=WORDS[k]; if(!w) return;
   const toCam=cam.position.subtract(pos).normalize();
   w.plane.position.copyFrom(pos.add(toCam.scale(1.0))); w.plane.position.y+=.5;
+  /* the word is a world-sized plane: shrink it with the camera distance so it covers what it covered from the old camera */
+  const z=clamp(V3.Distance(cam.position,w.plane.position)/(CAM.ref-1),.35,1);
+  w.plane.metadata={k:z};
   w.plane.scaling.setAll(.01); w.plane.material.alpha=1; w.plane.setEnabled(true);
   const old=fxList.findIndex(f=>f.k===k); if(old>=0) fxList.splice(old,1);
-  fxList.push({k,t:0});
+  fxList.push({k,t:0,z});
 }
 function updateFx(dt){
   for(let i=fxList.length-1;i>=0;i--){
     const f=fxList[i],p=WORDS[f.k].plane; f.t+=dt;
     const s=f.t<.12?lerp(.2,1.25,f.t/.12):f.t<.22?lerp(1.25,1,(f.t-.12)/.1):1;
-    p.scaling.setAll(s*(f.k==='KO'?1.3:.7)); p.material.alpha=f.t>.35?clamp(1-(f.t-.35)/.25,0,1):1;
+    p.scaling.setAll(s*(f.k==='KO'?1.3:.7)*f.z); p.material.alpha=f.t>.35?clamp(1-(f.t-.35)/.25,0,1):1;
     if(f.t>.6){ p.setEnabled(false); fxList.splice(i,1); }
   }
 }
@@ -1219,7 +1227,7 @@ function applyPose(f,dt){
 }
 
 /* ---------- combat ---------- */
-const G={state:'title',bout:0,t:0,hitstop:0,shake:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
+const G={state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
 function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0}; }
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
@@ -1642,25 +1650,30 @@ if($('tutorGo')) $('tutorGo').addEventListener('click',hideTutor);
 if($('resume')) $('resume').addEventListener('click',resumeFight);
 if($('restart')) $('restart').addEventListener('click',restartBout);
 function updateCamera(dt){
+  const asp=engine.getAspectRatio(cam), portrait=asp<CAM.wide;
+  if(portrait){ cam.fovMode=B.Camera.FOVMODE_HORIZONTAL_FIXED; cam.fov=CAM.fovH; } else { cam.fovMode=B.Camera.FOVMODE_VERTICAL_FIXED; cam.fov=CAM.fovV; }
   let dp,dt2;
   if(G.state==='title'||G.state==='card'){
     const a=G.t*.12; dp=new V3(Math.sin(a)*11.5,4.6,-Math.cos(a)*11.5); dt2=new V3(0,1.2,0);
   } else {
     const mid=P.pos.add(E.pos).scale(.5), d=V3.Distance(P.pos,E.pos);
+    mid.x+=(P.mv.x+E.mv.x)*.5*CAM.lead; mid.z+=(P.mv.z+E.mv.z)*.5*CAM.lead;
     const ax=E.pos.subtract(P.pos); ax.y=0; if(ax.length()>1e-3) ax.normalize();
     const n=new V3(-ax.z,0,ax.x); if(n.z>0) n.scaleInPlace(-1);
     const dv=new V3(0,0,-.55).add(n.scale(.45)); dv.normalize();
-    dp=mid.add(dv.scale(6.6+d*.5)); dp.y=Math.min(7.2,4.6+d*.22); dt2=mid.add(new V3(0,1.1,0));
+    /* far enough that a fighter fills `frac` of the height, and that both fit with `pad` metres beside them */
+    const tanH=portrait?Math.tan(CAM.fovH/2):Math.tan(CAM.fovV/2)*asp, tanV=portrait?tanH/asp:Math.tan(CAM.fovV/2);
+    const D=Math.max(CAM.body/(2*tanV*(portrait?CAM.fracPortrait:CAM.frac)),(d+2*(portrait?CAM.padPortrait:CAM.pad))/(2*tanH));
+    dp=mid.add(dv.scale(D*Math.cos(CAM.pitch))); dp.y=CAM.aimY+D*Math.sin(CAM.pitch); dt2=mid.add(new V3(0,CAM.aimY,0));
     dp.x=clamp(dp.x,-15.5,15.5); dp.z=clamp(dp.z,-15.5,15.5);
   }
-  const asp=engine.getAspectRatio(cam);
-  if(asp<1.25){ cam.fovMode=B.Camera.FOVMODE_HORIZONTAL_FIXED; cam.fov=1.0; } else { cam.fovMode=B.Camera.FOVMODE_VERTICAL_FIXED; cam.fov=.85; }
-  const k=damp(G.state==='title'||G.state==='card'?1.5:3.2,dt);
+  const k=damp(G.state==='title'||G.state==='card'?1.5:portrait?CAM.followPortrait:CAM.follow,dt);
   camPos.x=lerp(camPos.x,dp.x,k); camPos.y=lerp(camPos.y,dp.y,k); camPos.z=lerp(camPos.z,dp.z,k);
   camTgt.x=lerp(camTgt.x,dt2.x,k); camTgt.y=lerp(camTgt.y,dt2.y,k); camTgt.z=lerp(camTgt.z,dt2.z,k);
   G.shake=Math.max(0,G.shake-dt*6);
-  const sh=G.shake*(reduceMotion?0:1);
-  cam.position.set(camPos.x+rand(-1,1)*sh*.12,camPos.y+rand(-1,1)*sh*.12,camPos.z+rand(-1,1)*sh*.12);
+  const sh=G.shake*(reduceMotion?0:1)*.12*V3.Distance(camPos,camTgt)/CAM.ref;
+  const j=()=>Math.random()*2-1; /* render only: the gameplay rng stays out of the frame loop */
+  cam.position.set(camPos.x+j()*sh,camPos.y+j()*sh,camPos.z+j()*sh);
   cam.setTarget(camTgt);
   const f=camTgt.subtract(camPos); f.y=0; f.normalize(); G.camF.copyFrom(f); G.camR.set(f.z,0,-f.x);
 }
@@ -1777,24 +1790,55 @@ function updateAmbient(dt){
 }
 
 /* ---------- main loop ---------- */
-function frame(){
-  let dt=Math.min(engine.getDeltaTime()/1000,.05);
-  const real=dt;
-  if(G.state==='pause'){ pollPad(); updateHud(); return; }
-  if(G.hitstop>0){ G.hitstop-=real; dt*=.12; }
-  G.t+=dt;
-  audioTick(real);
-  if(tutorLeft>0){ tutorLeft-=real; if(tutorLeft<=0) hideTutor(); }
+/* The fight steps at a fixed 1/60 s, the rate the balance table is measured at (simMeet). Reaction times and the
+   hit windows are a few frames long, so a 30 or 144 Hz step changes who wins. Fighters are drawn at a position
+   interpolated between the last two ticks. f.pos is the root node's own position: the true one is put back before
+   the next tick, and a position written from outside (a reset, a probe) is taken as the truth. */
+const SIM=1/60;
+let acc=0;
+/* Frame times wobble by about 0.4 ms around vsync, and an accumulator turns that into frames that run 0 or 2 ticks.
+   A frame within 8% of a whole multiple of 1/60 s (or 1/2, 1/3, 1/4 of one) counts as exactly that. */
+const SNAP=[3,2,1,.5,1/3,.25];
+function snapDt(d){ for(const m of SNAP){ const s=SIM*m; if(Math.abs(d-s)<s*.08) return s; } return d; }
+function simSync(f){
+  if(!f.cur){ f.cur=f.pos.clone(); f.prev=f.pos.clone(); f.shown=f.pos.clone(); return; }
+  if(f.pos.equalsWithEpsilon(f.shown,1e-6)) f.pos.copyFrom(f.cur);
+  else { f.cur.copyFrom(f.pos); f.prev.copyFrom(f.pos); }
+}
+function simShow(f,a){
+  f.cur.copyFrom(f.pos);
+  f.pos.set(lerp(f.prev.x,f.cur.x,a),lerp(f.prev.y,f.cur.y,a),lerp(f.prev.z,f.cur.z,a));
+  f.shown.copyFrom(f.pos);
+}
+function simTick(){
+  let dt=SIM;
+  if(G.hitstop>0){ G.hitstop-=dt; dt*=.12; }
   buf.jab=Math.max(0,buf.jab-dt); buf.heavy=Math.max(0,buf.heavy-dt); buf.dodge=Math.max(0,buf.dodge-dt);
-  pollPad();
   const live=G.state==='fight';
   if(G.state==='ready'){ G.readyT+=dt; if(G.readyT>1.15){ G.state='fight'; banner('FIGHT!'); } }
   const Ip=live?playerIntent():IDLE, Ie=live?aiIntent(E,P,dt):IDLE;
+  P.prev.copyFrom(P.pos); E.prev.copyFrom(E.pos);
   step(P,E,Ip,dt); if(P.started&&buf[P.started]!==undefined) buf[P.started]=0;
   step(E,P,Ie,dt);
   resolveBodies();
-  if(live) noteCorner(real);
+  if(live) noteCorner(SIM);
   if(G.state==='ko'){ G.koTimer-=dt; if(G.koTimer<=0){ G.state='card'; afterKO(); } }
+  G.ticks++; if(G.trace) G.trace(G.ticks);
+}
+function frame(){
+  let dt=Math.min(engine.getDeltaTime()/1000,.05);
+  const real=dt;
+  if(G.state==='pause'){ acc=0; pollPad(); updateHud(); return; }
+  if(G.hitstop>0) dt*=.12;
+  G.t+=dt;
+  audioTick(real);
+  if(tutorLeft>0){ tutorLeft-=real; if(tutorLeft<=0) hideTutor(); }
+  pollPad();
+  simSync(P); simSync(E);
+  acc=Math.min(acc+snapDt(real),SIM*5);
+  while(acc>=SIM-1e-9){ acc-=SIM; simTick(); }
+  const a=Math.max(0,acc/SIM);
+  simShow(P,a); simShow(E,a);
   updateFx(real); updateAmbient(dt); updateCamera(dt); updateHud();
 }
 
@@ -2000,7 +2044,7 @@ function simMeet(opt){
   if(opt.diff&&DIFF[opt.diff]) diff=opt.diff;
   const bouts=opt.bouts||[0,1,2];
   const prevRng=rng, prevState=G.state;
-  const dt=1/60, CAP=60, out=[];
+  const dt=opt.dt||1/60, CAP=60, out=[];
   for(let bi=0; bi<bouts.length; bi++){
     const bout=bouts[bi], rows=[];
     for(let i=0;i<n;i++){
@@ -2356,7 +2400,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

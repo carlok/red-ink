@@ -804,3 +804,153 @@ Retro: **moved** — Halvorsen echo win% is very sensitive to HP; small steps + 
 
 Questions: (1) Lock landscape only after fullscreen succeeds on Android? (2) Add a hub-only music mute separate from fight stems? (3) Tighten Halvorsen toward 18% if finale should feel harsher than 22%?
 
+## Sprint 14 — Camera and frame rate
+
+Goal: fighters at about a third of the screen height at close range (they were 24% on a desktop and 9% on a phone in portrait), both always in frame through a chase and a knockback, and the same bout on a 30, 60 or 144 Hz screen.
+
+Probes: `node tools/cam-probe.mjs [tag] [--close] [--norim] [--only sizes] [--cam key=value]`, `node tools/step-probe.mjs`, `node tools/combat-probe.mjs`, `node tools/balance-run.mjs 200 normal 1 normal 0,1,2 [hz]`. Share is the fighter's bounding-box height over the viewport height at gap 2.0 m, after 90 frames for the camera to settle. Clipped means a body (0.6 m either side of its centre) outside the central 84% of the width, a head above 10% of the height, or a foot below 99%. Off screen means outside 2% to 98% of the width. The chase and circle runs move both fighters at 4.4 m/s, the player's top speed. Knockback sets 18 m/s on one fighter, the heavy-hit value. The first probe run counted 1.2 m of arm either side as body; arms point along the fight axis, which the camera sees side on, so the definition went to 0.6 m and the baseline was run again on the old camera with it.
+
+### Baseline
+
+| | 1920×1080 | 844×390 | 390×844 |
+| --- | --- | --- | --- |
+| Fighter height at gap 2.0 m | 24.0% | 24.4% | 9.3% |
+| Camera to the midpoint at gap 2, 1, 6 | 8.56, 8.05, 10.74 m | same | same |
+| Gaps 1–6 m, chase, circle, knockback clipped | none | none | none |
+| Nearest crowd or pillar, 16 tangent / 8 radial rim placements | 0.97 / 0.36 m | not run | 0.97 / 0.36 m |
+
+| | |
+| --- | --- |
+| Draws / active meshes / GPU | 149 / 119 / 1.217 ms |
+| Comic word width, jab / heavy / block / K.O., share of screen width | 15.8 / 17.6 / 17.3 / 33.0% |
+| Word readable, jab / heavy / block / guard break | 51 / 32 / 51 / 33 ms |
+| Bout table, 200 fights, seed 1, 60 Hz step | 90.5% 32.3 s / 67.5% 34.0 s / 44.0% 43.9 s |
+
+The same 200 seeded fights at other step rates, the way a 30 fps phone or a 120 or 144 Hz screen steps the game:
+
+| Step | Reyes | Dag | Pike |
+| --- | --- | --- | --- |
+| 30 Hz | 100% 16.3 s | 88% 31.0 s | 100% 29.2 s |
+| 60 Hz | 90.5% 32.3 s | 67.5% 34.0 s | 44.0% 43.9 s |
+| 120 Hz | 91% 32.3 s | 55.5% 34.1 s | 43% 43.6 s |
+| 144 Hz | 92.5% 30.6 s | 62.5% 34.0 s | 35.5% 44.2 s |
+
+Reyes answers in 0.08 s, and a jab goes live at 0.10 s. Whether the answer lands in time is a one-frame call at 60 Hz. The table everything else was tuned against only held on a 60 Hz screen, and the quality ladder starts at 44 fps, so a phone under load played a much easier game.
+
+### Change 1 — camera sized from the frame
+
+Hypothesis: a camera distance worked out from the field of view, so a fighter fills a set share of the height and both fit with room beside them, gets the fighters to a third of the screen without clipping, in every aspect.
+
+| | Old | New |
+| --- | --- | --- |
+| Distance | horizontal 6.6 + 0.5·gap, height min(7.2, 4.6 + 0.22·gap) | max(size term, fit term) at pitch 0.47 rad, `CAM` table at the top of the script |
+| Size term | — | fighter height 1.9 m ÷ (2 · tan(half fov) · 0.34), portrait 0.20 |
+| Fit term | — | (gap + 2 · pad) ÷ (2 · tan(half horizontal fov)), pad 1.7 m, portrait 1.5 m |
+| Aim | midpoint | midpoint plus 0.25 s of walking speed |
+| Follow, per second | 3.2 | 3.2, portrait 8 |
+
+| | 1920×1080 | 844×390 | 390×844 |
+| --- | --- | --- | --- |
+| Fighter height at gap 2.0 m | 24.0% → 34.1% | 24.4% → 34.3% | 9.3% → 17.7% |
+| Camera to the midpoint at gap 2 | 8.56 → 6.17 m | 8.56 → 6.17 m | 8.56 → 4.58 m |
+| Gaps 1–6 m clipped | none | none | none |
+| Chase, circle clipped / off screen | 0 / 0 | 0 / 0 | 0 / 0 |
+| Knockback clipped / off screen | 0 / 0 | 0 / 0 | 13–14 of 72 frames / 0 |
+| Nearest crowd or pillar, tangent / radial | 0.97 / 0.36 → 1.64 / 2.28 m | not run | 0.97 / 0.36 → 1.31–1.67 / 1.73–2.04 m (four runs) |
+| Something between camera and fighters | 0 | not run | 0 of 24 |
+
+On a desktop the size term rules until the fighters are 6.5 m apart, so the camera holds at 6.17 m and does not breathe with the gap. In portrait the width rules: the visible width at 4.58 m is 5.0 m, which is the gap plus the padding, so a phone cannot go closer than about 18% without losing a fighter. The target in the plan was 20%.
+
+Without the lead, the 4.4 m/s circle clipped 21 of 192 frames on a desktop: the pair runs toward the camera faster than the follow catches up, and the feet leave the bottom of the frame by 10%. A quarter second of lead brought that to 0.
+
+Portrait settings tried (share, chase and circle clipped, knockback clipped / off screen):
+
+| Follow / padding | Share | Chase, circle | Knockback |
+| --- | --- | --- | --- |
+| 3.2 / 1.35 | 18.7% | 86, 134 | 42 / 22 |
+| 6 / 1.35 | 18.7% | 0, 0 | 25 / 9 |
+| 8 / 1.5 (kept) | 17.7% | 0, 0 | 14 / 0 |
+| 8 / 1.8 | 15.5% | 0, 0 | 0 / 0 |
+| 6 / 2.2 | 13.7% | 0, 0 | 0 / 0 |
+
+Verdict: **keep**. `tuning/s14-before-1920.jpg`, `tuning/s14-after-1920.jpg` (and the `-close` pair at gap 1.2), `-844` and `-390` are the frames. At gap 1.2 no rig seam shows. The dust motes near the lens were bigger from the old camera (36 px against about 12 px).
+
+### Change 2 — comic words and shake follow the camera distance
+
+Hypothesis: a word is a world-sized plane, so at 0.7 of the distance it would cover 1.4 times as much of the screen; scaling it by distance holds the screen share. Shake moves the camera by up to 0.12 m around a fixed aim, so its angle grows as the camera comes in; scaling the amplitude by distance holds the angle.
+
+| | Before | After |
+| --- | --- | --- |
+| Word width, jab / heavy / block / K.O. | 15.8 / 17.6 / 17.3 / 33.0% | 15.9 / 15.9 / 16.0 / 29.6% |
+| Word readable | 51 / 32 / 51 / 33 ms | 33–50 ms, varies by run |
+| Damage, stamina, stun, hitstop, counter | 7 / 16, 10 / 24, 0.30 / 0.55 s, 0.05 / 0.09 / 0.14 s, 8.75 | same |
+| Shake angle at full | ±0.80° | ±0.80°, by construction |
+
+Verdict: **keep**. The readable time is sampled once a frame (16.7 ms), so 32 and 50 are one frame apart. The word scale is `clamp(distance to the word ÷ 7.56, 0.35, 1)`. `combat-probe` divides it back out so "readable" still means a scale of 0.45.
+
+### Change 3 — a fixed 1/60 s step, drawn interpolated, frame times snapped
+
+Hypothesis: running the fight in 1/60 s ticks, the loop `simMeet` already uses, makes every refresh rate play the table that was measured. The two fighters are drawn between their last two tick positions so a 120 or 144 Hz screen does not judder. Frame times within 8% of a multiple of 1/60 s are snapped to it so a 60 Hz screen runs one tick per frame.
+
+Seeded rng, bout 1, a player who stands still, 900 ticks (15 s) recorded per tick at five frame lengths. `engine.getDeltaTime` is overridden; `G.trace` and `G.seed` are probe hooks.
+
+| Frame rate | Frames for 900 ticks | State vs 60 fps | Drawn frames where the walking enemy did not move |
+| --- | --- | --- | --- |
+| 20 fps | 300 | identical, 900 ticks | 0 of 190 |
+| 30 fps | 450 | identical | 0 of 278 |
+| 60 fps | 900 | — | 0 of 577 |
+| 120 fps | 1800 | identical | 0 of 1153 |
+| 144 fps | 2158 | identical | 0 of 1381 |
+
+The player took hits in that run (hp 100 → 72.8), so the comparison covers the AI rng, strikes and stun, not an empty room. The camera shake used the gameplay `rng` three times per drawn frame; with a seed that made the AI depend on the frame count. It now uses `Math.random`, and `frame()` no longer touches `rng`.
+
+| | Before | After |
+| --- | --- | --- |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0% | 90.5 / 67.5 / 44.0% |
+| Medians | 32.3 / 34.0 / 43.9 s | 32.3 / 34.0 / 43.9 s |
+| Fight draws / active meshes / GPU | 149 / 119 / 1.217 ms | 147–149 / 115–118 / 1.25–1.34 ms (three runs) |
+| S6 pose numbers (`pose-probe`), S5 AI answers (`ai-probe`) | — | unchanged |
+| Touch jab to attack / to pose | 17 / 17 ms | 16–17 / 33–34 ms |
+| Pad jab to attack / to pose | 17–18 / 18–34 ms | 16–17 / 33–34 ms |
+| Keyboard heavy to attack | 17 ms | 17 ms |
+
+Frame times in headless Chrome at a 60 Hz present: mean 16.67 ms, standard deviation 0.38 ms, range 15.1–18.2 ms. A plain accumulator on those gave 67 frames with no tick and 66 with two out of 600 (an earlier run happened to give 600 single ticks, so I first wrote that it did not matter). With the snap, 598–600 of 600 frames fall inside the window and three runs gave 600 of 600 single ticks. 144 Hz frames (6.94 ms) fall outside the window and keep their own length. This is headless timing; a real display's was not measured.
+
+`input-probe` reads the pose of a touch or pad jab at 33–34 ms where it read 16–18 ms, a frame later than the state. A trace from a settled guard shows the right shoulder 0.054 rad along on the first frame after the press, and the keyboard heavy reads 16–17 ms for state and pose. The probe takes its starting arm angle right after the state returns to idle, while the arm is still settling from the last swing, so the 0.02 rad threshold crosses a frame earlier or later with the tick phase. That is the likely cause, not a proven one. Both readings are inside the 80 ms budget.
+
+Verdict: **keep**.
+
+### Checked, no code change
+
+Outline. `part()` is the only function that sets `renderOutline`, and nothing calls it; the fighters are built with `pp()` and have no outline. The thickening I expected from a closer camera does not exist. Left the dead function alone.
+
+Rim. In portrait the nearest pillar at one heading is 1.31–1.67 m from the camera over four runs, around the 1.5 m I set; the old camera was 0.36 m from one. Nothing sat between the camera and the fighters in 24 placements. No pull toward the centre was added.
+
+First key press. `input-probe` measured 117–134 ms for the first keyboard press on the old build and 118–208 ms on the new one. It is the first `keydown` calling `audioInit`, which decodes the audio pack in the handler. In play that press is Start or Enter on the title card. Later key presses are 17 ms. No change.
+
+Review findings, left as they are. An independent read of the diff, by hand and without running it, found no bug. It listed three small things, with its own figures:
+
+- Crossing aspect 1.25 on a resize or a rotation changes the target distance, because portrait uses 0.20 of the height and landscape 0.34. At gap 4.6 it reported 7.05 m against 10.86 m. Between aspect 0.8 and 1.25 a nearly square window shows the fighters at about 20% of the height. The follow eases the move.
+- A fighter in the `ko` state keeps its last walking `mv`, since `step` returns early. The camera lead then sits up to about 0.55 m off for the 2.4 s of the knockout.
+- A steady frame time within 8% of a snap point, 17.5 ms for example, runs one tick per frame. The sim then runs about 5% slow there, and about 8% fast near 65 or 130 Hz. Sim-time balance is not affected, only the wall-clock pace.
+
+The six-bout game from origin. Everything above was measured on the three-bout game, then rebased onto the S9 story and hub, the S12 QA work and the S13 bouts 4–6, audio and fullscreen. Checked again on the combined build:
+
+| | Result |
+| --- | --- |
+| Bout table, 200 fights, seed 1, 60 Hz, six bouts | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, the curve S13 logged |
+| `step-probe`, 900 ticks at 20, 30, 60, 120, 144 fps | identical; natural frames 600 of 600 single ticks |
+| `cam-probe --bout 1` to `5`, fighter height at gap 2.0 m | 33.9–37.6% at 1920×1080 (Dag tops out 21.6% from the top edge), 17.6–19.8% at 390×844 |
+| Same runs, clipped frames in the 1–6 m sweep / off screen in chase, circle, knockback | none / none |
+| `node tools/regression.mjs` | 22 of 22 |
+| Draws / active meshes / GPU | 149 / 116 / 1.25 ms |
+| Damage, stamina, stun, hitstop, counter | unchanged; word width 15.7–15.9%, K.O. 29.7% |
+
+The arena unlocks only change light and exposure, not geometry, so the rim clearance was not run again. `cam-probe` takes `--bout 0` to `5` for this. `balance-run` takes the step rate as its seventh argument, after the bouts list.
+
+Hand check still open: 55 fps at 1080p on an iGPU, a real pad and phone, and how the closer view feels on a real monitor. The headless runs measure draws, GPU time and pixels, not feel.
+
+
+
+
+

@@ -124,10 +124,18 @@ const PROBE = String.raw`
         if (ms > 500) break;
       }
     }
+    /* share of the screen width the word covers, from the plane's billboard width (2.24 m at scale 1) */
+    function wordShare() {
+      if (!w || !w.isEnabled()) return 0;
+      const m = scene.getTransformMatrix().m, r = cam.getDirection(new BABYLON.Vector3(1, 0, 0)), h = 1.12 * w.scaling.x;
+      const px = (v) => (v.x * m[0] + v.y * m[4] + v.z * m[8] + m[12]) / (v.x * m[3] + v.y * m[7] + v.z * m[11] + m[15]) * 0.5 + 0.5;
+      return Math.abs(px(w.position.add(r.scale(h))) - px(w.position.add(r.scale(-h))));
+    }
     function snap(ms) {
       return {
         ms: Math.round(ms),
-        scale: w ? r3(w.scaling.x) : null,
+        scale: w ? r3(w.scaling.x / ((w.metadata && w.metadata.k) || 1)) : null,
+        share: r3(wordShare()),
         on: w ? w.isEnabled() : false,
         lean: r3(S.E.body.rotation.x - lean0),
         shake: r3(S.G.shake),
@@ -154,6 +162,7 @@ const PROBE = String.raw`
       wordMs: at((s) => s.on && s.scale >= 0.45),
       flinchMs: at((s) => Math.abs(s.lean) >= 0.08),
       wordAt100: w100.length ? r3(Math.max(...w100.map((s) => s.scale || 0))) : null,
+      wordShareMax: rows.length ? r3(Math.max(...rows.map((s) => s.share || 0))) : null,
       flinchAt100: w100.length ? r3(Math.max(...w100.map((s) => Math.abs(s.lean)))) : null,
       minDist100: w100.length ? r3(Math.min(...w100.map((s) => s.dist))) : null,
       fovAt100: w100.length ? w100[w100.length - 1].fov : null,
