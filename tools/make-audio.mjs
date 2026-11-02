@@ -1,6 +1,6 @@
 /**
- * Build the CC0 one-shots and loops. Peaks are normalised here.
- * Hits land at -6 dBFS. Music stems land at -18 dBFS.
+ * Build the CC0 one-shots. Peaks are normalised here. Hits land at -6 dBFS.
+ * The music (a live sequencer) and the room and crowd beds are made in the page, not here.
  * Usage: node tools/make-audio.mjs
  */
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -90,11 +90,6 @@ const N = {
   whoosh: seconds(0.16),
   ko: seconds(0.7),
   ui: seconds(0.06),
-  room: seconds(1.5),
-  crowd: seconds(1.5),
-  calm: seconds(2),
-  tense: seconds(2),
-  finish: seconds(2),
 };
 
 const clips = {
@@ -140,43 +135,6 @@ const clips = {
     tone(N.ko, 40, 22, 0.66).map((x) => x * 0.7),
   ]), HIT),
   ui: normalize(tone(N.ui, 880, 440, 0.05), UI),
-  room: normalize(noise(N.room, 21).map((x, i) => {
-    const t = i / N.room;
-    const edge = Math.sin(Math.PI * t);
-    return x * edge;
-  }), ROOM),
-  crowd: normalize(noise(N.crowd, 33).map((x, i) => {
-    const t = i / RATE;
-    return x * (0.6 + 0.4 * Math.sin(2 * Math.PI * 2 * t));
-  }), 10 ** (-24 / 20)),
-  calm: normalize(mix([
-    loopTone(2, 196, 0.25),
-    loopTone(2, 294, 0.2).map((x) => x * 0.45),
-  ]), MUSIC),
-  calm2: normalize(mix([
-    loopTone(2, 207, 0.31),
-    loopTone(2, 311, 0.17).map((x) => x * 0.38),
-  ]), MUSIC),
-  tense: normalize(mix([
-    loopTone(2, 155, 2.2),
-    loopTone(2, 164, 3.1).map((x) => x * 0.7),
-  ]), MUSIC),
-  tense2: normalize(mix([
-    loopTone(2, 147, 2.6),
-    loopTone(2, 174, 2.8).map((x) => x * 0.65),
-  ]), MUSIC),
-  finish: normalize(mix([
-    loopTone(2, 98, 0.5),
-    tone(N.finish, 392, 98, 1.6).map((x) => x * 0.4),
-  ]), MUSIC),
-  hub: normalize(mix([
-    loopTone(2, 220, 0.12),
-    loopTone(2, 330, 0.08).map((x) => x * 0.35),
-  ]), MUSIC),
-  dock: normalize(mix([
-    loopTone(2, 130, 3.4),
-    noise(N.room, 41).map((x, i) => x * (0.15 + 0.1 * Math.sin(i / RATE * 40))),
-  ]), MUSIC),
 };
 
 function peakOf(samples) {

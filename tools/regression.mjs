@@ -128,7 +128,7 @@ async function runHttpSuite(cdp) {
     return w;
   });
 
-  await test("menu_credits_quit_clockout", async () => {
+  await test("menu_credits_quit_play", async () => {
     const v = await waitFight(cdp, 0);
     if (v.state !== "fight") throw new Error(JSON.stringify(v));
     const r = await cdp.eval(`(async () => {
@@ -137,12 +137,49 @@ async function runHttpSuite(cdp) {
       kd("Escape"); await raf(); o.paused = G.state === "pause" && !$("pause").hidden;
       $("pauseCredits").click(); await sleep(120); o.credits = $("cTitle").textContent === "Who made this" && $("cRows").querySelectorAll("dt").length === 6;
       $("go").click(); await sleep(120); o.backToPause = G.state === "pause" && !$("pause").hidden;
-      $("quitTitle").click(); await sleep(150); o.quit = G.state === "card" && $("pause").hidden && !$("cardLinks").hidden;
-      $("linkOut").click(); await sleep(150); o.clockOut = $("cTitle").textContent === "Shift over";
-      kd("Escape"); await sleep(150); o.escBack = !$("cardLinks").hidden;
+      $("quitTitle").click(); await sleep(250); o.quitToSplash = G.state === "splash" && !$("splash").hidden && $("pause").hidden && $("hud").hidden;
+      o.silent = S.audioGraph().ac.state === "suspended";
+      kd("j"); await sleep(150); o.keysIgnored = G.state === "splash" && S.audioGraph().ac.state === "suspended";
+      $("spCredits").click(); await sleep(150); o.creditsFromSplash = $("cTitle").textContent === "Who made this";
+      kd("Escape"); await sleep(150); o.escBackToSplash = G.state === "splash" && !$("splash").hidden && S.audioGraph().ac.state === "suspended";
+      kd("Enter"); await sleep(300); o.playWithEnter = G.state === "card" && $("splash").hidden && !$("cardLinks").hidden && S.audioGraph().ac.state === "running";
+      $("linkOut").click(); await sleep(250); o.quitFromTitle = G.state === "splash" && /[0-9]+ (of|di) 6/.test($("spNote").textContent);
+      $("spPlay").click(); await sleep(300); o.playWithClick = G.state === "card" && S.audioGraph().ac.state === "running";
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
+  });
+
+  await test("splash_on_load_is_silent", async () => {
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await bootSublevel(cdp, 15000, true);
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, $ = (i) => document.getElementById(i), o = {};
+      await sleep(600);
+      o.splash = S.G.state === "splash" && !$("splash").hidden && $("wrap").hidden;
+      o.noAudio = S.audioGraph().ac === null;
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", bubbles: true })); $("snd").click(); await sleep(150);
+      o.stillNoAudio = S.audioGraph().ac === null;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    await cdp.eval(`window.__sublevel.play()`);
+    return r;
+  });
+
+  await test("opponent_dossier_every_bout", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = { bouts: [] };
+      for (let i = 0; i < S.BOUTS.length; i++) {
+        S.introCard(i); await sleep(250);
+        const rows = [...$("cRows").querySelectorAll("dd")].map((d) => d.textContent), keys = rows.filter((t) => /^(sw_|stl_|dos_)/.test(t));
+        o.bouts.push({ title: $("cTitle").textContent === S.BOUTS[i].foe, rows: rows.length === 10, noMissingStrings: keys.length === 0, showcase: G.showcase === true && $("wrap").classList.contains("dossier"), playerHidden: !S.P.root.isEnabled() });
+      }
+      $("go").click(); await sleep(300);
+      o.afterGo = { state: G.state, showcaseCleared: G.showcase === null && !$("wrap").classList.contains("dossier"), playerBack: S.P.root.isEnabled() };
+      return o; })()`, true);
+    const bad = r.bouts.filter((b) => !Object.values(b).every(Boolean)).length || !Object.values(r.afterGo).every((v) => v === true || typeof v === "string");
+    if (bad) throw new Error(JSON.stringify(r));
+    return { bouts: r.bouts.length, afterGo: r.afterGo };
   });
 
   await test("reset_progress_two_clicks", async () => {
@@ -289,7 +326,7 @@ async function runHttpSuite(cdp) {
     })()`,
       true,
     );
-    if (!v || v.clipCount < 18 || v.hitPoolJab !== 3 || v.hitPoolHeavy !== 2) throw new Error(JSON.stringify(v));
+    if (!v || v.clipCount < 10 || v.hitPoolJab !== 3 || v.hitPoolHeavy !== 2) throw new Error(JSON.stringify(v));
     return v;
   });
 
@@ -366,8 +403,10 @@ async function runFileSuite(cdp) {
   });
 }
 
-await withPage(async (cdp) => runHttpSuite(cdp));
-await withPage(async (cdp) => runFileSuite(cdp), { url: fileIndexUrl(), file: true });
+/* the autoplay flag lets a scripted Play start the audio context, which a real click does by itself */
+const AUTOPLAY = { args: ["--autoplay-policy=no-user-gesture-required"] };
+await withPage(async (cdp) => runHttpSuite(cdp), AUTOPLAY);
+await withPage(async (cdp) => runFileSuite(cdp), { url: fileIndexUrl(), file: true, ...AUTOPLAY });
 
 const failed = results.filter((r) => !r.pass);
 const summary = {

@@ -1,3 +1,2 @@
-The sounds in samples.js were generated for Sublevel Three (tools/make-audio.mjs) and are released under CC0 1.0.
-Variants: jab/heavy/block pools, calm/tense doubles, hub and dock card loops — all procedural, no external samples.
+The sounds in samples.js were generated for Sublevel Three and are released under CC0 1.0.
 https://creativecommons.org/publicdomain/zero/1.0/
