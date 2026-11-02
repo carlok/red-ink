@@ -1,6 +1,6 @@
 # Sublevel Three
 
-![A bout on the warehouse floor. The auditor and Reyes circle inside the yellow tape, under cold overhead light and a sodium bulb.](tuning/s7-after.jpg)
+![A jab lands inside the yellow tape. The auditor, in a white shirt, snaps Reyes back in his blue overalls, with a POW burst and orange sparks between them and the crowd dark behind.](tuning/s14-hero.jpg)
 
 Browser fighting game. One HTML file, no account, no build step to play.
 
