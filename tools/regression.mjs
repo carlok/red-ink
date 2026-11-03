@@ -299,6 +299,27 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("draw_budget_per_place", async () => {
+    /* Same method as tools/env-probe.mjs. Headless Chrome on one Mac measured 39 to 46 draws for the same scene across runs (S23 and S24 trees alike);
+       the budget is that top value plus a little, so it catches a real jump (a new mesh per fighter or per crowd member) and not that wobble. */
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, B = window.BABYLON, engine = B.Engine.LastCreatedEngine, scene = B.Engine.LastCreatedScene, out = [];
+      for (const b of [0, 5]) {
+        document.getElementById("wrap").hidden = true; document.getElementById("tutor").hidden = true; S.seed(5); S.startBout(b);
+        while (G.state !== "fight") await raf();
+        for (let i = 0; i < 160; i++) await raf();
+        S.E.ai.cd = 99; S.E.cfg.cd = 99; S.E.speed0 = 0; S.P.pos.set(-0.7, 0, 0); S.E.pos.set(0.7, 0, 0);
+        for (let i = 0; i < 90; i++) await raf();
+        const draws = []; let prev = engine._drawCalls.current; for (let i = 0; i < 40; i++) { await raf(); const n = engine._drawCalls.current; draws.push(n - prev); prev = n; }
+        out.push({ bout: b + 1, draws: draws.sort((x, y) => x - y)[20], active: scene.getActiveMeshes().length });
+      }
+      return JSON.stringify(out); })()`, true);
+    const rows = JSON.parse(r);
+    const bad = rows.filter((x) => x.draws > 48 || x.active > 52 || x.draws < 20);
+    if (bad.length) throw new Error(JSON.stringify(rows));
+    return rows;
+  });
+
   await test("autoplay_acts_and_yields", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
