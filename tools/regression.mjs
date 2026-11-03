@@ -405,6 +405,38 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("practice_mode_leaves_progress_alone", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const key = (k) => { window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })); window.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true })); };
+      const fight = async (b) => { $("wrap").hidden = true; S.startBout(b); while (G.state !== "fight") await raf(); };
+      const prog = () => localStorage.getItem("sublevel-progress");
+      S.qaResetProgress(); S.titleCard(); await sleep(60); o.hiddenAtStart = $("linkPractice").hidden;
+      await fight(0); S.qaEndBout(true); await sleep(120); S.titleCard(); await sleep(60); o.shownAfterAWin = !$("linkPractice").hidden;
+      const before = prog(); localStorage.removeItem("sublevel-log");
+      $("linkPractice").click(); await sleep(150);
+      o.card = G.state === "card" && $("cTitle").textContent === "Reyes" && /Practice/.test($("cStamp").textContent) && !$("cardBack").hidden && $("cardAssist").hidden;
+      $("go").click(); await sleep(60); while (G.state !== "fight") await raf();
+      o.fighting = G.practice === true && G.bout === 0 && S.P.hp === 100;
+      S.qaEndBout(true); await sleep(150);
+      o.noGrant = prog() === before && /Practice/.test($("cStamp").textContent) && /Progress unchanged/.test($("cBody").textContent) && !$("cardBack").hidden;
+      o.logged = S.logRead().length === 1 && S.logRead()[0].practice === true;
+      $("cardBack").click(); await sleep(150); o.backToChooser = $("cTitle").textContent === "Reyes" && /Practice/.test($("cStamp").textContent);
+      key("Escape"); await sleep(150); o.escToTitle = /Level Three|Livello/.test($("cTitle").textContent) || $("avatarBox").hidden === false; o.flagCleared = G.practice === false;
+      await fight(1); S.qaEndBout(true); await sleep(120); S.titleCard(); await sleep(60);
+      $("linkPractice").click(); await sleep(150);
+      o.twoOpponents = $("cTitle").textContent === "Reyes" && !$("cardAssist").hidden; $("cardAssist").click(); await sleep(150);
+      o.cycles = $("cTitle").textContent === "Dag";
+      $("go").click(); await sleep(60); while (G.state !== "fight") await raf(); S.qaEndBout(false); await sleep(150);
+      o.lossKeepsPractice = G.practice === true && /Retry|Riprova/.test($("cRows").textContent);
+      S.titleCard(); await sleep(60); o.normalAgain = G.practice === false;
+      S.setLang("it"); $("linkPractice").click(); await sleep(150); o.italian = /Allenamento/.test($("cStamp").textContent) && /Indietro/.test($("cardBack").textContent); S.setLang("en"); S.titleCard();
+      S.qaResetProgress(); localStorage.removeItem("sublevel-log");
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("autoplay_acts_and_yields", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};

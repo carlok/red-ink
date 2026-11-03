@@ -289,9 +289,11 @@ dl.rows dd a{color:inherit}
       </div>
       <button class="go" id="go" type="button"><span id="goTxt">Start</span><span aria-hidden="true">&rarr;</span></button>
       <button class="btn2 cardMenu" id="cardAssist" type="button" hidden>Try Easy</button>
+      <button class="btn2 cardMenu" id="cardBack" type="button" hidden>Back</button>
       <button class="btn2 cardMenu" id="cardMenu" type="button">Menu &middot; Esc</button>
       <div class="cardLinks" id="cardLinks" hidden>
         <button class="btn2" id="linkCredits" type="button">Credits</button>
+        <button class="btn2" id="linkPractice" type="button" hidden>Practice</button>
         <button class="btn2" id="linkOut" type="button">Clock out</button>
       </div>
     </article>
@@ -499,6 +501,13 @@ const STR={
   tutor_pad:{en:'Left stick moves. X jabs, Y heavy. Hold LT to block. A dodges. Start pauses.',it:'Levetta sinistra muove. X diretto, Y potente. Tieni LT per parare. A schiva. Start pausa.'},
   tutor_touch:{en:'Stick moves. Tap Jab or Heavy. Hold Block. Tap Dodge.',it:'Il joystick muove. Tocca Diretto o Potente. Tieni Para. Tocca Schiva.'},
   key_space:{en:'Space',it:'Spazio'},
+  practice_btn:{en:'Practice',it:'Allenamento'},
+  practice_stamp:{en:'Practice',it:'Allenamento'},
+  practice_note:{en:'Practice: no progress changes.',it:'Allenamento: i progressi non cambiano.'},
+  practice_next:{en:'Another opponent',it:'Altro avversario'},
+  practice_done:{en:'Progress unchanged. Fight again, or pick another opponent.',it:'Progressi invariati. Combatti ancora, o scegli un altro avversario.'},
+  practice_again:{en:'Fight again',it:'Combatti ancora'},
+  practice_back:{en:'Choose opponent',it:'Scegli avversario'},
   log_export:{en:'Export playtest log',it:'Esporta il registro delle partite'},
   log_clear:{en:'Clear log',it:'Svuota il registro'},
   log_clear_confirm:{en:'Tap again to clear',it:'Tocca ancora per svuotare'},
@@ -607,6 +616,7 @@ function paintLang(){
   const first=(id,k)=>{ const el=$(id)&&$(id).parentNode; if(el&&el.firstChild&&el.firstChild.nodeType===3) el.firstChild.textContent=L(k)+' '; };
   if($('cardAssist')&&$('cardAssist').hidden) set('cardAssist','assist_btn'); set('noGLTitle','gl_none_title'); set('noGLBody','gl_none_body'); set('noGLBtn','gl_reload');
   paintLog(); if(!logArmed) set('logClear','log_clear');
+  set('linkPractice','practice_btn');
   set('tutorGo','got_it'); set('avLbl','fighter_lbl'); set('glbLbl','glb_load'); set('avReset','av_reset'); set('dropHint','drop_hint'); set('fail','fail_msg');
   if($('avReset')&&$('avReset').hidden) set('avName','av_placeholder');
   { const h=$('avHint'); if(h&&(h.textContent===STR.av_hint.en||h.textContent===STR.av_hint.it)) h.textContent=L('av_hint'); }
@@ -2266,7 +2276,7 @@ window.addEventListener('keydown',e=>{
   if(k==='escape'){
     e.preventDefault();
     if(G.menuOpen){ closeMenu(); return; }
-    if(G.state==='card'&&!wrapEl.hidden){ if(cardEsc) $('go').click(); else openMenu(); return; }
+    if(G.state==='card'&&!wrapEl.hidden){ if(cardEsc) $('go').click(); else if(G.lastCard&&G.lastCard.back) G.lastCard.back.go(); else openMenu(); return; }
     if(G.state==='fight'||G.state==='ready') pauseFight();
     else if(G.state==='pause') resumeFight();
     return;
@@ -2563,6 +2573,7 @@ function openCreditsFromPause(){
 if($('quitTitle')) $('quitTitle').addEventListener('click',quitToTitle);
 if($('pauseCredits')) $('pauseCredits').addEventListener('click',openCreditsFromPause);
 if($('linkCredits')) $('linkCredits').addEventListener('click',()=>{ audioInit('click'); SFX.ui(); creditsCard(titleCard); });
+if($('linkPractice')) $('linkPractice').addEventListener('click',()=>{ audioInit('click'); SFX.ui(); practiceCard(0); });
 if($('linkOut')) $('linkOut').addEventListener('click',()=>{ clockOut(); });
 if($('spPlay')) $('spPlay').addEventListener('click',playGame);
 if($('spCredits')) $('spCredits').addEventListener('click',()=>{ $('splash').hidden=true; creditsCard(()=>{ wrapEl.hidden=true; G.state='splash'; $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus(); }catch(e){} },30); }); });
@@ -2645,6 +2656,7 @@ function showCard(c){
   $('cRows').hidden=!(c.rows&&c.rows.length);
   $('avatarBox').hidden=!c.avatar; $('goTxt').textContent=c.btn;
   $('go').onclick=()=>{ audioInit('click'); SFX.ui(); wrapEl.hidden=true; c.go(); };
+  if($('cardBack')){ $('cardBack').hidden=!c.back; if(c.back){ $('cardBack').textContent=c.back.label; $('cardBack').onclick=()=>{ audioInit('click'); SFX.ui(); wrapEl.hidden=true; c.back.go(); }; } }
   if($('cardAssist')){ $('cardAssist').hidden=!c.assist; if(c.assist){ $('cardAssist').textContent=c.assist.label; $('cardAssist').onclick=()=>{ audioInit('click'); SFX.ui(); wrapEl.hidden=true; c.assist.go(); }; } }
   musicMoodSet(c.mood||'card',c.moodArg);
   cardEsc=!!c.esc; if($('cardLinks')) $('cardLinks').hidden=!c.links; if(!c.noRemember) G.lastCard=c; if($('cardMenu')) $('cardMenu').hidden=!!c.esc;
@@ -2686,16 +2698,34 @@ function showcaseOpponent(i){
   if(P) P.root.setEnabled(false);
   skinEnsure(E,skinLooks(i)[i]);
 }
+/* Practice: fight an opponent already beaten, with progress, unlocks and the save left alone. Opponents are cycled with the extra button; Esc or Back returns to the title card. */
+function practiceCard(i){
+  const n=Math.min(progress.wins,BOUTS.length); if(n<1){ titleCard(); return; }
+  i=((i%n)+n)%n; const c=BOUTS[i]; showcaseOpponent(i);
+  showCard({stamp:L('practice_stamp'),kick:L('company_kick'),title:c.foe,body:boutPlace(c)+' · '+boutRole(c)+'. '+L('practice_note'),
+    rows:dossierRows(c),btn:L('bout_btn'),showcase:true,mood:'dossier',moodArg:i,go:()=>{ G.practice=true; maybeAutoFullscreen(); startBout(i); },
+    assist:n>1?{label:L('practice_next'),go:()=>practiceCard(i+1)}:null,back:{label:L('back_btn'),go:()=>titleCard()}});
+}
+function practiceWinCard(){
+  const i=G.bout, perfect=!!(G.log&&G.log.hits===0);
+  showCard({stamp:L('practice_stamp'),kick:L('bout_stamp')+' '+(i+1),title:BOUTS[i].foe+L('win_down'),body:L('practice_done'),
+    rows:[[L('row_you'),fightLine()],[L('row_punches'),punchLine()]],btn:L('practice_again'),go:()=>{ G.practice=true; startBout(i); },
+    back:{label:L('practice_back'),go:()=>practiceCard(i)},mood:'win'}); voiceSay(perfect?'perfect':'win',.45);
+}
 function introCard(i,lead){
+  G.practice=false;
   const c=BOUTS[i]; showcaseOpponent(i);
   showCard({stamp:L('bout_stamp')+' '+(i+1)+' / '+BOUTS.length,kick:lead||L('company_kick'),title:c.foe,body:boutPlace(c)+' · '+boutRole(c)+'. '+L(c.introKey),
     rows:dossierRows(c),btn:L('bout_btn'),showcase:true,mood:'dossier',moodArg:i,go:()=>{ maybeAutoFullscreen(); startBout(i); }});
 }
 function titleCard(){
+  G.practice=false;
+  $('linkPractice').hidden=!(progress.wins>0);
   showCard({stamp:L('card_title_stamp'),kick:L('company_form'),title:L('card_title_name'),
     body:L('card_title_body'),rows:titleRows(),avatar:true,links:true,btn:L('card_title_btn'),go:()=>introCard(0)});
 }
 function hubCard(nextIdx){
+  G.practice=false;
   const n=BOUTS[nextIdx];
   showCard({stamp:L('hub_stamp'),kick:L('company_kick'),title:L('hub_title'),body:L('hub_body'),
     rows:[[L('row_rules'),L('rule_1')+' · '+L('rule_2')+' · '+L('rule_3')],[L('row_hub_next'),boutPlace(n)+' · '+n.foe],[L('row_opp'),n.foe+' · '+boutRole(n)],[L('row_tip'),boutTip(n)]],
@@ -2735,7 +2765,7 @@ function startBout(i){
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
   resetFighter(E,2.3,-Math.PI/2,cfg.hp);
-  const php=(i===0||G.retry)?100:Math.min(100,P.hp+35); G.retry=false;
+  const php=(i===0||G.retry||G.practice)?100:Math.min(100,P.hp+35); G.retry=false;
   resetFighter(P,-2.3,Math.PI/2,100); P.hp=php;
   $('eName').textContent=cfg.foe; $('roundLbl').textContent=roundText(i);
   Object.keys(cache).forEach(k=>delete cache[k]);
@@ -2758,7 +2788,7 @@ function punchLine(){
 /* Three losses in a row on one bout: the lose card offers a retry on Easy (the setting stays changed; Settings undoes it). */
 function afterKO(){
   logFight(G.winner===P);
-  if(G.winner===P){ G.loss={bout:G.bout,n:0}; winCard(); }
+  if(G.winner===P){ G.loss={bout:G.bout,n:0}; if(G.practice) practiceWinCard(); else winCard(); }
   else {
     G.loss=(G.loss&&G.loss.bout===G.bout)?{bout:G.bout,n:G.loss.n+1}:{bout:G.bout,n:1};
     const assist=(G.loss.n>=3&&diff!=='easy')?{label:L('assist_btn'),go:()=>{ diff='easy'; saveDiff(); paintDiff(); G.loss.n=0; G.retry=true; startBout(G.bout); }}:null;
@@ -3787,7 +3817,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,STR,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
