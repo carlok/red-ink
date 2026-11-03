@@ -600,6 +600,26 @@ async function runHttpSuite(cdp) {
     return out;
   });
 
+  await test("share_preview_tags", async () => {
+    const r = await cdp.eval(`(async () => {
+      const m = (sel) => { const e = document.head.querySelector(sel); return e ? e.getAttribute("content") || e.getAttribute("href") : null; };
+      const img = m('meta[property="og:image"]'), o = {
+        description: (m('meta[name="description"]') || "").length > 40,
+        title: m('meta[property="og:title"]') === "Sublevel Three",
+        ogDescription: !!m('meta[property="og:description"]'),
+        card: m('meta[name="twitter:card"]') === "summary_large_image",
+        theme: (m('meta[name="theme-color"]') || "").startsWith("#"),
+        icon: (m('link[rel="icon"]') || "").startsWith("data:image/svg+xml,"),
+        imageAbsolute: (img || "").startsWith("https://") && (img || "").endsWith(".jpg"),
+      };
+      /* the absolute og:image URL points at the live site, which this test cannot reach, so the file is fetched from this server's assets folder */
+      const local = await fetch("assets/social.jpg"), blob = await local.blob();
+      o.imageServed = local.ok && blob.size > 5000 && blob.size < 300000;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("key_cap_light_and_layout", async () => {
     await waitFight(cdp, 0);
     const r = await cdp.eval(`(async () => {
