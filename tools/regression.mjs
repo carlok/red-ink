@@ -576,6 +576,30 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("progress_save_is_versioned", async () => {
+    const load = async (raw) => {
+      await cdp.eval(`localStorage.setItem('sublevel-progress', ${JSON.stringify(raw)})`);
+      await cdp.send("Page.reload", { ignoreCache: true });
+      await bootSublevel(cdp);
+    };
+    const out = {};
+    /* a Sprint 25 save has no version: it loads intact, and the next save stamps v */
+    await load('{"wins":3,"outfit":"sanitation","arena":2,"dock":1}');
+    out.old = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, a = { wins: p.wins, outfit: p.outfit, arena: p.arena, dock: p.dock, v: p.v }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { loaded: a, stamped: r.v, kept: r.wins === 3 && r.outfit === 'sanitation' && r.arena === 2 && r.dock === 1 }; })()`);
+    /* broken JSON gives the defaults, at the current version */
+    await load('{nope');
+    out.bad = await cdp.eval(`(() => { const p = window.__sublevel.progress; return { wins: p.wins, v: p.v }; })()`);
+    /* a save from a newer build is kept exactly as it is, unknown fields included, through a save */
+    await load('{"v":99,"wins":2,"outfit":"auditor","arena":0,"dock":0,"future":"keep"}');
+    out.future = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, before = { v: p.v, future: p.future }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { before, after: { v: r.v, future: r.future, wins: r.wins } }; })()`);
+    await cdp.eval(`window.__sublevel.qaResetProgress()`);
+    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 1 && out.old.stamped === 1 && out.old.kept
+      && out.bad.wins === 0 && out.bad.v === 1
+      && out.future.before.v === 99 && out.future.before.future === "keep" && out.future.after.v === 99 && out.future.after.future === "keep" && out.future.after.wins === 2;
+    if (!ok) throw new Error(JSON.stringify(out));
+    return out;
+  });
+
   await test("key_cap_light_and_layout", async () => {
     await waitFight(cdp, 0);
     const r = await cdp.eval(`(async () => {

@@ -653,7 +653,16 @@ const UNLOCK_CHAIN=[
   {type:'arena',id:3,labelKey:'unlock_arena_finale'}
 ];
 const SAVE_KEY='sublevel-progress';
-let progress={wins:0,outfit:'auditor',arena:0,dock:0};
+/* The save carries a version, so a later build can change its shape without wiping what players have won. migrateProgress upgrades an older save one step at a time; a save from a newer build is kept exactly as it is. */
+const PROGRESS_VER=1;
+const progressDefaults=()=>({v:PROGRESS_VER,wins:0,outfit:'auditor',arena:0,dock:0});
+function migrateProgress(p){
+  if(!p||typeof p!=='object'||Array.isArray(p)) return progressDefaults();
+  if(typeof p.v!=='number') p.v=0;
+  if(p.v<1) p.v=1;   /* 0 to 1: Sprint 25 and older saves had no version field; the fields are the same */
+  return p;
+}
+let progress=progressDefaults();
 /* fight camera. frac: share of the screen height a fighter fills at close range (portrait uses fracPortrait).
    pad: metres of floor kept visible beside each fighter. lead: seconds of walking speed the aim runs ahead, so a chase stays in frame.
    yaw: how far the camera slides toward the player's back, so the opponent turns his face to it (0 is square on the side); follow: how fast the camera catches up, per second. A phone in portrait sees under 5 m across and needs the faster one.
@@ -982,7 +991,7 @@ function buildProps(){
 function loadProgress(){
   try{
     const raw=localStorage.getItem(SAVE_KEY);
-    if(raw){ const p=JSON.parse(raw); if(p&&typeof p==='object') progress=Object.assign({wins:0,outfit:'auditor',arena:0,dock:0},p); }
+    if(raw){ const p=JSON.parse(raw); if(p&&typeof p==='object') progress=Object.assign(progressDefaults(),migrateProgress(p)); }
   }catch(e){}
   applyArena(progress.arena);
 }
@@ -2555,7 +2564,7 @@ if($('logClear')) $('logClear').addEventListener('click',()=>{
 });
 let resetArmed=false, resetTimer=0;
 function resetProgress(){
-  progress={wins:0,outfit:'auditor',arena:0,dock:0};
+  progress=progressDefaults();
   saveProgressData(); applyArena(0); syncPlayerOutfit(); skinEnsure(P);
 }
 function onResetClick(){
@@ -3391,7 +3400,7 @@ function setLang(code){
 function saveProbe(opt){
   opt=opt||{};
   const snap=JSON.parse(JSON.stringify(progress));
-  progress={wins:6,outfit:'exec',arena:3,dock:1};
+  progress={v:PROGRESS_VER,wins:6,outfit:'exec',arena:3,dock:1};
   let roundTrip=false, survivedThrow=false;
   if(opt.throwWrites){
     const prior=Storage.prototype.setItem;
@@ -3425,7 +3434,7 @@ function qaClickGo(){
   return {ok:true,state:G.state};
 }
 function qaResetProgress(){
-  progress={wins:0,outfit:'auditor',arena:0,dock:0};
+  progress=progressDefaults();
   saveProgressData();
   applyArena(0);
   syncPlayerOutfit();
