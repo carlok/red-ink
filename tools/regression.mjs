@@ -379,6 +379,32 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("playtest_log_records_and_exports", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const bout = async (win) => { $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(win); await sleep(120); };
+      localStorage.removeItem("sublevel-log");
+      await bout(true); await bout(false);
+      const a = S.logRead();
+      o.two = a.length === 2 && a[0].win === true && a[1].win === false && a[0].bout === 1 && a[0].foe === "Reyes" && a[0].v === 1;
+      o.fields = ["secs", "hits", "blocks", "dodges", "thrown", "landed", "diff", "ctl", "toggle", "practice", "t"].every((k) => k in a[0]) && a[0].ctl === "human" && /^[0-9]{4}-/.test(a[0].t);
+      const j = JSON.parse(S.logJson()); o.json = j.app === "sublevel-three" && j.version === 1 && j.entries.length === 2;
+      o.button = /\\(2\\)/.test($("logExport").textContent);
+      for (let i = 0; i < 210; i++) S.logFight(true);
+      o.capped = S.logRead().length === 200;
+      $("logClear").click(); o.armed = /again/i.test($("logClear").textContent) && S.logRead().length === 200;
+      $("logClear").click(); o.cleared = S.logRead().length === 0;
+      const set = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error("quota"); };
+      let threw = false; try { await bout(true); } catch (e) { threw = true; }
+      Storage.prototype.setItem = set;
+      o.survivesFullStorage = !threw && G.state === "card";
+      S.setLang("it"); await sleep(50); o.italian = /registro/i.test($("logExport").textContent) && /Svuota/.test($("logClear").textContent); S.setLang("en");
+      localStorage.removeItem("sublevel-log");
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("autoplay_acts_and_yields", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};

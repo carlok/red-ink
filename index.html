@@ -281,6 +281,7 @@ dl.rows dd a{color:inherit}
             <div class="tuneRow"><select id="voiceSel" aria-label="Voice"><option value="">Auto (male)</option></select><button type="button" class="bind" id="voiceHear">Hear</button></div>
             <label class="tuneRow rumble" for="blockTog"><input id="blockTog" type="checkbox"> Block as a toggle (tap to start and stop)</label>
             <label class="tuneRow rumble" for="autoOn"><input id="autoOn" type="checkbox"> Autoplay (the AI fights for you)</label>
+            <div class="tuneRow"><button type="button" class="bind" id="logExport">Export playtest log</button><button type="button" class="bind" id="logClear">Clear log</button></div>
             <div class="tuneRow"><button type="button" class="bind" id="resetBtn">Reset progress</button></div>
           </div>
           <small id="avHint">Export a cartoon avatar as GLB (MetaPerson or Avaturn), then pick it here or drop it anywhere on this page.</small>
@@ -498,6 +499,11 @@ const STR={
   tutor_pad:{en:'Left stick moves. X jabs, Y heavy. Hold LT to block. A dodges. Start pauses.',it:'Levetta sinistra muove. X diretto, Y potente. Tieni LT per parare. A schiva. Start pausa.'},
   tutor_touch:{en:'Stick moves. Tap Jab or Heavy. Hold Block. Tap Dodge.',it:'Il joystick muove. Tocca Diretto o Potente. Tieni Para. Tocca Schiva.'},
   key_space:{en:'Space',it:'Spazio'},
+  log_export:{en:'Export playtest log',it:'Esporta il registro delle partite'},
+  log_clear:{en:'Clear log',it:'Svuota il registro'},
+  log_clear_confirm:{en:'Tap again to clear',it:'Tocca ancora per svuotare'},
+  log_saved:{en:'Saved',it:'Salvato'},
+  log_copied:{en:'Copied to the clipboard',it:'Copiato negli appunti'},
   snd_on:{en:'Sound on',it:'Suono acceso'},
   snd_off:{en:'Sound off',it:'Suono spento'},
   got_it:{en:'Got it',it:'Capito'},
@@ -600,6 +606,7 @@ function paintLang(){
   document.documentElement.lang=lang;
   const first=(id,k)=>{ const el=$(id)&&$(id).parentNode; if(el&&el.firstChild&&el.firstChild.nodeType===3) el.firstChild.textContent=L(k)+' '; };
   if($('cardAssist')&&$('cardAssist').hidden) set('cardAssist','assist_btn'); set('noGLTitle','gl_none_title'); set('noGLBody','gl_none_body'); set('noGLBtn','gl_reload');
+  paintLog(); if(!logArmed) set('logClear','log_clear');
   set('tutorGo','got_it'); set('avLbl','fighter_lbl'); set('glbLbl','glb_load'); set('avReset','av_reset'); set('dropHint','drop_hint'); set('fail','fail_msg');
   if($('avReset')&&$('avReset').hidden) set('avName','av_placeholder');
   { const h=$('avHint'); if(h&&(h.textContent===STR.av_hint.en||h.textContent===STR.av_hint.it)) h.textContent=L('av_hint'); }
@@ -2508,6 +2515,34 @@ let audOut=false;
 function clockOut(){ toSplash(true); try{ window.close(); }catch(e){} }
 /* Reset progress: bouts won, unlocked outfits and arena grades, and the dock mission. Two clicks, because it cannot be undone; the second
    has to come within four seconds. Settings (keys, sound, language) stay. */
+/* Playtest log: one entry per finished bout, kept in this browser only (nothing is sent), newest 200. Export writes it as JSON, so real players' numbers can be set against the bot table. */
+const LOG_KEY='sublevel-log', LOG_MAX=200;
+let logArmed=false, logTimer=0;
+function logRead(){ try{ const a=JSON.parse(localStorage.getItem(LOG_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function logWrite(a){ try{ localStorage.setItem(LOG_KEY,JSON.stringify(a.slice(-LOG_MAX))); }catch(e){} }
+function logFight(won){
+  try{
+    const g=G.log||{}, a=logRead();
+    a.push({v:1,t:new Date().toISOString(),bout:G.bout+1,foe:BOUTS[G.bout].foe,win:!!won,secs:Math.round((g.time||0)*10)/10,hits:g.hits|0,blocks:g.blocks|0,dodges:g.dodges|0,thrown:g.thrown|0,landed:g.landed|0,diff:diff,ctl:autoOn?(G.autoTaken?'mixed':'ai'):'human',toggle:blockToggle,practice:!!G.practice});
+    logWrite(a);
+  }catch(e){}
+  paintLog();
+}
+function logJson(){ return JSON.stringify({app:'sublevel-three',version:1,exported:new Date().toISOString(),entries:logRead()},null,1); }
+function paintLog(){ const b=$('logExport'); if(b&&!b.dataset.flash) b.textContent=L('log_export')+' ('+logRead().length+')'; }
+function logFlash(key){ const b=$('logExport'); if(!b) return; b.dataset.flash='1'; b.textContent=L(key); setTimeout(()=>{ delete b.dataset.flash; paintLog(); },2000); }
+if($('logExport')) $('logExport').addEventListener('click',()=>{
+  const txt=logJson();
+  try{
+    const url=URL.createObjectURL(new Blob([txt],{type:'application/json'})), a=document.createElement('a');
+    a.href=url; a.download='sublevel-playtest-log.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000); logFlash('log_saved');
+  }catch(e){ try{ navigator.clipboard.writeText(txt); logFlash('log_copied'); }catch(e2){} }
+});
+if($('logClear')) $('logClear').addEventListener('click',()=>{
+  const b=$('logClear');
+  if(!logArmed){ logArmed=true; b.textContent=L('log_clear_confirm'); logTimer=setTimeout(()=>{ logArmed=false; b.textContent=L('log_clear'); },4000); return; }
+  clearTimeout(logTimer); logArmed=false; try{ localStorage.removeItem(LOG_KEY); }catch(e){} b.textContent=L('log_clear'); paintLog();
+});
 let resetArmed=false, resetTimer=0;
 function resetProgress(){
   progress={wins:0,outfit:'auditor',arena:0,dock:0};
@@ -2722,6 +2757,7 @@ function punchLine(){
 }
 /* Three losses in a row on one bout: the lose card offers a retry on Easy (the setting stays changed; Settings undoes it). */
 function afterKO(){
+  logFight(G.winner===P);
   if(G.winner===P){ G.loss={bout:G.bout,n:0}; winCard(); }
   else {
     G.loss=(G.loss&&G.loss.bout===G.bout)?{bout:G.bout,n:G.loss.n+1}:{bout:G.bout,n:1};
@@ -3751,7 +3787,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,STR,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,STR,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
