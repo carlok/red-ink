@@ -166,6 +166,67 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("voice_says_fight_once_and_obeys_mute", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), g = S.audioGraph(), o = {};
+      const voices = (log) => log.filter((x) => typeof x === "string" && x.startsWith("voice:"));
+      S.setAudio({ mute: false }); /* an earlier test saves a mute */
+      if (g.ac.state !== "running") { await g.ac.resume(); for (let i = 0; i < 20 && g.ac.state !== "running"; i++) await sleep(50); }
+      $("wrap").hidden = true; g.MUS.log = []; S.startBout(0); while (G.state !== "fight") await raf(); await sleep(300);
+      o.fightOnce = JSON.stringify(voices(g.MUS.log)) === JSON.stringify(["voice:fight"]);
+      g.MUS.log = []; S.qaEndBout(true); await sleep(800); o.perfectWord = voices(g.MUS.log).join() === "voice:perfect" && /Perfect|Perfetto/.test($("cRows").textContent); /* no hit taken in the test */
+      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); G.log.hits = 2; g.MUS.log = []; S.qaEndBout(true); await sleep(800); o.winWord = voices(g.MUS.log).join() === "voice:win";
+      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); g.MUS.log = []; S.qaEndBout(false); await sleep(800); o.loseWord = voices(g.MUS.log).join() === "voice:lose";
+      S.setAudio({ mute: true }); $("wrap").hidden = true; g.MUS.log = []; S.startBout(0); while (G.state !== "fight") await raf(); await sleep(300); o.mutedSilent = voices(g.MUS.log).length === 0; S.setAudio({ mute: false });
+      S.toSplash(true); g.MUS.log = []; S.voiceSay("fight"); o.splashSilent = voices(g.MUS.log).length === 0; S.play();
+      g.MUS.log = null; return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("win_and_lose_themes_differ", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), g = S.audioGraph(), o = {};
+      const run = async (win) => { $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); g.MUS.log = []; if (win) S.qaEndBout(true); else S.qaEndBout(false); await sleep(5000); const n = g.MUS.log.slice(); g.MUS.log = null; return n; };
+      const root = 40, win = await run(true), winMood = S.musicMood(), lose = await run(false), loseMood = S.musicMood();
+      const pcs = (ns, base) => new Set(ns.map((m) => (((m - base) % 12) + 12) % 12));
+      const w = pcs(win, root + 3), l = pcs(lose, root);
+      o.winMood = winMood === "win"; o.loseMood = loseMood === "lose"; o.notes = win.length > 8 && lose.length > 3;
+      o.winMajor = w.has(4) && !w.has(3); o.loseMinor = l.has(3) && !l.has(4);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("esc_opens_menu_on_every_card", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })), o = {};
+      document.getElementById("wrap").hidden = true;
+      const cards = {
+        title: () => S.titleCard(), dossier: () => S.introCard(2), hub: () => S.hubCard(1), dock: () => S.dockMission(() => {}), final: () => S.showFinalCard(),
+        win: async () => { S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); }, lose: async () => { S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(false); }
+      };
+      S.qaResetProgress();
+      for (const [name, open] of Object.entries(cards)) {
+        await open(); await sleep(200);
+        const title = $("cTitle").textContent;
+        kd("Escape"); await sleep(120);
+        const opened = G.menuOpen && !$("pause").hidden && getComputedStyle($("restart")).display === "none" && $("resume").textContent === "Back";
+        const cardKept = !$("wrap").hidden && G.state === "card" && $("cTitle").textContent === title;
+        kd("Escape"); await sleep(120);
+        const closed = !G.menuOpen && $("pause").hidden;
+        o[name] = opened && cardKept && closed;
+      }
+      S.titleCard(); await sleep(150); $("cardMenu").click(); await sleep(100); const viaButton = G.menuOpen; $("pauseCredits").click(); await sleep(150);
+      const creditsOpen = $("cTitle").textContent === "Who made this"; $("go").click(); await sleep(150);
+      o.menuButtonAndCreditsBack = viaButton && creditsOpen && $("cTitle").textContent === "Sublevel Three";
+      kd("Escape"); await sleep(100); $("quitTitle").click(); await sleep(250); o.quitFromCardMenu = G.state === "splash" && $("pause").hidden && !G.menuOpen;
+      S.play(); await sleep(250);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("opponent_dossier_every_bout", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = { bouts: [] };

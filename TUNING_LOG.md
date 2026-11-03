@@ -1378,3 +1378,56 @@ The intro card before each bout is now a dossier. The next opponent stands in th
 Screenshots: `tuning/s22-splash.jpg`, `s22-splash-phone.jpg`, `s22-crowd.jpg`, `s22-dossier-reyes.jpg`, `s22-dossier-voss.jpg`, `s22-dossier-phone.jpg`.
 
 Not done: the small extras of the plan (footsteps, a crowd gasp) were left out to keep this reviewable; how the music and the bed sound over speakers is unchecked (the numbers say it is not a drone, not that it is good); the spectators use the Punch clip as a fist pump, which reads as swinging at the air; the first bout's crowd takes about a second to appear; on `?skin=0` the crowd stays boxes and the dossier shows the procedural opponent; a real phone and an integrated GPU are still unchecked.
+
+## Sprint 23: Esc everywhere, 80s synth, a voice that says FIGHT, and win and lose themes
+
+Asked for: Esc to work when there is no fight, 80s-style synth music, a voice saying "FIGHT", different music for a win and a loss, and things like that.
+
+### Esc
+
+Esc used to pause a fight, resume a pause and go back from Credits; on the title, dossier, hub, dock mission, win, lose and final cards it did nothing, and on a phone the Menu button existed only in a fight. Now Esc opens the pause card as a menu over any card (titled Menu, Restart hidden, Resume reads Back); Esc, Back or a Menu button on every card closes it; Quit reaches the splash; Credits from the menu returns to the card it left (`G.lastCard`). Card types where Esc opens the menu: 7 of 7 (was 0). The splash ignores Esc.
+
+### 80s timbres
+
+Same sequencer, new instruments: a detuned-saw lead with chorus and a dotted delay, a gated-reverb snare (a plateau of noise held 140 ms and cut at 180 ms), claps, Simmons-style toms on the last bar of four, an octave-pulsing bass with a sub, a chorused pad with a sidechain pump, open hats, 16th-note arpeggios, a DX-style FM bell in Cold Storage, one shared convolver reverb (a generated 1.6 s impulse). Minor keys and an i–VI–III–VII line: The Sump 84 bpm E minor, Dock Four 100 A minor, The Blind Map 110 D dorian, Cold Storage 92 C minor, The Gatehouse 118 F minor, The Reconciler 126 G minor.
+
+| `tools/audio-bed-probe.mjs` | Sprint 22 | Now |
+| --- | --- | --- |
+| Snare energy at 100 ms / 300 ms, relative to its peak | −39.5 / silent (a click) | −7.7 / −64 (a gated tail) |
+| Title card, dBFS rms / onsets per 10 s / modulation | −26.1 / 12.5 / 0.53 | −27.7 / 19–21 / 0.59 |
+| Tense moment, dBFS rms / onsets / modulation | −23.9 / 22.5 / 1.3 | −25.3 / 30 / 1.08 |
+| Nodes created per 10 s, tense moment (Sump / Blind Map / Reconciler) | 162 / – / – | 285 / 375 / 471 |
+
+The plan's limit of 250 nodes was not met: every note is a few nodes. Hats cost none (two looping noise chains with an automated gain), which took the Reconciler from 831 to 471.
+
+### Win, lose and dossier themes
+
+`showCard` takes a `mood`. WIN: the place's key moved up a minor third to its relative major, 8% faster, an I–V–vi–IV line, a brass-like stab, four-on-the-floor with claps, octave bass and a rising arpeggio, and after 8 bars only the stab and the arpeggio remain. LOSE: 64 bpm in minor, a tape stop at the start, a wide low pad, a whole-bar sub, a falling four-note motif every other bar, no drums. DOSSIER: a bass riff and an arpeggio drawn from the opponent's own seed over a pad. The regression test logs the notes played: the win notes contain the major third and not the minor, the lose notes the reverse.
+
+### The voice
+
+A formant synthesiser, `voiceSay`: a sawtooth falling from 125 to 98 Hz through three band-pass filters whose frequencies glide between vowels, noise bursts for F, T, K and Z, a comb delay and a reverb send. No files. It says FIGHT with the banner, K.O. on a knockout, WIN or LOSE on the result card, and PERFECT for a win without a hit (the win card also gets a Perfect row). English in both languages, the arcade way. `tools/voice-probe.mjs`, each word levelled to about −10 dBFS:
+
+| Word | Length | Spectrum |
+| --- | --- | --- |
+| FIGHT | 550 ms | opens with a high-frequency burst (99% of the energy above 3.5 kHz); the vowel at F1 656–703 / F2 1266–1313 Hz, gliding to F1 422 / F2 1969; ends with a /t/ burst (75–98%) |
+| K.O. | 560 ms | a /k/ burst, F1 469 / F2 1875–2719 for the first vowel, F1 422–516 / F2 1031–1078 for the O |
+| WIN | 380 ms | F1 about 300–330 / F2 about 1730–2200 |
+| LOSE | 460 ms | F1 375–469 / F2 1031–1266, ending in a /z/ noise burst |
+| PERFECT | 500 ms | bursts at the P–F and K–T, F1 469 / F2 1359–1453 then F1 563 / F2 1828 |
+
+The probe shows the structure, not that a listener understands it. The music ducks for each word.
+
+Extras: Play ends with a coin and a rising arpeggio; the splash has a faint magenta grid (a first try with a sun disc covered the Credits button and read as a planet). Left out: a "Continue?" countdown on the lose card, because quitting automatically after ten seconds punishes someone who is reading.
+
+### Checked
+
+| Check | Result |
+| --- | --- |
+| `tools/regression.mjs` | 30 of 30 (new: Esc on seven card types with the button, Credits and Quit; win major and lose minor; the voice once per bout, WIN, LOSE and PERFECT words, silent when muted or on the splash) |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, unchanged |
+| `tools/step-probe.mjs` | identical at 20 to 144 fps; the natural-frame count read 597 single ticks of 600 (2 empty, 1 double) once, a frame-time wobble on this machine, not the sim |
+| `tools/combat-probe.mjs`, `tools/ui-probe.mjs`, `tools/input-probe.mjs` | unchanged, no failures |
+| `tools/env-probe.mjs` | draws 41–43, GPU about 2.0 ms, no console errors |
+
+Not done: how the synth music, the voice and the themes sound is unchecked (the numbers say they have the structure, not that they sound good); the voice is English only; a real phone and an integrated GPU are still unchecked.
