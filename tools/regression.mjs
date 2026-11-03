@@ -1079,6 +1079,32 @@ async function runHttpSuite(cdp) {
     return v;
   });
 
+  /* Last in the suite: it reloads the page twice. */
+  await test("stored_values_are_validated_on_load", async () => {
+    const reload = async () => { await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp); };
+    await cdp.eval(`(() => {
+      const set = (k, v) => localStorage.setItem(k, v);
+      set("sublevel-sfx", "abc"); set("sublevel-music", "NaN"); set("sublevel-amb", "Infinity"); set("sublevel-rumble", "x");
+      set("sublevel-diff", "constructor");
+      set("sublevel-binds", JSON.stringify({ jab: "j", heavy: "j", block: "l", dodge: "space" }));
+      set("sublevel-progress", JSON.stringify({ v: 2, wins: "abc", outfit: "constructor", arena: 99, dock: 7, pass2: -3 }));
+    })()`);
+    await reload();
+    const a = await cdp.eval(`(() => { const S = window.__sublevel;
+      return { title: S.G.state === "card" && !!document.getElementById("cTitle").textContent,
+        progress: S.progress, diff: S.diffNow(), binds: { ...S.binds }, vol: S.audioGraph().ac ? "ctx" : "none" }; })()`);
+    const okA = a.title && a.progress.wins === 0 && a.progress.outfit === "auditor" && a.progress.arena === 3 && a.progress.dock === 1 && a.progress.pass2 === 0
+      && a.diff === "normal" && a.binds.jab === "j" && a.binds.heavy === "k";
+    if (!okA) throw new Error("bad values: " + JSON.stringify(a));
+    /* a save that is not JSON is kept under another key */
+    await cdp.eval(`(() => { localStorage.removeItem("sublevel-progress-bad"); localStorage.setItem("sublevel-progress", "{nope"); })()`);
+    await reload();
+    const b = await cdp.eval(`(() => ({ title: window.__sublevel.G.state === "card", wins: window.__sublevel.progress.wins, bad: localStorage.getItem("sublevel-progress-bad") }))()`);
+    if (!b.title || b.wins !== 0 || b.bad !== "{nope") throw new Error("corrupt save: " + JSON.stringify(b));
+    await cdp.eval(`(() => { ["sublevel-sfx","sublevel-music","sublevel-amb","sublevel-rumble","sublevel-diff","sublevel-binds","sublevel-progress-bad"].forEach((k) => localStorage.removeItem(k)); window.__sublevel.qaResetProgress(); })()`);
+    return { a, b };
+  });
+
   if (SHOT) {
     await cdp.eval(`document.getElementById("wrap").hidden = false`);
     const pic = await cdp.send("Page.captureScreenshot", { format: "jpeg", quality: 72 });

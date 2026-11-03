@@ -335,6 +335,7 @@ const $=id=>document.getElementById(id);
 if(!window.BABYLON){ $('fail').hidden=false; $('wrap').hidden=true; return; }
 const B=BABYLON, V3=B.Vector3, C3=B.Color3;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+const num=(x,lo,hi,def)=>{ x=Number(x); return Number.isFinite(x)?clamp(x,lo,hi):def; };   /* a number read from storage or a setting: NaN and Infinity give def */
 const lerp=(a,b,t)=>a+(b-a)*t;
 const damp=(k,dt)=>1-Math.exp(-k*dt);
 let rng=Math.random;
@@ -688,6 +689,14 @@ function migrateProgress(p){
   if(typeof p.v!=='number') p.v=0;
   if(p.v<1) p.v=1;   /* 0 to 1: Sprint 25 and older saves had no version field; the fields are the same */
   if(p.v<2){ if(typeof p.pass2!=='number') p.pass2=0; p.v=2; }   /* 1 to 2: the second pass counts the bouts cleared in it */
+  return sanitizeProgress(p);
+}
+/* A hand-edited or damaged save must not reach the game as it is. Each known field keeps its value when it is the right kind and is put right when it is not
+   (a count outside its range is clamped, anything that is not a number becomes 0, an unknown outfit becomes the Auditor); fields this build does not know are left alone. */
+function sanitizeProgress(p){
+  const n=(x,hi)=>Number.isFinite(x)?Math.floor(clamp(x,0,hi)):0;
+  p.wins=n(p.wins,BOUTS.length); p.pass2=n(p.pass2,BOUTS.length); p.dock=n(p.dock,1); p.arena=n(p.arena,3);
+  if(typeof p.outfit!=='string'||!Object.prototype.hasOwnProperty.call(OUTFITS,p.outfit)) p.outfit='auditor';
   return p;
 }
 let progress=progressDefaults();
@@ -1017,10 +1026,14 @@ function buildProps(){
   it=[]; for(let i=0;i<8;i++){ const p=polar(i/8*Math.PI*2+.39,14.15); it.push([at(box(.1,8,.1),p[0],4,p[1]),i&1?'#ff4a3d':'#4de8ff',1]); } set('strips',it);
 }
 function loadProgress(){
+  let raw=null;
   try{
-    const raw=localStorage.getItem(SAVE_KEY);
-    if(raw){ const p=JSON.parse(raw); if(p&&typeof p==='object') progress=Object.assign(progressDefaults(),migrateProgress(p)); }
-  }catch(e){}
+    raw=localStorage.getItem(SAVE_KEY);
+    if(raw){ const p=JSON.parse(raw); if(p&&typeof p==='object'&&!Array.isArray(p)) progress=Object.assign(progressDefaults(),migrateProgress(p)); else throw new Error('not a save'); }
+  }catch(e){
+    /* a save that cannot be read is kept under another key before the next win overwrites it, so it can be recovered by hand */
+    if(raw){ try{ localStorage.setItem(SAVE_KEY+'-bad',raw); }catch(e2){} }
+  }
   applyArena(progress.arena);
 }
 /* Another tab may have moved the save on since this one loaded it. Unless the caller means to overwrite (a reset, a probe), a save first takes
@@ -1169,11 +1182,11 @@ function loadAudioPrefs(){
     const m=localStorage.getItem('sublevel-mute');
     if(m==='1') muted=true;
     const s=localStorage.getItem('sublevel-sfx');
-    if(s!==null&&s!=='') volSfx=clamp(Number(s),0,1);
+    if(s!==null&&s!=='') volSfx=num(s,0,1,volSfx);
     const u=localStorage.getItem('sublevel-music');
-    if(u!==null&&u!=='') volMusic=clamp(Number(u),0,1);
+    if(u!==null&&u!=='') volMusic=num(u,0,1,volMusic);
     const a=localStorage.getItem('sublevel-amb');
-    if(a!==null&&a!=='') volAmb=clamp(Number(a),0,1);
+    if(a!==null&&a!=='') volAmb=num(a,0,1,volAmb);
   }catch(e){}
 }
 function saveAudioPrefs(){
@@ -1708,8 +1721,8 @@ function readAudioStore(){
 }
 function setAudio(o){
   if(!o) return;
-  if(o.sfx!=null) volSfx=clamp(Number(o.sfx),0,1);
-  if(o.music!=null) volMusic=clamp(Number(o.music),0,1);
+  if(o.sfx!=null) volSfx=num(o.sfx,0,1,volSfx);
+  if(o.music!=null) volMusic=num(o.music,0,1,volMusic);
   if(o.mute!=null){ muted=!!o.mute; if(muted) voiceCancel(); }
   saveAudioPrefs(); applyBus(); paintAudio();
 }
@@ -2260,6 +2273,8 @@ function loadBinds(){
     const b=raw?JSON.parse(raw):null;
     if(b&&typeof b==='object'){
       for(const act of Object.keys(DEFAULT_BINDS)) if(typeof b[act]==='string'&&b[act]&&!RESERVED.has(b[act])) binds[act]=b[act];
+      /* two actions on one key cannot both work: a save that has that is dropped for the defaults */
+      const used=Object.values(binds); if(new Set(used).size!==used.length) Object.assign(binds,DEFAULT_BINDS);
     }
   }catch(e){}
 }
@@ -2267,7 +2282,7 @@ function saveBinds(){ try{ localStorage.setItem('sublevel-binds', JSON.stringify
 function loadRumble(){
   try{
     const r=localStorage.getItem('sublevel-rumble');
-    if(r!==null&&r!=='') rumbleAmt=clamp(Number(r),0,1);
+    if(r!==null&&r!=='') rumbleAmt=num(r,0,1,rumbleAmt);
   }catch(e){}
 }
 function saveRumble(){ try{ localStorage.setItem('sublevel-rumble', String(rumbleAmt)); }catch(e){} }
@@ -3494,7 +3509,7 @@ function scaleCfg(cfg,pass2){
   return o;
 }
 function loadDiff(){
-  try{ const v=localStorage.getItem('sublevel-diff'); if(v&&DIFF[v]) diff=v; }catch(e){}
+  try{ const v=localStorage.getItem('sublevel-diff'); if(v&&Object.prototype.hasOwnProperty.call(DIFF,v)) diff=v; }catch(e){}
 }
 function saveDiff(){ try{ localStorage.setItem('sublevel-diff', diff); }catch(e){} }
 function paintDiff(){
@@ -3945,7 +3960,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={buf,strike,ATK,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
