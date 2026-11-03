@@ -184,6 +184,32 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("voice_sources_and_settings", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, g = S.audioGraph(), $ = (i) => document.getElementById(i), o = {};
+      S.setAudio({ mute: false }); if (g.ac.state !== "running") { await g.ac.resume(); await sleep(100); }
+      const v = (name, lang, local = true) => ({ name, lang, localService: local });
+      const fake = { voices: [v("Bahh", "en-US"), v("Samantha", "en-US"), v("Fred", "en-US"), v("Rishi", "en-IN"), v("Daniel", "en-GB"), v("Luca", "it-IT"), v("Alice", "it-IT")], spoken: [], cancel() {}, speak(u) { this.spoken.push({ text: u.text, voice: u.voice && u.voice.name, pitch: u.pitch, volume: u.volume }); }, getVoices() { return this.voices; }, addEventListener() {} };
+      Object.defineProperty(window, "speechSynthesis", { value: fake, configurable: true }); const U = window.SpeechSynthesisUtterance; window.SpeechSynthesisUtterance = function (t) { this.text = t; };
+      const say = (w) => { g.MUS.log = []; S.voiceSay(w); const src = g.MUS.log.find((x) => String(x).startsWith("voice-src:")); g.MUS.log = null; return src; };
+      o.malePreferred = say("fight") === "voice-src:browser" && fake.spoken[0].voice === "Daniel" && fake.spoken[0].text === "Fight!" && fake.spoken[0].pitch <= 0.8;
+      o.picks = S.voicePick(fake.voices, "en", "").name === "Daniel" && S.voicePick([v("Bahh", "en-US"), v("Samantha", "en-US"), v("Zira", "en-US")], "en", "") === null && S.voicePick(fake.voices, "it", "").name === "Luca";
+      S.setLang("it"); await sleep(50); fake.spoken.length = 0; say("fight"); o.italian = fake.spoken[0] && fake.spoken[0].text === "Combatti!" && fake.spoken[0].voice === "Luca" && $("fightBanner") === null; S.setLang("en"); await sleep(50);
+      fake.spoken.length = 0; $("voiceSel").value = "Rishi"; $("voiceSel").dispatchEvent(new Event("change")); say("ko"); o.chosenVoice = fake.spoken[0] && fake.spoken[0].voice === "Rishi" && fake.spoken[0].text === "K.O.!"; $("voiceSel").value = ""; $("voiceSel").dispatchEvent(new Event("change"));
+      const real = fake.voices; fake.voices = [v("Bahh", "en-US"), v("Samantha", "en-US")]; o.robotFallback = say("fight") === "voice-src:robot"; fake.voices = real;
+      const n = 200, wav = new Uint8Array(44 + n * 2), dv = new DataView(wav.buffer); const w4 = (a, t) => { for (let i = 0; i < 4; i++) wav[a + i] = t.charCodeAt(i); };
+      w4(0, "RIFF"); dv.setUint32(4, 36 + n * 2, true); w4(8, "WAVE"); w4(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, 22050, true); dv.setUint32(28, 44100, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w4(36, "data"); dv.setUint32(40, n * 2, true);
+      let bin = ""; wav.forEach((b) => { bin += String.fromCharCode(b); });
+      window.SUBLEVEL_VOICE = { fight: "data:audio/wav;base64," + btoa(bin) }; S.voiceClipsInit(); await sleep(400); fake.spoken.length = 0;
+      o.clipFirst = say("fight") === "voice-src:clip" && fake.spoken.length === 0; window.SUBLEVEL_VOICE = {};
+      $("pVoice").checked = false; $("pVoice").dispatchEvent(new Event("change")); g.MUS.log = []; S.voiceSay("fight"); o.voiceOffSilent = g.MUS.log.length === 0 && !$("voiceOn").checked; g.MUS.log = null;
+      $("pVoice").checked = true; $("pVoice").dispatchEvent(new Event("change")); o.savedOn = localStorage.getItem("sublevel-voice") === "1";
+      delete window.speechSynthesis; window.SpeechSynthesisUtterance = U;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("win_and_lose_themes_differ", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), g = S.audioGraph(), o = {};
