@@ -260,6 +260,26 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("result_card_punch_stats", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const key = (k, d) => window.dispatchEvent(new KeyboardEvent(d ? "keydown" : "keyup", { key: k, bubbles: true }));
+      $("wrap").hidden = true; S.seed(5); S.startBout(0);
+      while (G.state !== "fight") await raf();
+      const E = S.E; E.ai.cd = 99; E.cfg.cd = 99; E.speed0 = 0; E.cfg.heavy = 0; E.cfg.dodge = 0; E.cfg.block = 0; S.P.pos.set(-0.5, 0, 0); E.pos.set(0.5, 0, 0);
+      for (let i = 0; i < 4; i++) { key("j", true); key("j", false); for (let k = 0; k < 40; k++) await raf(); }
+      const lg = G.log; o.counts = lg.thrown >= 3 && lg.landed >= 1 && lg.landed <= lg.thrown && lg.time > 2;
+      S.qaEndBout(true); await sleep(200);
+      const rows = $("cRows").textContent;
+      o.enRow = /Punches/.test(rows) && /[0-9]+ of [0-9]+ landed \\([0-9]+%\\)/.test(rows);
+      S.setLang("it"); $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); await sleep(200);
+      o.itRow = /Pugni/.test($("cRows").textContent) && /a segno/.test($("cRows").textContent) && /colpi subiti/.test($("cRows").textContent);
+      S.setLang("en");
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("esc_opens_menu_on_every_card", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })), o = {};

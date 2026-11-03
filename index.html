@@ -427,6 +427,9 @@ const STR={
   row_tip:{en:'Tip',it:'Consiglio'},
   row_next:{en:'Next',it:'Prossimo'},
   row_you:{en:'You',it:'Tu'},
+  row_punches:{en:'Punches',it:'Pugni'},
+  st_line:{en:'{h} hits taken, {b} blocks, {d} dodges, {c} s in the corner',it:"{h} colpi subiti, {b} parate, {d} schivate, {c} s all'angolo"},
+  st_punch:{en:'{l} of {t} landed ({a}%) · {s} s',it:'{l} su {t} a segno ({a}%) · {s} s'},
   row_retry:{en:'Retry',it:'Riprova'},
   row_unlock:{en:'Unlocked',it:'Sbloccato'},
   row_rules:{en:'Rules',it:'Regole'},
@@ -1842,9 +1845,10 @@ function applyPose(f,dt){
 
 /* ---------- combat ---------- */
 const G={menuOpen:false,lastCard:null,showcase:null,state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
-function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0}; }
+function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0,thrown:0,landed:0,time:0}; }
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
+  G.log.time+=dt;
   if(Math.hypot(P.pos.x,P.pos.z)>R*.85) G.log.corner+=dt;
 }
 let P=null,E=null;
@@ -1853,7 +1857,7 @@ const IDLE={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
 function startAtk(f,type){
   const D=ATK[type];
   f.state='attack'; f.atk={type,def:D,t:0,done:false}; f.stam-=D.cost; f.stamDelay=.55; f.started=type;
-  if(f.isPlayer){ f.hist.push(type); if(f.hist.length>3) f.hist.shift(); }
+  if(f.isPlayer){ f.hist.push(type); if(f.hist.length>3) f.hist.shift(); G.log.thrown++; }
   SFX.whoosh();
 }
 function startDodge(f,I,dirO){
@@ -1875,6 +1879,7 @@ function strike(a,d,D){
   if(d.inv>0){ SFX.whoosh(); return; }
   const dir=d.pos.subtract(a.pos); dir.y=0; dir.normalize();
   if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
+  else if(a.isPlayer&&d.state!=='block') G.log.landed++;
   if(d.state==='block'){
     d.hp=Math.max(1,d.hp-D.dmg*.1); d.stam-=D.dmg*.95; d.vel.addInPlace(dir.scale(D.kb*3)); a.stam=Math.max(0,a.stam-4);
     camKick(dir,.03); fxWord('BLOK',mid); SFX.block(); G.shake=Math.max(G.shake,.25); G.hitstop=.035; G.cheer=Math.max(G.cheer,.4);
@@ -2536,12 +2541,12 @@ function dockMission(next){
 }
 function showFinalCard(){
   showCard({stamp:L('final_stamp'),kick:L('final_kick'),title:L('final_title'),body:L('final_body'),
-    rows:[[L('row_next'),L('final_next')],[L('row_you'),fightLine()]],btn:L('final_btn'),go:()=>{ G.bout=0; titleCard(); }});
+    rows:[[L('row_next'),L('final_next')],[L('row_you'),fightLine()],[L('row_punches'),punchLine()]],btn:L('final_btn'),go:()=>{ G.bout=0; titleCard(); }});
 }
 function winCard(){
   const i=G.bout, next=i+1, uLabel=unlockLabel(i);
   grantWin(i);
-  const rows=[[L('row_you'),fightLine()]], perfect=!!(G.log&&G.log.hits===0);
+  const rows=[[L('row_you'),fightLine()],[L('row_punches'),punchLine()]], perfect=!!(G.log&&G.log.hits===0);
   if(perfect) rows.unshift([L('row_perfect'),L('perfect_v')]);
   if(uLabel) rows.unshift([L('row_unlock'),uLabel]);
   if(next<BOUTS.length) rows.unshift([L('row_next'),boutPlace(BOUTS[next])]);
@@ -2573,14 +2578,19 @@ function startBout(i){
   skinBout(i);
 }
 function fightLine(){
-  const L=G.log||{hits:0,blocks:0,dodges:0,corner:0};
-  return L.hits+' hits, '+L.blocks+' blocks, '+L.dodges+' dodges, '+(Math.round(L.corner*10)/10)+' s in the corner';
+  const g=G.log||{hits:0,blocks:0,dodges:0,corner:0};
+  return L('st_line').replace('{h}',g.hits).replace('{b}',g.blocks).replace('{d}',g.dodges).replace('{c}',Math.round(g.corner*10)/10);
+}
+/* punches thrown and landed (a block or a dodge is not landed) and the length of the bout, for the result cards */
+function punchLine(){
+  const g=G.log||{thrown:0,landed:0,time:0};
+  return L('st_punch').replace('{l}',g.landed).replace('{t}',g.thrown).replace('{a}',g.thrown?Math.round(g.landed/g.thrown*100):0).replace('{s}',Math.round(g.time*10)/10);
 }
 function afterKO(){
   if(G.winner===P) winCard();
   else {
     showCard({stamp:L('lose_stamp'),kick:L('bout_stamp')+' '+(G.bout+1),title:L('lose_title'),body:L('lose_body'),
-      rows:[[L('row_retry'),BOUTS[G.bout].foe+', '+boutPlace(BOUTS[G.bout])],[L('row_you'),fightLine()]],btn:L('lose_btn'),go:()=>{ G.retry=true; startBout(G.bout); },mood:'lose'}); voiceSay('lose',.5);
+      rows:[[L('row_retry'),BOUTS[G.bout].foe+', '+boutPlace(BOUTS[G.bout])],[L('row_you'),fightLine()],[L('row_punches'),punchLine()]],btn:L('lose_btn'),go:()=>{ G.retry=true; startBout(G.bout); },mood:'lose'}); voiceSay('lose',.5);
   }
 }
 
