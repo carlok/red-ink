@@ -730,7 +730,8 @@ async function runHttpSuite(cdp) {
         description: (m('meta[name="description"]') || "").length > 40,
         title: m('meta[property="og:title"]') === "Sublevel Three",
         ogDescription: !!m('meta[property="og:description"]'),
-        card: m('meta[name="twitter:card"]') === "summary_large_image",
+        noTwitterCard: m('meta[name="twitter:card"]') === null,   /* Instagram reads Open Graph; no Twitter card is wanted */
+        imageSize: m('meta[property="og:image:width"]') === "1200" && m('meta[property="og:image:height"]') === "630",
         theme: (m('meta[name="theme-color"]') || "").startsWith("#"),
         icon: (m('link[rel="icon"]') || "").startsWith("data:image/svg+xml,"),
         imageAbsolute: (img || "").startsWith("https://") && (img || "").endsWith(".jpg"),
