@@ -7,6 +7,17 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="A browser fighting game in six bouts. Keyboard, gamepad or touch, no install, free and open source.">
+<meta name="theme-color" content="#141516">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23141516'/%3E%3Crect y='50' width='64' height='6' fill='%23f0c400'/%3E%3Ctext x='32' y='42' font-size='34' font-weight='800' text-anchor='middle' fill='%23f0c400' font-family='Impact,Arial Black,sans-serif'%3ES3%3C/text%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Sublevel Three">
+<meta property="og:description" content="A browser fighting game in six bouts. Keyboard, gamepad or touch, no install, free and open source.">
+<meta property="og:url" content="https://carlok.github.io/red-ink/">
+<meta property="og:image" content="https://carlok.github.io/red-ink/assets/social.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Auditor lands a jab on Reyes in a dark basement ring, with a POW! burst.">
 <style>
 /* Fonts are served from assets/fonts (SIL OFL 1.1, see assets/fonts/README.txt): no request to Google Fonts. */
 @font-face{font-family:'Big Shoulders Stencil Display';font-style:normal;font-weight:800;font-display:swap;src:url(assets/fonts/big-shoulders-stencil-display-800.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
@@ -385,6 +396,8 @@ const STR={
   banner_ko:{en:'K.O.',it:'K.O.'},
   banner_down:{en:'DOWN',it:'A TERRA'},
   row_perfect:{en:'Perfect',it:'Perfetto'},
+  row_save:{en:'Saving',it:'Salvataggio'},
+  save_failed:{en:'Not saved: this browser blocks storage, so the win is lost when you close the page.',it:'Non salvato: il browser blocca la memoria, quindi la vittoria si perde alla chiusura della pagina.'},
   perfect_v:{en:'You took no hits.',it:'Non hai preso colpi.'},
   card_menu:{en:'Menu · Esc',it:'Menu · Esc'},
   dos_health:{en:'Health',it:'Salute'},
@@ -454,6 +467,19 @@ const STR={
   row_punches:{en:'Punches',it:'Pugni'},
   row_assist:{en:'Assist',it:'Aiuto'},
   assist_btn:{en:'Try Easy',it:'Prova Facile'},
+  continue_btn:{en:'Continue: bout',it:'Continua: match'},
+  pass2_stamp:{en:'Second pass',it:'Secondo giro'},
+  pass2_btn:{en:'Second pass: bout',it:'Secondo giro: match'},
+  pass2_again:{en:'Second pass again',it:'Secondo giro di nuovo'},
+  pass2_note:{en:'The same fighter, harder, with one change.',it:'Lo stesso avversario, più duro, con una novità.'},
+  pass2_next:{en:'Next bout',it:'Prossimo match'},
+  pass2_done:{en:'All six down a second time.',it:'Tutti e sei battuti per la seconda volta.'},
+  row_pass2:{en:'Second pass',it:'Secondo giro'},
+  row_mod:{en:'Change',it:'Novità'},
+  mod_iron:{en:'Iron jaw: takes much more punishment.',it:'Mascella di ferro: incassa molto di più.'},
+  mod_quick:{en:'Quick hands: reads you sooner and resets faster.',it:'Mani veloci: ti legge prima e riparte più in fretta.'},
+  mod_heavy:{en:'Heavy hands: every hit he lands costs you more.',it:'Mani pesanti: ogni colpo a segno ti costa di più.'},
+  mod_relentless:{en:'Relentless: attacks more often.',it:'Instancabile: attacca più spesso.'},
   assist_body:{en:'Three losses here. Easy slows his reactions; Settings changes it back.',it:'Tre sconfitte qui. Facile rallenta le sue reazioni; lo cambi nelle Impostazioni.'},
   st_line:{en:'{h} hits taken, {b} blocks, {d} dodges, {c} s in the corner',it:"{h} colpi subiti, {b} parate, {d} schivate, {c} s all'angolo"},
   st_punch:{en:'{l} of {t} landed ({a}%) · {s} s',it:'{l} su {t} a segno ({a}%) · {s} s'},
@@ -590,7 +616,8 @@ const STR={
   after_b6:{en:'The yard rules peel off the wall. You walk upstairs without counting steps. The shift ends balanced.',it:'Le regole del cortile cadono dal muro. Salite senza contare i passi. Il turno chiude in pari.'},
   win_down:{en:' is down',it:' a terra'}
 };
-function L(id){ const o=STR[id]; return o?(o[lang]||o.en):id; }
+let moveCaps='WASD'; /* what the four movement keys are labelled on this keyboard: ZQSD on AZERTY, see loadMoveCaps */
+function L(id){ const o=STR[id], v=o?(o[lang]||o.en):id; return moveCaps==='WASD'?v:v.replace('W A S D',moveCaps.split('').join(' ')).replace('WASD',moveCaps); }
 function wordCount(s){ return String(s).trim().split(/\s+/).filter(Boolean).length; }
 function storyMetrics(){
   let maxEn=0,maxIt=0,bad=[];
@@ -653,7 +680,17 @@ const UNLOCK_CHAIN=[
   {type:'arena',id:3,labelKey:'unlock_arena_finale'}
 ];
 const SAVE_KEY='sublevel-progress';
-let progress={wins:0,outfit:'auditor',arena:0,dock:0};
+/* The save carries a version, so a later build can change its shape without wiping what players have won. migrateProgress upgrades an older save one step at a time; a save from a newer build is kept exactly as it is. */
+const PROGRESS_VER=2;
+const progressDefaults=()=>({v:PROGRESS_VER,wins:0,outfit:'auditor',arena:0,dock:0,pass2:0});
+function migrateProgress(p){
+  if(!p||typeof p!=='object'||Array.isArray(p)) return progressDefaults();
+  if(typeof p.v!=='number') p.v=0;
+  if(p.v<1) p.v=1;   /* 0 to 1: Sprint 25 and older saves had no version field; the fields are the same */
+  if(p.v<2){ if(typeof p.pass2!=='number') p.pass2=0; p.v=2; }   /* 1 to 2: the second pass counts the bouts cleared in it */
+  return p;
+}
+let progress=progressDefaults();
 /* fight camera. frac: share of the screen height a fighter fills at close range (portrait uses fracPortrait).
    pad: metres of floor kept visible beside each fighter. lead: seconds of walking speed the aim runs ahead, so a chase stays in frame.
    yaw: how far the camera slides toward the player's back, so the opponent turns his face to it (0 is square on the side); follow: how fast the camera catches up, per second. A phone in portrait sees under 5 m across and needs the faster one.
@@ -982,7 +1019,7 @@ function buildProps(){
 function loadProgress(){
   try{
     const raw=localStorage.getItem(SAVE_KEY);
-    if(raw){ const p=JSON.parse(raw); if(p&&typeof p==='object') progress=Object.assign({wins:0,outfit:'auditor',arena:0,dock:0},p); }
+    if(raw){ const p=JSON.parse(raw); if(p&&typeof p==='object') progress=Object.assign(progressDefaults(),migrateProgress(p)); }
   }catch(e){}
   applyArena(progress.arena);
 }
@@ -2218,7 +2255,7 @@ function paintBinds(){
     const kbd=el.querySelector('kbd'); if(kbd) kbd.textContent=keyName2(binds[el.dataset.bind]);
     el.classList.toggle('listen', listenAct===el.dataset.bind);
   });
-  keysHtml='<kbd data-k="move">WASD</kbd> '+L('kw_move')+' <kbd data-k="jab">'+keyName2(binds.jab)+'</kbd> '+L('kw_jab')+' <kbd data-k="heavy">'+keyName2(binds.heavy)+'</kbd> '+L('kw_heavy')+' <kbd data-k="block">'+keyName2(binds.block)+'</kbd> '+L('kw_block')+' ('+blockWord()+') <kbd data-k="dodge">'+keyName2(binds.dodge)+'</kbd> '+L('kw_dodge')+' <kbd>Esc</kbd> '+L('kw_menu');
+  keysHtml='<kbd data-k="move">'+moveCaps+'</kbd> '+L('kw_move')+' <kbd data-k="jab">'+keyName2(binds.jab)+'</kbd> '+L('kw_jab')+' <kbd data-k="heavy">'+keyName2(binds.heavy)+'</kbd> '+L('kw_heavy')+' <kbd data-k="block">'+keyName2(binds.block)+'</kbd> '+L('kw_block')+' ('+blockWord()+') <kbd data-k="dodge">'+keyName2(binds.dodge)+'</kbd> '+L('kw_dodge')+' <kbd>Esc</kbd> '+L('kw_menu');
   if(!padOn) $('keys').innerHTML=keysHtml;
   document.querySelectorAll('#cRows dt').forEach(dt=>{
     if(dt.textContent===L('row_strike')) dt.nextElementSibling.textContent=strikeText();
@@ -2235,15 +2272,34 @@ function actionFor(k){
 }
 loadBinds();
 loadRumble();
+loadMoveCaps();
 /* The key as it is labelled on the keycap, and for a layout whose letters are not Latin (Cyrillic, Greek, Arabic, Hebrew) the key in that
-   position, so J K L and WASD are in the same place on any keyboard. */
+   position, so J K L are in the same place on any keyboard. Movement is by position instead: the four keys where W A S D sit on a QWERTY
+   board move the fighter whatever they are labelled (ZQSD on AZERTY, comma A O E on Dvorak). Where the event carries a code, a key typed
+   W, A, S or D from any other position is not movement; with no code (a synthetic event) the typed letter is used. */
+const MOVE_CODES={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d'};
 function keyName(e){
   if(e.key===' ') return 'space';
+  if(e.code&&MOVE_CODES[e.code]) return MOVE_CODES[e.code];
   const k=e.key.toLowerCase();
-  if(k.length===1&&/[a-z0-9]/.test(k)) return k;
+  if(k.length===1&&/[a-z0-9]/.test(k)){
+    if(e.code&&/^[wasd]$/.test(k)) return 'x-'+k;
+    return k;
+  }
   const m=/^Key([A-Z])$/.exec(e.code||''); if(m) return m[1].toLowerCase();
   return k;
 }
+/* The caps of the four movement keys, read from the browser's layout map where it has one (Chromium), so the hints say ZQSD on AZERTY. */
+function loadMoveCaps(){
+  try{
+    if(!navigator.keyboard||!navigator.keyboard.getLayoutMap) return;
+    navigator.keyboard.getLayoutMap().then(m=>{
+      const c=['KeyW','KeyA','KeyS','KeyD'].map(k=>String(m.get(k)||'').toUpperCase());
+      if(c.every(x=>x.length===1&&/[A-Z]/.test(x))&&c.join('')!=='WASD') setMoveCaps(c.join(''));
+    }).catch(()=>{});
+  }catch(e){}
+}
+function setMoveCaps(c){ moveCaps=c||'WASD'; paintBinds(); paintLang(); }
 const INPUT={buf:.22}; /* seconds a press of jab, heavy or dodge waits for the fighter to be free */
 /* The key hint under the arena lights a key as the game receives it, so a press that does nothing can be told from a key that never arrived. */
 const MOVE_KEYS=new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']);
@@ -2281,7 +2337,9 @@ window.addEventListener('keydown',e=>{
     else if(G.state==='pause') resumeFight();
     return;
   }
-  if(k==='enter'&&!$('wrap').hidden&&!G.menuOpen){ e.preventDefault(); $('go').click(); return; }
+  /* Enter starts the card's main action, unless focus is on another control (Back, the Easy retry, a link, a slider): then it belongs to that control. */
+  const onOther=e.target&&e.target!==$('go')&&e.target.closest&&e.target.closest('button,input,select,textarea,a[href],[role=button]');
+  if(k==='enter'&&!$('wrap').hidden&&!G.menuOpen&&!onOther){ e.preventDefault(); $('go').click(); return; }
   if(['space','arrowup','arrowdown','arrowleft','arrowright'].includes(k)&&$('wrap').hidden) e.preventDefault();
   if(e.repeat) return;
   keys.add(k); capLight(k,true);
@@ -2486,6 +2544,7 @@ function closeMenu(){
 }
 function restartBout(){
   if($('pause')) $('pause').hidden=true;
+  G.retry=true;   /* a restart begins at full health, like Retry on the lose card; without it the bout started at the damaged health plus 35 */
   startBout(G.bout||0);
 }
 /* Quit: leave the fight, the fullscreen and the sound, and show the splash. Wins are saved when they happen (grantWin), so nothing is lost.
@@ -2533,7 +2592,7 @@ function logWrite(a){ try{ localStorage.setItem(LOG_KEY,JSON.stringify(a.slice(-
 function logFight(won){
   try{
     const g=G.log||{}, a=logRead();
-    a.push({v:1,t:new Date().toISOString(),bout:G.bout+1,foe:BOUTS[G.bout].foe,win:!!won,secs:Math.round((g.time||0)*10)/10,hits:g.hits|0,blocks:g.blocks|0,dodges:g.dodges|0,thrown:g.thrown|0,landed:g.landed|0,diff:diff,ctl:autoOn?(G.autoTaken?'mixed':'ai'):'human',toggle:blockToggle,practice:!!G.practice});
+    a.push({v:1,t:new Date().toISOString(),bout:G.bout+1,foe:BOUTS[G.bout].foe,win:!!won,secs:Math.round((g.time||0)*10)/10,hits:g.hits|0,blocks:g.blocks|0,dodges:g.dodges|0,thrown:g.thrown|0,landed:g.landed|0,diff:diff,ctl:autoOn?(G.autoTaken?'mixed':'ai'):'human',toggle:blockToggle,practice:!!G.practice,pass2:!!G.pass2});
     logWrite(a);
   }catch(e){}
   paintLog();
@@ -2555,7 +2614,7 @@ if($('logClear')) $('logClear').addEventListener('click',()=>{
 });
 let resetArmed=false, resetTimer=0;
 function resetProgress(){
-  progress={wins:0,outfit:'auditor',arena:0,dock:0};
+  progress=progressDefaults();
   saveProgressData(); applyArena(0); syncPlayerOutfit(); skinEnsure(P);
 }
 function onResetClick(){
@@ -2712,20 +2771,46 @@ function practiceWinCard(){
     rows:[[L('row_you'),fightLine()],[L('row_punches'),punchLine()]],btn:L('practice_again'),go:()=>{ G.practice=true; startBout(i); },
     back:{label:L('practice_back'),go:()=>practiceCard(i)},mood:'win'}); voiceSay(perfect?'perfect':'win',.45);
 }
+/* The second pass: a card per bout (no dossier, since its numbers are the first pass's), the win card that counts it, and the way on. */
+function pass2Card(i){
+  const c=BOUTS[i]; showcaseOpponent(i);
+  showCard({stamp:L('pass2_stamp'),kick:L('bout_stamp')+' '+(i+1)+' / '+BOUTS.length,title:c.foe,body:boutPlace(c)+' · '+boutRole(c)+'. '+L('pass2_note'),
+    rows:[[L('row_mod'),L(PASS2_MODS[i].key)],[L('row_tip'),boutTip(c)]],btn:L('bout_btn'),showcase:true,mood:'dossier',moodArg:i,
+    go:()=>{ G.pass2=true; maybeAutoFullscreen(); startBout(i); },back:{label:L('back_btn'),go:()=>titleCard()}});
+}
+function pass2WinCard(){
+  const i=G.bout, last=i>=BOUTS.length-1, perfect=!!(G.log&&G.log.hits===0);
+  progress.pass2=Math.max(progress.pass2||0,i+1); const saved=saveProgressData();
+  const rows=[[L('row_pass2'),(i+1)+' / '+BOUTS.length],[L('row_mod'),L(PASS2_MODS[i].key)],[L('row_you'),fightLine()],[L('row_punches'),punchLine()]];
+  if(!last) rows.unshift([L('row_next'),boutPlace(BOUTS[i+1])+' · '+BOUTS[i+1].foe]);
+  if(!saved) rows.unshift([L('row_save'),L('save_failed')]);
+  showCard({stamp:L('pass2_stamp'),kick:L('bout_stamp')+' '+(i+1),title:BOUTS[i].foe+L('win_down'),body:last?L('pass2_done'):L(BOUTS[i].afterKey),
+    rows,btn:last?L('back_btn'):L('pass2_next'),go:()=>{ if(last) titleCard(); else pass2Card(i+1); },mood:'win'}); voiceSay(perfect?'perfect':'win',.45);
+}
 function introCard(i,lead){
-  G.practice=false;
+  G.practice=false; G.pass2=false;
   const c=BOUTS[i]; showcaseOpponent(i);
   showCard({stamp:L('bout_stamp')+' '+(i+1)+' / '+BOUTS.length,kick:lead||L('company_kick'),title:c.foe,body:boutPlace(c)+' · '+boutRole(c)+'. '+L(c.introKey),
     rows:dossierRows(c),btn:L('bout_btn'),showcase:true,mood:'dossier',moodArg:i,go:()=>{ maybeAutoFullscreen(); startBout(i); }});
 }
+/* A player with bouts won gets a second action on the title card that goes on from the rule board, where Play still starts a new run at bout 1. The dock mission is skipped by dockMission itself once it has been seen. */
+function continueAction(){
+  const w=progress.wins;
+  if(w>=BOUTS.length){   /* every bout won: the way on is the second pass, from the first bout not yet cleared in it */
+    const d=Math.min(progress.pass2||0,BOUTS.length);
+    return d>=BOUTS.length?{label:L('pass2_again'),go:()=>pass2Card(0)}:{label:L('pass2_btn')+' '+(d+1)+' · '+BOUTS[d].foe,go:()=>pass2Card(d)};
+  }
+  if(!(w>0)) return null;
+  return {label:L('continue_btn')+' '+(w+1)+' · '+BOUTS[w].foe,go:()=>{ if(w>=2) dockMission(()=>hubCard(w)); else hubCard(w); }};
+}
 function titleCard(){
-  G.practice=false;
+  G.practice=false; G.pass2=false;
   $('linkPractice').hidden=!(progress.wins>0);
   showCard({stamp:L('card_title_stamp'),kick:L('company_form'),title:L('card_title_name'),
-    body:L('card_title_body'),rows:titleRows(),avatar:true,links:true,btn:L('card_title_btn'),go:()=>introCard(0)});
+    body:L('card_title_body'),rows:titleRows(),avatar:true,links:true,btn:L('card_title_btn'),go:()=>introCard(0),assist:continueAction()});
 }
 function hubCard(nextIdx){
-  G.practice=false;
+  G.practice=false; G.pass2=false;
   const n=BOUTS[nextIdx];
   showCard({stamp:L('hub_stamp'),kick:L('company_kick'),title:L('hub_title'),body:L('hub_body'),
     rows:[[L('row_rules'),L('rule_1')+' · '+L('rule_2')+' · '+L('rule_3')],[L('row_hub_next'),boutPlace(n)+' · '+n.foe],[L('row_opp'),n.foe+' · '+boutRole(n)],[L('row_tip'),boutTip(n)]],
@@ -2742,11 +2827,12 @@ function showFinalCard(){
 }
 function winCard(){
   const i=G.bout, next=i+1, uLabel=unlockLabel(i);
-  grantWin(i);
+  const saved=grantWin(i);
   const rows=[[L('row_you'),fightLine()],[L('row_punches'),punchLine()]], perfect=!!(G.log&&G.log.hits===0);
   if(perfect) rows.unshift([L('row_perfect'),L('perfect_v')]);
   if(uLabel) rows.unshift([L('row_unlock'),uLabel]);
   if(next<BOUTS.length) rows.unshift([L('row_next'),boutPlace(BOUTS[next])]);
+  if(!saved) rows.unshift([L('row_save'),L('save_failed')]);   /* localStorage threw (private mode, full storage): say so rather than lose the win in silence */
   const goNext=()=>{
     if(i===1) dockMission(()=>hubCard(next));
     else if(next<BOUTS.length) hubCard(next);
@@ -2757,11 +2843,11 @@ function winCard(){
 }
 
 /* ---------- flow ---------- */
-const roundText=i=>L('bout_stamp').toUpperCase()+' '+(i+1)+' / '+BOUTS.length;
+const roundText=i=>L('bout_stamp').toUpperCase()+' '+(i+1)+' / '+BOUTS.length+(G.pass2?' · II':'');
 function startBout(i){
   if(G.state==='splash') splashHold=false; /* a bout started by a probe from the splash, which the interface cannot do */
   musicMoodSet('card'); if($('splash')) $('splash').hidden=true; audOut=false; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
-  G.fightVoiced=false; G.autoTaken=false; G.blockLatch=false; P.bot=null; G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i]);
+  G.fightVoiced=false; G.autoTaken=false; G.blockLatch=false; P.bot=null; G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i],G.pass2?i:-1);
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
   resetFighter(E,2.3,-Math.PI/2,cfg.hp);
@@ -2788,7 +2874,7 @@ function punchLine(){
 /* Three losses in a row on one bout: the lose card offers a retry on Easy (the setting stays changed; Settings undoes it). */
 function afterKO(){
   logFight(G.winner===P);
-  if(G.winner===P){ G.loss={bout:G.bout,n:0}; if(G.practice) practiceWinCard(); else winCard(); }
+  if(G.winner===P){ G.loss={bout:G.bout,n:0}; if(G.pass2) pass2WinCard(); else if(G.practice) practiceWinCard(); else winCard(); }
   else {
     G.loss=(G.loss&&G.loss.bout===G.bout)?{bout:G.bout,n:G.loss.n+1}:{bout:G.bout,n:1};
     const assist=(G.loss.n>=3&&diff!=='easy')?{label:L('assist_btn'),go:()=>{ diff='easy'; saveDiff(); paintDiff(); G.loss.n=0; G.retry=true; startBout(G.bout); }}:null;
@@ -3353,7 +3439,17 @@ const DIFF={
   hard:{hp:1.12,speed:1.06,react:.86,dmg:1.12,guard:1.2,cd:.9}
 };
 let diff='normal';
-function scaleCfg(cfg){
+/* The second pass (after bout 6): the same six fighters at the player's own difficulty, plus one change each. The first pass is untouched:
+   scaleCfg only reads this when it is given a bout index. The numbers are tuned with balance-run --pass2. */
+const PASS2_MODS=[
+  {key:'mod_iron',apply:o=>{ o.hp=Math.round(o.hp*1.4); }},
+  {key:'mod_quick',apply:o=>{ o.react*=.8; o.cd*=.85; }},
+  {key:'mod_heavy',apply:o=>{ o.dmg*=1.1; }},
+  {key:'mod_heavy',apply:o=>{ o.dmg*=1.25; }},
+  {key:'mod_relentless',apply:o=>{ o.cd*=.8; }},
+  {key:'mod_iron',apply:o=>{ o.hp=Math.round(o.hp*1.06); }}
+];
+function scaleCfg(cfg,pass2){
   const d=DIFF[diff]||DIFF.normal;
   const o=Object.assign({},cfg);
   o.hp=Math.max(1,Math.round(cfg.hp*d.hp));
@@ -3363,6 +3459,7 @@ function scaleCfg(cfg){
   o.block=Math.min(.95,cfg.block*d.guard);
   o.dodge=Math.min(.9,cfg.dodge*d.guard);
   o.cd=cfg.cd*d.cd;
+  if(pass2>=0&&PASS2_MODS[pass2]) PASS2_MODS[pass2].apply(o);
   return o;
 }
 function loadDiff(){
@@ -3391,7 +3488,7 @@ function setLang(code){
 function saveProbe(opt){
   opt=opt||{};
   const snap=JSON.parse(JSON.stringify(progress));
-  progress={wins:6,outfit:'exec',arena:3,dock:1};
+  progress={v:PROGRESS_VER,wins:6,outfit:'exec',arena:3,dock:1};
   let roundTrip=false, survivedThrow=false;
   if(opt.throwWrites){
     const prior=Storage.prototype.setItem;
@@ -3425,7 +3522,7 @@ function qaClickGo(){
   return {ok:true,state:G.state};
 }
 function qaResetProgress(){
-  progress={wins:0,outfit:'auditor',arena:0,dock:0};
+  progress=progressDefaults();
   saveProgressData();
   applyArena(0);
   syncPlayerOutfit();
@@ -3466,7 +3563,7 @@ function simMeet(opt){
     const bout=bouts[bi], rows=[];
     for(let i=0;i<n;i++){
       rng=mulberry32((seed0+bout*10007+i*97)>>>0);
-      const cfg=scaleCfg(BOUTS[bout]);
+      const cfg=scaleCfg(BOUTS[bout],opt.pass2?bout:-1);
       E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
       resetFighter(E,2.3,-Math.PI/2,cfg.hp);
       resetFighter(P,-2.3,Math.PI/2,100); P.hp=100; P.speed0=4.4; P.reach=1; P.dmgMul=1;
@@ -3817,7 +3914,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

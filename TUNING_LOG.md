@@ -1505,3 +1505,51 @@ Screenshots: `tuning/s25-it-p.jpg`, `s25-it-l.jpg` (Italian HUD on a phone), `s2
 
 Not done: a real pad unplug, a real phone for the toggle, and a native read of the Italian; the `pages.yml` deploy gate is unrun; a tutor strip still sits over the touch buttons on a phone for its 12 s (older than this sprint); the sign texts painted in the arena and the licence lines in Credits are English.
 
+## Sprint 26: a fourth look at the play flow, and the ten best-ranked items
+
+`BACKLOG.md` got 13 items found by reading the flow from the splash to the result card, and everything was ranked again (the first pass at it is in the commit message of the backlog commit). The top ten were built, one commit each. Nine of them touch no sim code; the second pass reads one new optional argument in `scaleCfg`.
+
+| # | Item | What it does | Test |
+| --- | --- | --- | --- |
+| 11 | `AGENTS.md` | the rules a background agent must not break: one file, `lib/babylon.js` is built, the bout table and the command that checks it, the three commands before a PR, why each npm override exists, PR style | read, no test |
+| 12 | Save version | `progress.v` (now 2); `migrateProgress` upgrades an old save one step at a time; a save from a newer build is kept as it is | a Sprint 25 save loads intact and is stamped, broken JSON gives defaults, `v:99` and an unknown field survive a save |
+| 13 | Dependency care | `.github/dependabot.yml` (npm and actions, weekly; Babylon.js and esbuild ignored on purpose), `audit.yml` (non-blocking `npm audit --audit-level=high`, 0 vulnerabilities today), actions pinned to SHAs | YAML parses; the workflows run on this PR |
+| 14 | Share preview | description, Open Graph tags (what Instagram and most chat apps read; no Twitter card, by choice), `theme-color`, an inline SVG favicon, `assets/social.jpg` (1200 x 630, 58 KB, cut from `s18-hero.jpg`) | tags present, image served and under 300 KB |
+| 15 | Restart heals | `restartBout` started at the damaged health plus 35; it now sets `G.retry` like Retry | health 20 then restart gives 100 (was 55); the next bout still carries 20 to 55 |
+| 16 | Enter | the card shortcut stands aside when focus is on another control | Back keeps the card; Go and the page still start it |
+| 17 | Save warning | the win card leads with "Not saved" when `localStorage` throws | `setItem` stubbed to throw; none on a normal save |
+| 18 | Continue | title card action for 1 to 5 wins, to the rule board (dock mission first if unseen) | none at 0, at 3 opens bout 4's board, at 2 the dock card, Italian |
+| 19 | Movement by position | `event.code` KeyW/A/S/D move on any layout; a key typed W/A/S/D elsewhere does not; hints follow `getLayoutMap` | QWERTY, AZERTY Z and Q, Dvorak comma, no code, arrows, the two typed-W cases, caps |
+| 20 | Second pass | six fighters again at your difficulty, one change each; counts in `progress.pass2` only; card per bout; HUD `BOUT n / 6 · II` | gate, card, change applied, Retry keeps it, win counted and saved, last bout ends it, first pass unchanged |
+
+### The second pass, in numbers
+
+Bot at Normal skill, 200 fights per bout, seed 1, 60 Hz (`balance-run.mjs 200 normal 1 normal 0-5 [--pass2]`):
+
+| Bout | First pass | Change | Second pass | Hard alone (reference) |
+| --- | --- | --- | --- | --- |
+| Reyes | 90.5 | iron jaw, hp x1.4 | 71.5 | 86.5 |
+| Dag | 67.5 | quick hands, react x.8, cd x.85 | 52.0 | 30.5 |
+| Pike | 44.0 | heavy hands, dmg x1.1 | 16.5 | 0 |
+| Voss | 36.0 | heavy hands, dmg x1.25 | 16.0 | 4.5 |
+| Chen | 30.0 | relentless, cd x.8 | 12.0 | 3.0 |
+| Halvorsen | 22.0 | iron jaw, hp x1.06 | 11.5 | 0 |
+
+What it took: the plan said Hard multipliers plus the change. Hard alone takes the bot to 0 on Pike and Halvorsen and to 3 to 4.5 on Voss and Chen, so no change could keep a bout above 0; the pass keeps the player's own difficulty. Wall (block +.15) and nimble (dodge +.1, speed x1.08) did not move the bot at all (Pike +3, Halvorsen 0, Voss 0), so they were dropped; only changes the bot can measure are used. Halvorsen is the knife edge: iron jaw x1.12 took him from 22 to 2, x1.06 gives 11.5. A first wiring bug (the change applied in the dossier's showcase function, not in `startBout`, because both contain the same line) was caught by the new test, not by the table. The bot is a rough stand-in for a human: its win rate is a direction, not a target.
+
+### Checked
+
+| Check | Result |
+| --- | --- |
+| `tools/regression.mjs` | 53 of 53 (S25 had 45; 8 new tests: save version, share tags, restart health, Enter, save warning, Continue, movement, second pass) |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, identical |
+| `tools/step-probe.mjs` | identical to 60 fps over 900 ticks at 20, 30, 60, 120 and 144 fps |
+| `tools/autoplay-probe.mjs` | first action 49 ms, takeover in 2 ticks, the next bout resumes |
+| `tools/env-probe.mjs` | 40-42 draws, active meshes 45-46, GPU about 1.5 ms, no console errors |
+| New cards at 1280x720, 390x844, 844x390 | no horizontal overflow, the card stays in view; the title card scrolls as before (its settings box is long) |
+
+Screenshots: `tuning/s26-title-continue.jpg`, `s26-second-pass-card.jpg`, `s26-second-pass-card-phone.jpg`.
+
+Small things found on the way: `balance-run.mjs` could end with an `ENOTEMPTY` stack trace after printing its table (Chrome still writing its profile when the folder is removed); the cleanup now tolerates it. `env-probe.mjs` overwrites `tuning/s17-env-b1.jpg` to `b6.jpg` and `ai-probe.mjs` overwrites `tuning/s5-tell.jpg`: that is why `s5-tell.jpg` showed as modified since Sprint 25. `AGENTS.md` says to run `git checkout -- tuning/` after a probe. My first guess in the backlog that nothing tells a player a press was dropped for stamina was wrong for the keyboard (`denyCue`); it is touch and the pad that say nothing.
+
+Not done: a real AZERTY or Dvorak keyboard, the Italian second-pass and save-warning lines (mine, they want a native read), how a chat app renders the share card, switching off the Cursor `daily-care` agent, and playing the second pass through by hand.

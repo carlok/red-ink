@@ -517,6 +517,129 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("enter_does_not_hijack_a_focused_control", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const enter = (target) => target.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      $("wrap").hidden = true; S.qaResetProgress(); S.progress.wins = 3;
+      S.practiceCard(0); await sleep(150);
+      o.cardUp = !$("wrap").hidden && G.state === "card" && !$("cardBack").hidden;
+      $("cardBack").focus(); enter($("cardBack")); await sleep(250);
+      o.backFocused = G.state === "card" && !$("wrap").hidden && !G.practice;
+      $("go").focus(); enter($("go")); await sleep(300);
+      o.goStillWorks = G.state !== "card";
+      $("wrap").hidden = true; S.qaResetProgress(); S.titleCard(); await sleep(150);
+      const was = $("cTitle").textContent;   /* the title card's Play opens the dossier, which is a card too, so compare the title text */
+      document.body.focus(); enter(window); await sleep(300);
+      o.bodyStillWorks = $("cTitle").textContent !== was;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("win_card_warns_when_progress_cannot_be_saved", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const win = async () => { $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); return $("cRows").textContent; };
+      S.qaResetProgress();
+      const prior = Storage.prototype.setItem;
+      Storage.prototype.setItem = function () { throw new DOMException("quota"); };
+      try { o.blocked = await win(); } finally { Storage.prototype.setItem = prior; }
+      o.warned = o.blocked.includes(S.STR.save_failed.en) && o.blocked.includes(S.STR.row_save.en);
+      o.winStillShown = o.blocked.includes(S.STR.row_you.en);
+      o.normal = await win();
+      o.quietWhenSaved = !o.normal.includes(S.STR.save_failed.en);
+      o.italian = S.STR.save_failed.it.length > 20 && S.STR.row_save.it !== S.STR.row_save.en;
+      S.qaResetProgress();
+      return o; })()`, true);
+    if (!r.warned || !r.winStillShown || !r.quietWhenSaved || !r.italian) throw new Error(JSON.stringify(r));
+    return { warned: r.warned, quietWhenSaved: r.quietWhenSaved };
+  });
+
+  await test("title_card_continue_for_a_player_with_wins", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, $ = (i) => document.getElementById(i), o = {};
+      const title = async (wins, dock) => { $("wrap").hidden = true; S.qaResetProgress(); S.progress.wins = wins; S.progress.dock = dock; S.titleCard(); await sleep(120); return { shown: !$("cardAssist").hidden, text: $("cardAssist").textContent }; };
+      o.none = (await title(0, 0)).shown === false;
+      const three = await title(3, 1); o.threeShown = three.shown && three.text.includes("4") && three.text.includes(S.BOUTS[3].foe) && three.text.includes(S.STR.continue_btn.en);
+      $("cardAssist").click(); await sleep(150);
+      o.opensHub = $("cTitle").textContent === S.STR.hub_title.en && $("cRows").textContent.includes(S.BOUTS[3].foe);
+      const two = await title(2, 0); o.dockFirst = two.shown; $("cardAssist").click(); await sleep(150);
+      o.dockCard = $("cTitle").textContent === S.STR.dock_title.en;
+      const six = await title(6, 1); o.cleared = six.shown && six.text.includes(S.STR.pass2_btn.en) && !six.text.includes(S.STR.continue_btn.en);   /* every bout won: the action is the second pass, not Continue */
+      S.setLang("it"); await sleep(50); await title(3, 1);
+      o.italian = $("cardAssist").textContent.includes(S.STR.continue_btn.it) && !$("cardAssist").hidden;
+      S.setLang("en"); S.qaResetProgress(); $("wrap").hidden = true;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("movement_follows_the_physical_key", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf();
+      const ev = (type, key, code) => window.dispatchEvent(new KeyboardEvent(type, { key, code, bubbles: true }));
+      const moves = (key, code) => { ev("keydown", key, code); const i = S.intent(), m = Math.hypot(i.mx, i.mz) > 0.5; ev("keyup", key, code); return m; };
+      o.qwerty = moves("w", "KeyW");
+      o.azertyZ = moves("z", "KeyW");
+      o.azertyQ = moves("q", "KeyA");
+      o.dvorakComma = moves(",", "KeyW");
+      o.noCode = moves("w", undefined);
+      o.arrow = moves("ArrowUp", "ArrowUp");
+      /* the key typed W on AZERTY sits where QWERTY has Z; on Dvorak it sits where QWERTY has comma: neither moves */
+      o.azertyTypedW = !moves("w", "KeyZ");
+      o.dvorakTypedW = !moves("w", "Comma");
+      o.released = Math.hypot(S.intent().mx, S.intent().mz) < 0.01;
+      /* the hints follow the layout map when it reports other caps */
+      const before = $("keys").textContent;
+      S.setMoveCaps("ZQSD"); o.capStrip = $("keys").textContent.includes("ZQSD") && !$("keys").textContent.includes("WASD");
+      o.capTutor = S.tutorLine("keys").includes("ZQSD") || S.tutorLine().includes("ZQSD");
+      S.setMoveCaps("WASD"); o.capBack = $("keys").textContent === before;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("second_pass_after_bout_six", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const toFight = async () => { const t = performance.now(); while (G.state !== "fight" && performance.now() - t < 8000) await raf(); };
+      $("wrap").hidden = true; S.qaResetProgress(); S.progress.wins = 6; S.progress.outfit = "exec"; S.progress.arena = 3; S.progress.dock = 1;
+      /* the first pass is not touched: the same cfg with no pass index, and the change only with one */
+      o.firstPass = S.scaleCfg(S.BOUTS[0]).hp === 70 && S.scaleCfg(S.BOUTS[0], -1).hp === 70;
+      o.changed = S.scaleCfg(S.BOUTS[0], 0).hp === 98 && S.scaleCfg(S.BOUTS[2], 2).dmg > S.scaleCfg(S.BOUTS[2]).dmg;
+      /* the entry is on the title card once every bout is won, and it names the bout */
+      S.titleCard(); await sleep(120);
+      o.entry = !$("cardAssist").hidden && $("cardAssist").textContent.includes(S.STR.pass2_btn.en) && $("cardAssist").textContent.includes(S.BOUTS[0].foe);
+      $("cardAssist").click(); await sleep(150);
+      o.card = $("cStamp").textContent === S.STR.pass2_stamp.en && $("cRows").textContent.includes(S.STR.mod_iron.en);
+      $("go").click(); await toFight();
+      o.running = G.pass2 === true && S.E.cfg.hp === 98 && /II/.test($("roundLbl").textContent);
+      /* a loss keeps the pass: Retry runs the same changed fighter */
+      S.qaEndBout(false); await sleep(150); $("go").click(); await toFight();
+      o.retryKeeps = G.pass2 === true && S.E.cfg.hp === 98;
+      /* a win counts in pass2 and in nothing else */
+      S.qaEndBout(true); await sleep(150);
+      o.counted = S.progress.pass2 === 1 && S.progress.wins === 6 && S.progress.outfit === "exec" && S.progress.arena === 3;
+      o.winCard = $("cRows").textContent.includes(S.STR.mod_iron.en) && $("goTxt").textContent === S.STR.pass2_next.en;
+      o.saved = JSON.parse(localStorage.getItem("sublevel-progress")).pass2 === 1;
+      $("go").click(); await sleep(150);
+      o.nextCard = $("cTitle").textContent === S.BOUTS[1].foe && $("cRows").textContent.includes(S.STR.mod_quick.en);
+      /* the last bout ends the pass; the title then offers it again */
+      S.progress.pass2 = 5; $("wrap").hidden = true; G.pass2 = true; S.startBout(5); await toFight(); S.qaEndBout(true); await sleep(150);
+      o.last = S.progress.pass2 === 6 && $("cBody").textContent === S.STR.pass2_done.en && $("goTxt").textContent === S.STR.back_btn.en;
+      $("go").click(); await sleep(150);
+      o.again = !$("cardAssist").hidden && $("cardAssist").textContent === S.STR.pass2_again.en && G.pass2 === false;
+      /* leaving the pass by the title card clears it, and the next normal bout is the first-pass fighter again */
+      $("wrap").hidden = true; S.startBout(0); await toFight();
+      o.firstAgain = S.E.cfg.hp === 70 && !/II/.test($("roundLbl").textContent);
+      S.qaResetProgress(); $("wrap").hidden = true;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("esc_opens_menu_on_every_card", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })), o = {};
@@ -576,6 +699,51 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("progress_save_is_versioned", async () => {
+    const load = async (raw) => {
+      await cdp.eval(`localStorage.setItem('sublevel-progress', ${JSON.stringify(raw)})`);
+      await cdp.send("Page.reload", { ignoreCache: true });
+      await bootSublevel(cdp);
+    };
+    const out = {};
+    /* a Sprint 25 save has no version: it loads intact, and the next save stamps v */
+    await load('{"wins":3,"outfit":"sanitation","arena":2,"dock":1}');
+    out.old = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, a = { wins: p.wins, outfit: p.outfit, arena: p.arena, dock: p.dock, v: p.v, pass2: p.pass2 }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { loaded: a, stamped: r.v, kept: r.wins === 3 && r.outfit === 'sanitation' && r.arena === 2 && r.dock === 1 }; })()`);
+    /* broken JSON gives the defaults, at the current version */
+    await load('{nope');
+    out.bad = await cdp.eval(`(() => { const p = window.__sublevel.progress; return { wins: p.wins, v: p.v }; })()`);
+    /* a save from a newer build is kept exactly as it is, unknown fields included, through a save */
+    await load('{"v":99,"wins":2,"outfit":"auditor","arena":0,"dock":0,"future":"keep"}');
+    out.future = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, before = { v: p.v, future: p.future }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { before, after: { v: r.v, future: r.future, wins: r.wins } }; })()`);
+    await cdp.eval(`window.__sublevel.qaResetProgress()`);
+    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 2 && out.old.loaded.pass2 === 0 && out.old.stamped === 2 && out.old.kept
+      && out.bad.wins === 0 && out.bad.v === 2
+      && out.future.before.v === 99 && out.future.before.future === "keep" && out.future.after.v === 99 && out.future.after.future === "keep" && out.future.after.wins === 2;
+    if (!ok) throw new Error(JSON.stringify(out));
+    return out;
+  });
+
+  await test("share_preview_tags", async () => {
+    const r = await cdp.eval(`(async () => {
+      const m = (sel) => { const e = document.head.querySelector(sel); return e ? e.getAttribute("content") || e.getAttribute("href") : null; };
+      const img = m('meta[property="og:image"]'), o = {
+        description: (m('meta[name="description"]') || "").length > 40,
+        title: m('meta[property="og:title"]') === "Sublevel Three",
+        ogDescription: !!m('meta[property="og:description"]'),
+        noTwitterCard: m('meta[name="twitter:card"]') === null,   /* Instagram reads Open Graph; no Twitter card is wanted */
+        imageSize: m('meta[property="og:image:width"]') === "1200" && m('meta[property="og:image:height"]') === "630",
+        theme: (m('meta[name="theme-color"]') || "").startsWith("#"),
+        icon: (m('link[rel="icon"]') || "").startsWith("data:image/svg+xml,"),
+        imageAbsolute: (img || "").startsWith("https://") && (img || "").endsWith(".jpg"),
+      };
+      /* the absolute og:image URL points at the live site, which this test cannot reach, so the file is fetched from this server's assets folder */
+      const local = await fetch("assets/social.jpg"), blob = await local.blob();
+      o.imageServed = local.ok && blob.size > 5000 && blob.size < 300000;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("key_cap_light_and_layout", async () => {
     await waitFight(cdp, 0);
     const r = await cdp.eval(`(async () => {
@@ -585,7 +753,9 @@ async function runHttpSuite(cdp) {
       const lit = () => [...document.querySelectorAll("#keys kbd.on")].map((k) => k.dataset.k).join(",");
       kd({ key: "l", code: "KeyL" }); await raf(); o.lit = lit() === "block"; ku({ key: "l", code: "KeyL" }); await raf(); o.off = lit() === "";
       S.E.ai.cd = 99; S.E.cfg.cd = 99; S.P.stam = 100; S.P.state = "idle";
-      kd({ key: "\u043b", code: "KeyK" }); ku({ key: "\u043b", code: "KeyK" }); await raf(); await raf(); o.cyrillicK = S.P.state === "attack" && S.P.atk.type === "heavy";
+      kd({ key: "\u043b", code: "KeyK" }); ku({ key: "\u043b", code: "KeyK" });
+      /* poll for the heavy to start: on a slow runner two frames can be longer than the whole windup, which failed this test once on CI */
+      o.cyrillicK = false; for (let i = 0; i < 40 && !o.cyrillicK; i++) { await raf(); o.cyrillicK = S.P.state === "attack" && !!S.P.atk && S.P.atk.type === "heavy"; }
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
@@ -596,6 +766,20 @@ async function runHttpSuite(cdp) {
     const w = await cdp.eval(`window.__sublevel.qaEndBout(false)`);
     if (!w.ok || !/get up|alzati/i.test(w.title)) throw new Error(JSON.stringify(w));
     return w;
+  });
+
+  await test("restart_from_pause_starts_at_full_health", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, o = {};
+      const toFight = async () => { const t = performance.now(); while (S.G.state !== "fight" && performance.now() - t < 6000) await raf(); };
+      document.getElementById("wrap").hidden = true; S.startBout(2); await toFight();
+      S.P.hp = 20; o.before = S.P.hp; S.restartBout(); await toFight();
+      o.afterRestart = S.P.hp; o.retryFlagCleared = S.G.retry === false;
+      /* a normal start of the next bout still carries health over (+35), so only the restart changed */
+      S.P.hp = 20; S.startBout(3); await toFight(); o.nextBout = S.P.hp;
+      return o; })()`, true);
+    if (r.afterRestart !== 100 || !r.retryFlagCleared || r.nextBout !== 55) throw new Error(JSON.stringify(r));
+    return r;
   });
 
   await test("restart_bout", async () => {
