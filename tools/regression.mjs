@@ -51,12 +51,38 @@ function minimalGlb() {
 const GLB_B64 = minimalGlb();
 const results = [];
 
+const RESULT_FILE = join(ROOT, "regression-result.json");
+const TEST_MS = 120000;
+
+function report() {
+  const failed = results.filter((r) => !r.pass);
+  const summary = { pass: results.length - failed.length, fail: failed.length, tests: results };
+  writeFileSync(RESULT_FILE, JSON.stringify(summary, null, 2));
+  console.log(JSON.stringify(summary, null, 2));
+  return failed.length;
+}
+
+/* Each result is logged as it lands (stderr, so the JSON on stdout stays whole). A test that times out leaves the page in an unknown state,
+   so the run stops there with what it has instead of running 20 more tests against it. */
 async function test(name, fn) {
+  const t0 = Date.now();
+  let timer;
+  const late = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error(`test timed out after ${TEST_MS / 1000} s`), { timeout: true })), TEST_MS);
+  });
   try {
-    const detail = await fn();
-    results.push({ name, pass: true, detail });
+    const detail = await Promise.race([fn(), late]);
+    results.push({ name, pass: true, ms: Date.now() - t0, detail });
+    console.error(`  ok    ${name} (${Date.now() - t0} ms)`);
   } catch (e) {
-    results.push({ name, pass: false, error: e.message });
+    results.push({ name, pass: false, ms: Date.now() - t0, error: e.message });
+    console.error(`  FAIL  ${name} (${Date.now() - t0} ms): ${e.message.slice(0, 200)}`);
+    if (e.timeout) {
+      report();
+      process.exit(1);
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -172,12 +198,12 @@ async function runHttpSuite(cdp) {
       const voices = (log) => log.filter((x) => typeof x === "string" && x.startsWith("voice:"));
       S.setAudio({ mute: false }); /* an earlier test saves a mute */
       if (g.ac.state !== "running") { await g.ac.resume(); for (let i = 0; i < 20 && g.ac.state !== "running"; i++) await sleep(50); }
-      $("wrap").hidden = true; g.MUS.log = []; S.startBout(0); while (G.state !== "fight") await raf(); await sleep(300);
+      $("wrap").hidden = true; g.MUS.log = []; S.startBout(0); await __until(() => G.state === "fight", "fight"); await sleep(300);
       o.fightOnce = JSON.stringify(voices(g.MUS.log)) === JSON.stringify(["voice:fight"]);
       g.MUS.log = []; S.qaEndBout(true); await sleep(800); o.perfectWord = voices(g.MUS.log).join() === "voice:perfect" && /Perfect|Perfetto/.test($("cRows").textContent); /* no hit taken in the test */
-      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); G.log.hits = 2; g.MUS.log = []; S.qaEndBout(true); await sleep(800); o.winWord = voices(g.MUS.log).join() === "voice:win";
-      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); g.MUS.log = []; S.qaEndBout(false); await sleep(800); o.loseWord = voices(g.MUS.log).join() === "voice:lose";
-      S.setAudio({ mute: true }); $("wrap").hidden = true; g.MUS.log = []; S.startBout(0); while (G.state !== "fight") await raf(); await sleep(300); o.mutedSilent = voices(g.MUS.log).length === 0; S.setAudio({ mute: false });
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); G.log.hits = 2; g.MUS.log = []; S.qaEndBout(true); await sleep(800); o.winWord = voices(g.MUS.log).join() === "voice:win";
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); g.MUS.log = []; S.qaEndBout(false); await sleep(800); o.loseWord = voices(g.MUS.log).join() === "voice:lose";
+      S.setAudio({ mute: true }); $("wrap").hidden = true; g.MUS.log = []; S.startBout(0); await __until(() => G.state === "fight", "fight"); await sleep(300); o.mutedSilent = voices(g.MUS.log).length === 0; S.setAudio({ mute: false });
       S.toSplash(true); g.MUS.log = []; S.voiceSay("fight"); o.splashSilent = voices(g.MUS.log).length === 0; S.play();
       g.MUS.log = null; return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
@@ -232,7 +258,7 @@ async function runHttpSuite(cdp) {
   await test("easy_offered_after_three_losses", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
-      const lose = async (bout) => { $("wrap").hidden = true; S.startBout(bout); while (G.state !== "fight") await raf(); S.qaEndBout(false); await sleep(120); };
+      const lose = async (bout) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); S.qaEndBout(false); await sleep(120); };
       document.querySelector('[data-diff="normal"]').click(); G.loss = null;
       await lose(0); await lose(0); o.noneAtTwo = $("cardAssist").hidden;
       await lose(1); o.resetOnOtherBout = $("cardAssist").hidden;
@@ -242,7 +268,7 @@ async function runHttpSuite(cdp) {
       o.switched = S.diffNow() === "easy" && localStorage.getItem("sublevel-diff") === "easy" && (G.state === "ready" || G.state === "fight") && G.bout === 0;
       G.state = "pause"; await lose(0); await lose(0); await lose(0); o.noneWhenEasy = $("cardAssist").hidden;
       document.querySelector('[data-diff="normal"]').click();
-      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); await sleep(120); o.winClears = G.loss.n === 0 && $("cardAssist").hidden;
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.qaEndBout(true); await sleep(120); o.winClears = G.loss.n === 0 && $("cardAssist").hidden;
       S.setLang("it"); await lose(0); await lose(0); await lose(0); o.italian = /Prova Facile/.test($("cardAssist").textContent); S.setLang("en");
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
@@ -254,7 +280,7 @@ async function runHttpSuite(cdp) {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
       const gl = window.BABYLON.Engine.LastCreatedEngine._gl, ext = gl.getExtension("WEBGL_lose_context");
       if (!ext) return { skipped: true, noExtension: true };
-      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf();
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight");
       ext.loseContext(); await sleep(300);
       o.shown = !$("noGL").hidden && /reset/i.test($("noGLTitle").textContent) && /reload/i.test($("noGLBtn").textContent);
       o.paused = G.state === "pause";
@@ -286,13 +312,13 @@ async function runHttpSuite(cdp) {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
       const unplug = () => window.dispatchEvent(new Event("gamepaddisconnected"));
-      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf();
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight");
       unplug(); await raf();
       o.paused = G.state === "pause" && !$("pause").hidden && !$("pauseHint").hidden && /Controller disconnected/.test($("pauseHint").textContent);
       $("resume").click(); await raf();
       o.resumed = G.state === "fight" && $("pauseHint").hidden;
       G.state = "card"; unplug(); await raf(); o.ignoredOnCard = G.state === "card";
-      S.setLang("it"); $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); unplug(); await raf(); o.italian = /scollegato/.test($("pauseHint").textContent);
+      S.setLang("it"); $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); unplug(); await raf(); o.italian = /scollegato/.test($("pauseHint").textContent);
       $("resume").click(); S.setLang("en");
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
@@ -306,7 +332,7 @@ async function runHttpSuite(cdp) {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, B = window.BABYLON, engine = B.Engine.LastCreatedEngine, scene = B.Engine.LastCreatedScene, out = [];
       for (const b of [0, 5]) {
         document.getElementById("wrap").hidden = true; document.getElementById("tutor").hidden = true; S.seed(5); S.startBout(b);
-        while (G.state !== "fight") await raf();
+        await __until(() => G.state === "fight", "fight");
         for (let i = 0; i < 160; i++) await raf();
         S.E.ai.cd = 99; S.E.cfg.cd = 99; S.E.speed0 = 0; S.P.pos.set(-0.7, 0, 0); S.E.pos.set(0.7, 0, 0);
         for (let i = 0; i < 90; i++) await raf();
@@ -327,7 +353,7 @@ async function runHttpSuite(cdp) {
       const tap = async (k) => { key(k, true); key(k, false); await raf(); };
       const frames = async (n) => { for (let i = 0; i < n; i++) await raf(); };
       o.offByDefault = !$("blockTog").checked && !!$("pBlockTog");
-      $("wrap").hidden = true; S.seed(5); S.startBout(0); while (G.state !== "fight") await raf();
+      $("wrap").hidden = true; S.seed(5); S.startBout(0); await __until(() => G.state === "fight", "fight");
       const E = S.E; E.ai.cd = 99; E.cfg.cd = 99; E.speed0 = 0; E.cfg.heavy = 0; E.cfg.dodge = 0; E.cfg.block = 0; S.P.pos.set(-1.2, 0, 0); E.pos.set(1.2, 0, 0); S.P.hp = S.P.maxHp = 1e6; S.P.stam = 100;
       await tap("l"); await frames(20); o.holdModeTapDoesNothing = S.P.state !== "block";
       $("blockTog").checked = true; $("blockTog").dispatchEvent(new Event("change"));
@@ -337,7 +363,7 @@ async function runHttpSuite(cdp) {
       await tap("l"); await frames(10); const guarded = S.P.state === "block"; await tap("j"); await frames(4);
       o.jabEndsGuard = guarded && (S.P.state === "attack" || S.P.started === "jab") && !G.blockLatch;
       await frames(60);
-      await tap("l"); await frames(10); S.startBout(0); o.newBoutClears = !G.blockLatch; while (G.state !== "fight") await raf();
+      await tap("l"); await frames(10); S.startBout(0); o.newBoutClears = !G.blockLatch; await __until(() => G.state === "fight", "fight");
       o.tutor = /Tap L to guard/.test(S.tutorLine("keys")) && /again to drop/.test(S.tutorLine("pad")) && /Tap Block/.test(S.tutorLine("touch")) && ["keys", "pad", "touch"].every((m) => S.tutorLine(m).split(/\\s+/).length <= 16);
       $("pBlockTog").checked = false; $("pBlockTog").dispatchEvent(new Event("change"));
       o.pauseSwitchOff = !$("blockTog").checked && localStorage.getItem("sublevel-blocktoggle") === "0" && /hold/.test(document.getElementById("keys").textContent);
@@ -382,7 +408,7 @@ async function runHttpSuite(cdp) {
   await test("playtest_log_records_and_exports", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
-      const bout = async (win) => { $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(win); await sleep(120); };
+      const bout = async (win) => { $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.qaEndBout(win); await sleep(120); };
       localStorage.removeItem("sublevel-log");
       await bout(true); await bout(false);
       const a = S.logRead();
@@ -409,14 +435,14 @@ async function runHttpSuite(cdp) {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
       const key = (k) => { window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })); window.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true })); };
-      const fight = async (b) => { $("wrap").hidden = true; S.startBout(b); while (G.state !== "fight") await raf(); };
+      const fight = async (b) => { $("wrap").hidden = true; S.startBout(b); await __until(() => G.state === "fight", "fight"); };
       const prog = () => localStorage.getItem("sublevel-progress");
       S.qaResetProgress(); S.titleCard(); await sleep(60); o.hiddenAtStart = $("linkPractice").hidden;
       await fight(0); S.qaEndBout(true); await sleep(120); S.titleCard(); await sleep(60); o.shownAfterAWin = !$("linkPractice").hidden;
       const before = prog(); localStorage.removeItem("sublevel-log");
       $("linkPractice").click(); await sleep(150);
       o.card = G.state === "card" && $("cTitle").textContent === "Reyes" && /Practice/.test($("cStamp").textContent) && !$("cardBack").hidden && $("cardAssist").hidden;
-      $("go").click(); await sleep(60); while (G.state !== "fight") await raf();
+      $("go").click(); await sleep(60); await __until(() => G.state === "fight", "fight");
       o.fighting = G.practice === true && G.bout === 0 && S.P.hp === 100;
       S.qaEndBout(true); await sleep(150);
       o.noGrant = prog() === before && /Practice/.test($("cStamp").textContent) && /Progress unchanged/.test($("cBody").textContent) && !$("cardBack").hidden;
@@ -427,7 +453,7 @@ async function runHttpSuite(cdp) {
       $("linkPractice").click(); await sleep(150);
       o.twoOpponents = $("cTitle").textContent === "Reyes" && !$("cardAssist").hidden; $("cardAssist").click(); await sleep(150);
       o.cycles = $("cTitle").textContent === "Dag";
-      $("go").click(); await sleep(60); while (G.state !== "fight") await raf(); S.qaEndBout(false); await sleep(150);
+      $("go").click(); await sleep(60); await __until(() => G.state === "fight", "fight"); S.qaEndBout(false); await sleep(150);
       o.lossKeepsPractice = G.practice === true && /Retry|Riprova/.test($("cRows").textContent);
       S.titleCard(); await sleep(60); o.normalAgain = G.practice === false;
       S.setLang("it"); $("linkPractice").click(); await sleep(150); o.italian = /Allenamento/.test($("cStamp").textContent) && /Indietro/.test($("cardBack").textContent); S.setLang("en"); S.titleCard();
@@ -446,14 +472,14 @@ async function runHttpSuite(cdp) {
       $("autoOn").checked = true; $("autoOn").dispatchEvent(new Event("change"));
       o.saved = localStorage.getItem("sublevel-auto") === "1" && $("pAuto").checked;
       document.getElementById("wrap").hidden = true; S.seed(5); S.startBout(0);
-      while (G.state !== "fight") await raf();
+      await __until(() => G.state === "fight", "fight");
       let moved = false, acted = false; const p0 = S.P.pos.clone();
       for (let i = 0; i < 180; i++) { await raf(); if (S.P.pos.subtract(p0).length() > 0.3) moved = true; if (act()) acted = true; }
       o.movesWithoutInput = moved && !S.autoState().taken && !$("autoTag").hidden;
       S.P.hp = S.P.maxHp = 1e6; S.E.hp = S.E.maxHp = 1e6;
       key("j", true); key("j", false); await raf(); await raf();
       o.keyTakesOver = S.autoState().taken && $("autoTag").hidden;
-      S.startBout(1); while (G.state !== "fight") await raf();
+      S.startBout(1); await __until(() => G.state === "fight", "fight");
       o.nextBoutResumes = !S.autoState().taken && !$("autoTag").hidden;
       key("Escape", true); key("Escape", false); await raf(); key("Escape", true); key("Escape", false); await raf();
       $("pAuto").checked = false; $("pAuto").dispatchEvent(new Event("change"));
@@ -486,7 +512,7 @@ async function runHttpSuite(cdp) {
   await test("win_and_lose_themes_differ", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), g = S.audioGraph(), o = {};
-      const run = async (win) => { $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); g.MUS.log = []; if (win) S.qaEndBout(true); else S.qaEndBout(false); await sleep(5000); const n = g.MUS.log.slice(); g.MUS.log = null; return n; };
+      const run = async (win) => { $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); g.MUS.log = []; if (win) S.qaEndBout(true); else S.qaEndBout(false); await sleep(5000); const n = g.MUS.log.slice(); g.MUS.log = null; return n; };
       const root = 40, win = await run(true), winMood = S.musicMood(), lose = await run(false), loseMood = S.musicMood();
       const pcs = (ns, base) => new Set(ns.map((m) => (((m - base) % 12) + 12) % 12));
       const w = pcs(win, root + 3), l = pcs(lose, root);
@@ -502,14 +528,14 @@ async function runHttpSuite(cdp) {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
       const key = (k, d) => window.dispatchEvent(new KeyboardEvent(d ? "keydown" : "keyup", { key: k, bubbles: true }));
       $("wrap").hidden = true; S.seed(5); S.startBout(0);
-      while (G.state !== "fight") await raf();
+      await __until(() => G.state === "fight", "fight");
       const E = S.E; E.ai.cd = 99; E.cfg.cd = 99; E.speed0 = 0; E.cfg.heavy = 0; E.cfg.dodge = 0; E.cfg.block = 0; S.P.pos.set(-0.5, 0, 0); E.pos.set(0.5, 0, 0);
       for (let i = 0; i < 4; i++) { key("j", true); key("j", false); for (let k = 0; k < 40; k++) await raf(); }
       const lg = G.log; lg.dodges = 1; lg.hits = 1; o.singular = /1 hit taken, [0-9]+ blocks, 1 dodge,/.test(S.fightLine()); o.counts = lg.thrown >= 3 && lg.landed >= 1 && lg.landed <= lg.thrown && lg.time > 2;
       S.qaEndBout(true); await sleep(200);
       const rows = $("cRows").textContent;
       o.enRow = /Punches/.test(rows) && /[0-9]+ of [0-9]+ landed \\([0-9]+%\\)/.test(rows);
-      S.setLang("it"); $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); await sleep(200);
+      S.setLang("it"); $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.qaEndBout(true); await sleep(200);
       o.itRow = /Pugni/.test($("cRows").textContent) && /a segno/.test($("cRows").textContent) && /colpi subiti/.test($("cRows").textContent);
       S.setLang("en");
       return o; })()`, true);
@@ -540,7 +566,7 @@ async function runHttpSuite(cdp) {
   await test("win_card_warns_when_progress_cannot_be_saved", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
-      const win = async () => { $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); return $("cRows").textContent; };
+      const win = async () => { $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.qaEndBout(true); return $("cRows").textContent; };
       S.qaResetProgress();
       const prior = Storage.prototype.setItem;
       Storage.prototype.setItem = function () { throw new DOMException("quota"); };
@@ -578,7 +604,7 @@ async function runHttpSuite(cdp) {
   await test("movement_follows_the_physical_key", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
-      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf();
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight");
       const ev = (type, key, code) => window.dispatchEvent(new KeyboardEvent(type, { key, code, bubbles: true }));
       const moves = (key, code) => { ev("keydown", key, code); const i = S.intent(), m = Math.hypot(i.mx, i.mz) > 0.5; ev("keyup", key, code); return m; };
       o.qwerty = moves("w", "KeyW");
@@ -646,7 +672,7 @@ async function runHttpSuite(cdp) {
       document.getElementById("wrap").hidden = true;
       const cards = {
         title: () => S.titleCard(), dossier: () => S.introCard(2), hub: () => S.hubCard(1), dock: () => S.dockMission(() => {}), final: () => S.showFinalCard(),
-        win: async () => { S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); }, lose: async () => { S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(false); }
+        win: async () => { S.startBout(0); await __until(() => G.state === "fight", "fight"); S.qaEndBout(true); }, lose: async () => { S.startBout(0); await __until(() => G.state === "fight", "fight"); S.qaEndBout(false); }
       };
       S.qaResetProgress();
       for (const [name, open] of Object.entries(cards)) {
@@ -693,7 +719,7 @@ async function runHttpSuite(cdp) {
       b.click(); await sleep(50);
       o.cleared = S.progress.wins === 0 && S.progress.outfit === "auditor" && S.progress.arena === 0 && S.progress.dock === 0;
       o.saved = JSON.parse(localStorage.getItem("sublevel-progress")).wins === 0;
-      b.click(); await sleep(4300); o.disarms = !/sure|sicuro/i.test(b.textContent);
+      b.click(); o.disarms = await __until(() => !/sure|sicuro/i.test(b.textContent), "reset button disarms", 8000).then(() => true, () => false);
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
@@ -972,11 +998,4 @@ const AUTOPLAY = { args: ["--autoplay-policy=no-user-gesture-required"] };
 await withPage(async (cdp) => runHttpSuite(cdp), AUTOPLAY);
 await withPage(async (cdp) => runFileSuite(cdp), { url: fileIndexUrl(), file: true, ...AUTOPLAY });
 
-const failed = results.filter((r) => !r.pass);
-const summary = {
-  pass: results.filter((r) => r.pass).length,
-  fail: failed.length,
-  tests: results,
-};
-console.log(JSON.stringify(summary, null, 2));
-process.exit(failed.length ? 1 : 0);
+process.exit(report() ? 1 : 0);

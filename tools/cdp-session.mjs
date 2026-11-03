@@ -44,6 +44,17 @@ export function createStaticServer(root = ROOT) {
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
 }
 
+const EVAL_MS = 90000;
+
+/* Installed before the page loads (and again after every reload) so a test script can wait for a condition with a bound and a name. */
+const PAGE_HELPERS = `window.__until = async (fn, label, ms = 30000) => {
+  const t = performance.now();
+  while (!fn()) {
+    if (performance.now() - t > ms) throw new Error("never reached: " + label);
+    await new Promise((r) => requestAnimationFrame(r));
+  }
+};`;
+
 export class CDP {
   constructor(ws) {
     this.ws = ws;
@@ -68,12 +79,20 @@ export class CDP {
     });
   }
 
-  async eval(expression, awaitPromise = false) {
-    const out = await this.send("Runtime.evaluate", {
-      expression,
-      awaitPromise,
-      returnByValue: true,
+  /** ms bounds the whole call: a page script that waits for a state that never comes fails here, with its text, instead of hanging the run. */
+  async eval(expression, awaitPromise = false, ms = EVAL_MS) {
+    let timer;
+    const late = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const err = new Error(`eval timed out after ${ms / 1000} s: ${expression.replace(/\s+/g, " ").slice(0, 160)}`);
+        err.timeout = true;
+        reject(err);
+      }, ms);
     });
+    const out = await Promise.race([
+      this.send("Runtime.evaluate", { expression, awaitPromise, returnByValue: true }),
+      late,
+    ]).finally(() => clearTimeout(timer));
     if (out.exceptionDetails) {
       const d = out.exceptionDetails.exception?.description;
       throw new Error(d || JSON.stringify(out.exceptionDetails));
@@ -126,6 +145,7 @@ export async function withPage(fn, opts = {}) {
     const cdp = new CDP(ws);
     await cdp.send("Page.enable");
     await cdp.send("Runtime.enable");
+    await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: PAGE_HELPERS });
     await cdp.send("Page.navigate", { url });
     await fn(cdp);
     ws.close();
