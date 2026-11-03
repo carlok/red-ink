@@ -753,7 +753,9 @@ async function runHttpSuite(cdp) {
       const lit = () => [...document.querySelectorAll("#keys kbd.on")].map((k) => k.dataset.k).join(",");
       kd({ key: "l", code: "KeyL" }); await raf(); o.lit = lit() === "block"; ku({ key: "l", code: "KeyL" }); await raf(); o.off = lit() === "";
       S.E.ai.cd = 99; S.E.cfg.cd = 99; S.P.stam = 100; S.P.state = "idle";
-      kd({ key: "\u043b", code: "KeyK" }); ku({ key: "\u043b", code: "KeyK" }); await raf(); await raf(); o.cyrillicK = S.P.state === "attack" && S.P.atk.type === "heavy";
+      kd({ key: "\u043b", code: "KeyK" }); ku({ key: "\u043b", code: "KeyK" });
+      /* poll for the heavy to start: on a slow runner two frames can be longer than the whole windup, which failed this test once on CI */
+      o.cyrillicK = false; for (let i = 0; i < 40 && !o.cyrillicK; i++) { await raf(); o.cyrillicK = S.P.state === "attack" && !!S.P.atk && S.P.atk.type === "heavy"; }
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
