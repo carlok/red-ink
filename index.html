@@ -2507,6 +2507,7 @@ function closeMenu(){
 }
 function restartBout(){
   if($('pause')) $('pause').hidden=true;
+  G.retry=true;   /* a restart begins at full health, like Retry on the lose card; without it the bout started at the damaged health plus 35 */
   startBout(G.bout||0);
 }
 /* Quit: leave the fight, the fullscreen and the sound, and show the splash. Wins are saved when they happen (grantWin), so nothing is lost.

@@ -642,6 +642,20 @@ async function runHttpSuite(cdp) {
     return w;
   });
 
+  await test("restart_from_pause_starts_at_full_health", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, o = {};
+      const toFight = async () => { const t = performance.now(); while (S.G.state !== "fight" && performance.now() - t < 6000) await raf(); };
+      document.getElementById("wrap").hidden = true; S.startBout(2); await toFight();
+      S.P.hp = 20; o.before = S.P.hp; S.restartBout(); await toFight();
+      o.afterRestart = S.P.hp; o.retryFlagCleared = S.G.retry === false;
+      /* a normal start of the next bout still carries health over (+35), so only the restart changed */
+      S.P.hp = 20; S.startBout(3); await toFight(); o.nextBout = S.P.hp;
+      return o; })()`, true);
+    if (r.afterRestart !== 100 || !r.retryFlagCleared || r.nextBout !== 55) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("restart_bout", async () => {
     const v = await cdp.eval(
       `(async () => {
