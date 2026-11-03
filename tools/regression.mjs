@@ -1,6 +1,7 @@
 /**
- * Sprint 12 headless regression against window.__sublevel.
- * Usage: node tools/regression.mjs [--shot path.jpg]
+ * Headless regression against window.__sublevel (started in Sprint 12, extended every sprint since).
+ * Usage: node tools/regression.mjs [--shot path.jpg] [--only <part of a test name>]
+ * A test fails on a page error unless EXPECTED_ERRORS lists it; results also go to regression-result.json.
  */
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";

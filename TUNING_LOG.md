@@ -1553,3 +1553,38 @@ Screenshots: `tuning/s26-title-continue.jpg`, `s26-second-pass-card.jpg`, `s26-s
 Small things found on the way: `balance-run.mjs` could end with an `ENOTEMPTY` stack trace after printing its table (Chrome still writing its profile when the folder is removed); the cleanup now tolerates it. `env-probe.mjs` overwrites `tuning/s17-env-b1.jpg` to `b6.jpg` and `ai-probe.mjs` overwrites `tuning/s5-tell.jpg`: that is why `s5-tell.jpg` showed as modified since Sprint 25. `AGENTS.md` says to run `git checkout -- tuning/` after a probe. My first guess in the backlog that nothing tells a player a press was dropped for stamina was wrong for the keyboard (`denyCue`); it is touch and the pad that say nothing.
 
 Not done: a real AZERTY or Dvorak keyboard, the Italian second-pass and save-warning lines (mine, they want a native read), how a chat app renders the share card, switching off the Cursor `daily-care` agent, and playing the second pass through by hand.
+
+## Sprint 27: a fifth look, from two reviews, and the ten best-ranked items
+
+`BACKLOG.md` got 25 items from two read-only reviews (combat and feel; web robustness and tooling), and everything was ranked again. Ten of the new items were defects confirmed in the code, so this sprint changes tests and hardening and adds no content. No sim code was touched: the bout table and the second-pass table are identical.
+
+| # | Item | What it does | Test |
+| --- | --- | --- | --- |
+| 21 | Regression hang bounds | `CDP.eval` gives up after 90 s and names the expression; each test is raced against 120 s and the run stops at the first timeout; 24 unbounded `while state !== fight` waits go through `__until()`; the 4.3 s sleep in the reset test polls; one line per test on stderr; `regression-result.json`, uploaded by CI on failure (job limit 20 to 15 min) | a wait for a state that never comes fails at its bound with `never reached: ...`; a never-resolving eval fails at its limit |
+| 22 | Key repeat | Esc and Enter ran before the `e.repeat` guard; a repeat of either is now swallowed | one repeat Esc leaves the pause up (two would toggle back and pass either way); a repeat Enter leaves the card up |
+| 23 | Input cleared on pause | `clearInput()` zeroes the buffer, both sticks and the touch block; pause, resume and blur call it | a J pressed while paused does not fire on Resume |
+| 24 | Dodge stat | `G.log.dodges` counts evaded punches (the `inv>0` branch of `strike`); `dodgeTries` counts presses; playtest log entries are `v:2` with `tries` | an evaded jab counts once and not as a hit; a press counts as a try only |
+| 25 | Two tabs | `saveProgressData()` takes what the stored copy has beyond ours before it writes; resets pass `exact`; a `storage` event reloads progress | stored wins 5 behind the page's back, this tab wins bout 2, the save still says 5 with its outfit, arena, dock and pass2; a reset still writes 0 |
+| 26 | Voice cancel | `voiceCancel()` clears the delay timer, cancels speech and pauses clips; pause, mute (button and setting), a hidden tab and Quit call it | a line queued with a 0.4 s delay is not spoken after a pause; `cancel()` is called on each of the five |
+| 27 | Validation | `num()` for volumes and rumble; `sanitizeProgress` in `migrateProgress`; `hasOwnProperty` for the difficulty; duplicate binds fall back to the defaults; an unreadable save is copied to `sublevel-progress-bad` | bad values for all of them, reload, the title card is reached with sane values |
+| 28 | Page errors | the CDP session collects exceptions, `console.error` and error log entries; a test that sees one fails unless `EXPECTED_ERRORS` lists it | `console.error`, a late throw and a 404 each land in the list; the first run found one hit in 53 tests (the deliberate no-WebGL throw), now allowed with a reason |
+| 29 | Docs | README (six bouts, local fonts, the new behaviour), `CONTINUE.md` (a Next section in place of the finished sprint 9 and 12 plans, both budget numbers, the S27 entry), `AGENTS.md` (the guard of 20 to 48 draws and 52 meshes next to the 400 and 250 ceiling; how page errors and `--only` work) | read against the code |
+| 30 | Crash catcher | an uncaught error or rejection pauses a fight and shows the card with a report, Reload, Copy details, and Keep playing while frames still come; one card per load | timer, promise and a throw in the render loop each show it; Keep playing is offered except after the loop died; fits 1280x720, 390x844 and 844x390 |
+
+### Numbers
+
+| Check | Before | After |
+| --- | --- | --- |
+| Regression tests | 53 | 60 (all pass) |
+| Bout table (`balance-run.mjs 200 normal 1 normal 0-5`) | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0 | the same |
+| Slowest test, local | not recorded | 16.5 s (`easy_offered_after_three_losses`) |
+| Regression, local | 2:22 | about 2:30 |
+
+### What it took
+
+- Each new test was shown failing with its fix disabled (the reverse was done by hand on a copy), so none of them passes on its own. One of my first drafts did: two repeat Escapes toggle pause twice and end where they began, so the test now sends one.
+- The NaN gain was inferred from the spec in the review; with the validators reverted the test fails with the real `TypeError: ... non-finite` from `applyBus`, so the freeze on Play with a bad volume is confirmed.
+- Items 22 to 24 share hunks of `index.html` and of the regression, so they are one commit with a line each instead of three.
+- `balance-run.mjs` prints `dodges` per bout; that column now counts evasions, not presses.
+- Not done on purpose: the jab-answer fix (five of six foes cannot answer a jab; it moves all six numbers and is item 31 for a balance sprint of its own).
+- Not checked: holding Enter and Esc on a real keyboard, two real tabs, how the crash card reads on a phone, a native read of the five new Italian strings.

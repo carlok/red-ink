@@ -4,7 +4,7 @@ Ideas that were suggested or left out of a sprint and are not built. Nothing her
 
 ## Ranking
 
-Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items, a fourth look, from the play flow, added 13, and a fifth look, from two reviews (combat and feel; web robustness and tooling), added 25 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; Sprint 27 is items 21 to 30; after that, item 31 is next.
+Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items, a fourth look, from the play flow, added 13, and a fifth look, from two reviews (combat and feel; web robustness and tooling), added 25 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; Sprint 27 built items 21 to 30; item 31 is next.
 
 ### Tier 1: Sprint 25 (all ten built; see `TUNING_LOG.md`)
 
@@ -36,7 +36,7 @@ Every item below, best first. Score is value (1 to 5, counting risk removed) div
 | 19 | Movement by physical key (`e.code`), for AZERTY, Dvorak and similar layouts | S+ | 2.7 |
 | 20 | A second pass with a modifier per bout after bout 6 | M | 2.0 |
 
-### Tier 3: Sprint 27
+### Tier 3: Sprint 27 (all ten built; see `TUNING_LOG.md`)
 
 | # | Item | Size | Score |
 | --- | --- | --- | --- |
@@ -252,7 +252,7 @@ Found by reading the code and by holding it against the game-development guidanc
 
 ### Robustness and tooling
 
-- **A crash catcher.** No `window.onerror` or `unhandledrejection` handler exists (checked by grep). A throw inside the frame loop would leave a frozen or half-drawn page with no message (guess, not reproduced). Stop the loop, show a card ("Something broke") with Reload and Copy details (build, browser, quality level, the last five log entries, the error text). It would be the one place a bug report comes from. Local only, nothing is sent. Small to medium.
+- **A crash catcher (built in Sprint 27, item 30).** No `window.onerror` or `unhandledrejection` handler exists (checked by grep). A throw inside the frame loop would leave a frozen or half-drawn page with no message (guess, not reproduced). Stop the loop, show a card ("Something broke") with Reload and Copy details (build, browser, quality level, the last five log entries, the error text). It would be the one place a bug report comes from. Local only, nothing is sent. Small to medium.
 - **Per-system CPU time budget.** The regression budgets draw calls and meshes, not time. Wrap `simTick`, `aiIntent` and the render prep in `performance.now()` in `env-probe` and fail the regression if the average sim tick passes about 2 ms of the 16.7 ms frame. CPU time is steadier than frame rate under software GL. Small to medium.
 - **Pick the language on the first visit.** `navigator.language` is not read anywhere, so an Italian browser opens in English until the switch is found. With no saved `sublevel-lang`, use `it` for `it*`. Do it after the native read of the Italian text (see Yours). Small.
 - **Compare an exported playtest log with the bot table.** `tools/log-compare.mjs` reads the exported JSON and prints, per bout, the human win rate and mean time next to the `balance-run` numbers. Without it the log has no reader. Needs someone to play and export. Small.
@@ -296,7 +296,7 @@ Loose files are settled: `CLAUDE.md` is excluded locally (`.git/info/exclude`) a
 
 ## A fifth look, from two reviews
 
-Status after Sprint 27: items 21 to 30 are built when struck through below; the rest is open. "Confirmed" means read in the code, "guess" means not tested in a browser. Line numbers are those of master at `23c4b2e`. All are ranked above.
+Status after Sprint 27: the first nine bullets under "Confirmed defects" (items 21 to 29) are built, and so is the crash catcher (item 30, from the third look); the rest is open.
 
 Two read-only reviews went through the code: one on combat and feel, one on web robustness and tooling. The first ten were built in Sprint 27.
 
@@ -307,7 +307,7 @@ Two read-only reviews went through the code: one on combat and feel, one on web 
 - **The dodge stat counts presses.** `G.log.dodges++` is in `startDodge` (:2026); a dodge that works (`d.inv>0` in `strike`, :2038) records nothing. The result card and the playtest log overstate dodging. Small (item 24).
 - **Two tabs overwrite each other's progress.** `grantWin` compares against the in-memory `progress.wins` and writes the whole object, with no `storage` listener. Tab A at 3 wins erases tab B at 5. Small (item 25).
 - **A queued voice line ignores pause, mute, hide and Quit.** `voiceClip` (`<audio>`) and `voiceSpeak` (`speechSynthesis`) bypass the Web Audio graph and check `muted` and `document.hidden` only when called (:1493). No `speechSynthesis.cancel()` exists outside the speak call. Small (item 26).
-- **Stored values are not validated.** `Number('abc')` is NaN and `clamp` passes it (:1155-1160); setting a gain to NaN should throw inside `audioInit`, before the title card (inferred from the spec, not run). `loadProgress` (:1019) takes `wins:"abc"`; `DIFF[v]` and `OUTFITS[id]` accept `"constructor"`; loaded binds can put two actions on one key; a corrupt save is overwritten on the next win with no backup. Small to medium (item 27).
+- **Stored values are not validated.** `Number('abc')` is NaN and `clamp` passes it (:1155-1160); setting a gain to NaN throws `TypeError: ... non-finite` in `applyBus`, before the title card (confirmed by the Sprint 27 test with the validators reverted). `loadProgress` (:1019) takes `wins:"abc"`; `DIFF[v]` and `OUTFITS[id]` accept `"constructor"`; loaded binds can put two actions on one key; a corrupt save is overwritten on the next win with no backup. Small to medium (item 27).
 - **The regression can hang for 20 minutes.** About 12 tests use `while(G.state!=='fight') await raf()` with no bound, `test()` has no timeout, the JSON summary prints only at the end and `test.yml` uploads nothing on failure. Fixed sleeps such as `sleep(4300)` (:696) are the next flake. Small (item 21).
 - **The regression ignores page errors.** No `Runtime.exceptionThrown`, `consoleAPICalled`, `Log` or `Network.loadingFailed` subscription (grep gives 0), so a thrown handler or a 404 on a font passes CI. Small to medium (item 28).
 - **Docs disagree with the code.** `README.md:13` says "Three bouts" (there are six) and that Google Fonts load online (they are local). `CONTINUE.md` still says "Sprint 9, do this one" and "Sprint 12". `AGENTS.md` and `CONTINUE.md` give a 400 draw calls and 250 meshes budget while the regression enforces 48 and 52 (:318). Small to medium (item 29).
