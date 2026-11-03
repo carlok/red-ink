@@ -249,6 +249,39 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("webgl_context_lost_shows_message", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const gl = window.BABYLON.Engine.LastCreatedEngine._gl, ext = gl.getExtension("WEBGL_lose_context");
+      if (!ext) return { skipped: true, noExtension: true };
+      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf();
+      ext.loseContext(); await sleep(300);
+      o.shown = !$("noGL").hidden && /reset/i.test($("noGLTitle").textContent) && /reload/i.test($("noGLBtn").textContent);
+      o.paused = G.state === "pause";
+      ext.restoreContext(); await sleep(500);
+      o.hidden = $("noGL").hidden;
+      return o; })()`, true);
+    if (r.skipped) return r;
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("webgl_missing_shows_message", async () => {
+    const stub = await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => { const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (t, ...a) { return /webgl/.test(t) ? null : g.call(this, t, ...a); }; })()` });
+    await cdp.send("Page.reload", { ignoreCache: true });
+    let v;
+    for (let i = 0; i < 40; i++) {
+      await new Promise((r) => setTimeout(r, 150));
+      v = await cdp.eval(`(() => { const e = document.getElementById("noGL"); return { shown: !!e && !e.hidden, title: e && e.querySelector("h2").textContent, button: e && e.querySelector("button").textContent, boot: !!window.__sublevel }; })()`);
+      if (v.shown) break;
+    }
+    await cdp.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: stub.identifier });
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await bootSublevel(cdp);
+    if (!v.shown || !/WebGL/.test(v.title) || v.boot) throw new Error(JSON.stringify(v));
+    return v;
+  });
+
   await test("autoplay_acts_and_yields", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};

@@ -46,6 +46,10 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .bar{position:relative;width:100%;height:18px;background:#0a0a0b;border:2px solid var(--paper);transform:skewX(-14deg);overflow:hidden;box-sizing:border-box}
 .right .bar{transform:skewX(14deg)}
 .autoTag{font:600 11px/1 var(--f-data);letter-spacing:.14em;text-transform:uppercase;color:var(--ink);background:var(--tape);padding:3px 7px;align-self:flex-start;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.noGL{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:16px;background:var(--floor)}
+.noGL .box{max-width:440px;background:var(--paper);color:var(--ink);border:2px solid var(--tape);padding:20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.noGL h2{margin:0;font:800 clamp(22px,6vw,30px)/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
+.noGL p{margin:0;font:400 16px/1.4 var(--f-body)}
 .bar.thin{height:8px;border-width:1px;width:68%;border-color:var(--mute)}
 .bar i,.bar b{position:absolute;top:0;bottom:0;left:0;width:100%;display:block}
 .right .bar i,.right .bar b{left:auto;right:0}
@@ -194,6 +198,13 @@ dl.rows dd a{color:inherit}
     </div>
   </div>
 
+  <div class="noGL" id="noGL" role="alert" hidden>
+    <div class="box">
+      <h2 id="noGLTitle">This game needs WebGL</h2>
+      <p id="noGLBody">Your browser cannot start WebGL. Turn on hardware acceleration in its settings, or try Chrome, Firefox or Edge.</p>
+      <button class="btn2" id="noGLBtn" type="button">Reload</button>
+    </div>
+  </div>
   <div class="banner" id="banner" aria-live="polite"></div>
   <div class="tutor" id="tutor" hidden>
     <p id="tutorText"></p>
@@ -478,6 +489,11 @@ const STR={
   tutor_pad:{en:'Left stick moves. X jabs, Y heavy. Hold LT to block. A dodges. Start pauses.',it:'Levetta sinistra muove. X diretto, Y potente. Tieni LT per parare. A schiva. Start pausa.'},
   tutor_touch:{en:'Stick moves. Tap Jab or Heavy. Hold Block. Tap Dodge.',it:'Il joystick muove. Tocca Jab o Heavy. Tieni Block. Tocca Dodge.'},
   key_space:{en:'Space',it:'Spazio'},
+  gl_none_title:{en:'This game needs WebGL',it:'Questo gioco richiede WebGL'},
+  gl_none_body:{en:'Your browser cannot start WebGL. Turn on hardware acceleration in its settings, or try Chrome, Firefox or Edge.',it:"Il browser non riesce ad avviare WebGL. Attiva l'accelerazione hardware nelle impostazioni, oppure prova Chrome, Firefox o Edge."},
+  gl_lost_title:{en:'Graphics were reset',it:'Grafica reimpostata'},
+  gl_lost_body:{en:'The game is paused. If the picture does not come back in a few seconds, reload the page.',it:"Il gioco è in pausa. Se l'immagine non torna entro pochi secondi, ricarica la pagina."},
+  gl_reload:{en:'Reload',it:'Ricarica'},
   unlock_outfit_san:{en:'Sanitation cap (wear in fights)',it:'Cappello sanificazione (nei match)'},
   unlock_arena_dock:{en:'Dock sodium lights (arena)',it:'Luci sodio banchina (arena)'},
   unlock_outfit_stripe:{en:'Safety stripe shirt',it:'Maglia strisce sicurezza'},
@@ -568,7 +584,21 @@ const CAM={fovV:.85,fovH:1,wide:1.25,frac:.40,fracPortrait:.2,pad:1.7,padPortrai
 
 /* ---------- engine, scene ---------- */
 const canvas=$('view');
-const engine=new B.Engine(canvas,true,{stencil:true,preserveDrawingBuffer:false},false);
+/* No WebGL, or a GPU reset: say so in words instead of leaving a blank page. */
+function showNoGL(kind){
+  const el=$('noGL'); if(!el) return;
+  $('noGLTitle').textContent=L(kind==='lost'?'gl_lost_title':'gl_none_title');
+  $('noGLBody').textContent=L(kind==='lost'?'gl_lost_body':'gl_none_body');
+  $('noGLBtn').textContent=L('gl_reload'); $('noGLBtn').onclick=()=>location.reload();
+  el.hidden=false;
+}
+let engine;
+try{
+  if(!B||!B.Engine||!B.Engine.isSupported()) throw new Error('no WebGL');
+  engine=new B.Engine(canvas,true,{stencil:true,preserveDrawingBuffer:false},false);
+}catch(e){ showNoGL('none'); throw new Error('Sublevel Three needs WebGL ('+e.message+')'); }
+canvas.addEventListener('webglcontextlost',()=>{ if(G.state==='fight'||G.state==='ready') pauseFight(); showNoGL('lost'); });
+canvas.addEventListener('webglcontextrestored',()=>{ if($('noGL')) $('noGL').hidden=true; });
 engine.setHardwareScalingLevel(1/Math.min(window.devicePixelRatio||1,1.25));
 const scene=new B.Scene(engine);
 scene.clearColor=new B.Color4(.035,.036,.04,1);
