@@ -21,6 +21,8 @@ and expect 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0. Render-only code (camera, pa
 
 Budgets that still hold: under 400 draw calls, under 250 active meshes, keyboard to attack state under 80 ms.
 
+Some probes overwrite committed screenshots in `tuning/` as a side effect (`env-probe.mjs` rewrites `s17-env-b1.jpg` to `s17-env-b6.jpg`, `ai-probe.mjs` rewrites `s5-tell.jpg`). Run `git checkout -- tuning/` after a probe unless you mean to replace those pictures, so they do not slip into a commit.
+
 ## Before you open a PR
 
 ```bash

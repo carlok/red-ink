@@ -4,7 +4,7 @@ Ideas that were suggested or left out of a sprint and are not built. Nothing her
 
 ## Ranking
 
-Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items and a fourth look, from the play flow, added 13 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 takes items 11 to 20; next after that is item 21.
+Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items and a fourth look, from the play flow, added 13 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; next up is item 21.
 
 ### Tier 1: Sprint 25 (all ten built; see `TUNING_LOG.md`)
 
@@ -21,7 +21,7 @@ Every item below, best first. Score is value (1 to 5, counting risk removed) div
 | 9 | Playtest log with export | S+ | 2.7 |
 | 10 | Practice mode | M | 2.0 |
 
-### Tier 2: Sprint 26 (the ten picked)
+### Tier 2: Sprint 26 (all ten built; see `TUNING_LOG.md`)
 
 | # | Item | Size | Score |
 | --- | --- | --- | --- |
@@ -45,25 +45,25 @@ Every item below, best first. Score is value (1 to 5, counting risk removed) div
 | 23 | Tells you can hear, and shapes not only colour | S+ | 2.0 |
 | 24 | Medals per bout from the stats already counted | S+ | 2.0 |
 | 25 | Per-system CPU time budget (sim tick, AI, render prep) | S+ | 2.0 |
-| 26 | Feedback when a press is dropped for lack of stamina (guess: none today) | S+ | 2.0 |
-| 27 | Repo hygiene: `CHANGELOG.md` and a `probes` script | S | 2.0 |
-| 28 | Mobile haptics | S | 2.0 |
-| 29 | Controls reference card | S | 2.0 |
-| 30 | Progress export and import | S | 2.0 |
-| 31 | Voice variety (and which clip formats play everywhere) | S | 2.0 |
-| 32 | Page weight budget in CI | S | 2.0 |
-| 33 | Difficulty descriptions in the settings | S | 2.0 |
-| 34 | Credits note on the voice | S | 2.0 |
-| 35 | Pick the language on the first visit | S | 2.0 |
-| 36 | Compare an exported playtest log with the bot table | S | 2.0 |
-| 37 | Run the accessibility audit in CI | S | 2.0 |
-| 38 | A one-page design doc and a code map | S | 2.0 |
-| 39 | Pan the sound effects by fighter position | S | 2.0 |
-| 40 | A small FOV punch on heavy hits and the knockout | S | 2.0 |
-| 41 | Rebinding fails silently (reserved key, swapped clash) | S | 2.0 |
-| 42 | Pause menu: Space and the arrows are swallowed while a card is up (guess, test first) | S | 2.0 |
-| 43 | Stale state after Reset progress, Restart and Quit | S | 2.0 |
-| 44 | Language switch on the splash | S | 2.0 |
+| 26 | Repo hygiene: `CHANGELOG.md` and a `probes` script | S | 2.0 |
+| 27 | Mobile haptics | S | 2.0 |
+| 28 | Controls reference card | S | 2.0 |
+| 29 | Progress export and import | S | 2.0 |
+| 30 | Voice variety (and which clip formats play everywhere) | S | 2.0 |
+| 31 | Page weight budget in CI | S | 2.0 |
+| 32 | Difficulty descriptions in the settings | S | 2.0 |
+| 33 | Credits note on the voice | S | 2.0 |
+| 34 | Pick the language on the first visit | S | 2.0 |
+| 35 | Compare an exported playtest log with the bot table | S | 2.0 |
+| 36 | Run the accessibility audit in CI | S | 2.0 |
+| 37 | A one-page design doc and a code map | S | 2.0 |
+| 38 | Pan the sound effects by fighter position | S | 2.0 |
+| 39 | A small FOV punch on heavy hits and the knockout | S | 2.0 |
+| 40 | Rebinding fails silently (reserved key, swapped clash) | S | 2.0 |
+| 41 | Pause menu: Space and the arrows are swallowed while a card is up (guess, test first) | S | 2.0 |
+| 42 | Stale state after Reset progress, Restart and Quit | S | 2.0 |
+| 43 | Language switch on the splash | S | 2.0 |
+| 44 | Stamina-denied feedback on touch and the pad (the keyboard has `denyCue`) | S | 2.0 |
 | 45 | Cards and the pause menu as modal dialogs | M | 1.5 |
 | 46 | The quality ladder recovers | M | 1.5 |
 | 47 | Photo mode | M | 1.5 |
@@ -94,8 +94,9 @@ Settings card (M), daily challenge and share line (M, needs 20), installable off
 - A listening test of the music and the mix.
 - A real phone and an integrated-GPU check.
 - Italian voice lines recorded by a native speaker, and a native read of the Italian text.
-- Decide whether the Cursor `daily-care` agent should keep opening PRs here, and what it may touch (PR #18 came from it). Item 11 writes the rules down once you have decided.
+- Switch off the Cursor `daily-care` agent: you chose Dependabot for dependency bumps, and `AGENTS.md` says it owns them (PR #18 came from the agent).
 - Play on Safari and Firefox by hand once (item 58 automates only a smoke test).
+- Try the movement keys on a real AZERTY or Dvorak keyboard, and play the second pass through.
 - Turn on "Automatically delete head branches" in the GitHub repo settings (item 61).
 
 ## From Sprint 24
@@ -149,7 +150,7 @@ Found by reading the code, not by playing. Items marked "(guess)" were not check
 
 ### Gameplay and replay
 
-- **Nothing to do after bout 6:** no harder pass after a win, no modifiers (one-hit, no stamina), no endless mode; `DIFF` is three multiplier sets. Medium.
+- **Nothing to do after bout 6** (answered in Sprint 26 by a second pass with one change per fighter; modifiers such as one-hit or no stamina, and an endless mode, are still open): no harder pass after a win, no modifiers (one-hit, no stamina), no endless mode; `DIFF` is three multiplier sets. Medium.
 - **A thin move set:** no combos, counters or parry window. Large, and it needs `balance-run` tuning.
 - **A per-bout stats screen or a best-run table.** The counters exist in `G.log`; it overlaps the time-attack item above. Small.
 
@@ -203,6 +204,8 @@ New ideas, each with a rough size. They are ranked above. Status after Sprint 25
 
 ## A third look, after Sprint 25
 
+Status after Sprint 26: `AGENTS.md`, the save version, dependency care and the share preview are built (items 11 to 14), and so is the second pass (item 20; "nothing after bout 6" below is answered). The rest is open.
+
 Found by reading the code and by holding it against the game-development guidance (core loop, flow, rewards, web limits, audio mix, camera feel). Items marked "(guess)" were not checked. All are ranked above.
 
 ### Project and process
@@ -240,6 +243,8 @@ Found by reading the code and by holding it against the game-development guidanc
 
 ## A fourth look, from the play flow
 
+Status after Sprint 26: the first five (restart heals, Enter, save warning, Continue, movement by physical key) are built (items 15 to 19). The rest is open.
+
 Found by reading `index.html` from the splash to the result card and the pause menu. Line numbers are those of master at `0e21af0`. Items marked "(guess)" were not tested in a browser. The first five are Sprint 26 items 15 to 19.
 
 - **Restart from the pause menu heals.** `restartBout` (:2487) calls `startBout` without `G.retry`, so the start health is `min(100, P.hp+35)` (:2768): the damaged health plus 35. Retry from the lose card starts at 100. Set `G.retry=true` in `restartBout`. Small.
@@ -247,7 +252,7 @@ Found by reading `index.html` from the splash to the result card and the pause m
 - **Progress that cannot be saved is never reported.** `grantWin` returns false when `localStorage` throws (:993-999) and `winCard` ignores it (:2745), so in private mode a won bout is lost on reload without a word. Show a row on the win card. The log export's clipboard fallback also swallows its error (:2549). Small.
 - **Play always starts bout 1.** `titleCard`'s go is `introCard(0)` (:2725); `hubCard` is reachable only after a win. After a reload with 3 bouts won, the quit note says so and the player must replay bouts 1 to 3. Add a Continue action to `hubCard(wins)`. Small to medium.
 - **Movement is by typed letter.** `keyName` (:2240) uses `e.key` for Latin layouts, so on AZERTY the keys labelled W, A, S and D are scattered. Map movement by `e.code`, fall back to `key` when there is no code, and show the cap label from `navigator.keyboard.getLayoutMap()` where it exists. Small to medium.
-- **A press dropped for lack of stamina gives no feedback (guess).** `tools/key-probe.mjs` shows stamina as a cause of dropped presses; a flash on the stamina bar or a dull click would tell the player why. Small to medium.
+- **A press dropped for lack of stamina: the keyboard says so, touch and the pad do not.** `denyCue` (:2315) blinks the stamina bar and plays a low tick, but it is called only from the keydown handler (:2353); touch buttons and pad presses start nothing and say nothing. (I first guessed there was no feedback at all; reading `denyCue` showed otherwise.) Small.
 - **Rebinding fails silently.** A reserved key (WASD, arrows, Enter, Esc, Tab) ends listening with no change and no message, and a clash swaps the other action's key without saying so (:2269-2274). Add a status line. Small.
 - **Pause menu keys (guess).** `pauseFight` (:2457) never moves focus, and :2285 calls `preventDefault` on Space and the arrows whenever `wrap` is hidden, which includes the pause card, so Space may not press Resume or toggle a checkbox. Test in a browser first. Small.
 - **Stale state after Reset progress, Restart and Quit.** `resetProgress` (:2557) leaves `#linkPractice` visible and `G.loss` set until `titleCard` reruns; the pad-unplug hint (`pad_gone`, :2474) is cleared only in `resumeFight`, so Restart or Quit can leave it for a later pause. Practice with 0 wins then looks like a dead button (:2703). Small.
@@ -256,4 +261,4 @@ Found by reading `index.html` from the splash to the result card and the pause m
 - **Avatar loader messages are English only.** `avStatus` strings at :2898, :2899, :2916, :2919 and :2925 skipped the Italian pass. Small.
 - **Touch controls are decided once at load (guess).** `isTouch` (:2148) reads `(pointer: coarse)` at start, so a hybrid device with a mouse never gets them. Small.
 
-Loose files are settled: `CLAUDE.md` is excluded locally (`.git/info/exclude`) and `tuning/s5-tell.jpg` is restored to the committed copy.
+Loose files are settled: `CLAUDE.md` is excluded locally (`.git/info/exclude`) and `tuning/s5-tell.jpg` is restored to the committed copy. The `Yours` list also keeps: switch off the Cursor `daily-care` agent (Dependabot owns bumps, see `AGENTS.md`), try the AZERTY movement on a real keyboard, and play the second pass.

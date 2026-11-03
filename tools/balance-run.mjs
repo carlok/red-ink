@@ -110,5 +110,5 @@ try {
 } finally {
   chrome.kill("SIGKILL");
   server.close();
-  rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 80 });
+  try { rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 80 }); } catch { /* Chrome can still be writing its profile as it exits; the table is already printed */ }
 }
