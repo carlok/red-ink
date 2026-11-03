@@ -1431,3 +1431,43 @@ Extras: Play ends with a coin and a rising arpeggio; the splash has a faint mage
 | `tools/env-probe.mjs` | draws 41–43, GPU about 2.0 ms, no console errors |
 
 Not done: how the synth music, the voice and the themes sound is unchecked (the numbers say they have the structure, not that they sound good); the voice is English only; a real phone and an integrated GPU are still unchecked.
+
+## Sprint 24: a male voice from the browser, autoplay, and punch stats
+
+You asked for no robotic voice, a checkbox so the character can autoplay as AI, and other things that help. Ideas not built went to `BACKLOG.md`.
+
+### Voice
+
+No synthetic voice is bundled: Apple's licence limits the macOS voices to personal, non-commercial use, and the Piper voices I found are non-commercial or unclear, while the repo's audio is claimed CC0. So each word (`fight`, `ko`, `win`, `lose`, `perfect`) now takes the first source that works:
+
+1. a clip listed in `assets/voice/voice.js` (your own recording; `assets/voice/README.txt` says how);
+2. the browser's speech engine, a male voice of the game's language (`voicePick`: preferred names such as Daniel, Alex, Oliver, then names that read as male, never a female-marked name, never the macOS novelty voices Bahh, Bells, Fred and the like), pitch 0.7, rate 0.95, volume from the Hits slider;
+3. the old formant robot, kept as the last fallback.
+
+A Voice checkbox (title settings, pause menu) and a voice list with a Hear button. Italian says "Combatti!", "Hai vinto!"; the banners are localised too (COMBATTI!, A TERRA). FIGHT is spoken about 0.2 s before its banner; that lead is a guess, because the real engine start-up is not measurable headless.
+
+On this Mac the real list picks Daniel (English) and Eddy (Italian). The first version also picked Fred and Bahh-like voices from a name list; the novelty filter came from reading the actual 199-voice list.
+
+### Autoplay
+
+A checkbox (title settings, pause menu, saved as `sublevel-auto`; `?auto=1`) makes `simTick` use `botIntent(P, E, dt, diff)`, the balance bot, for the player's side. A move or attack key, the touch stick or buttons, or the pad takes over (`G.autoTaken`); the next bout starts with autoplay again. A yellow AUTO badge under the stamina bar says so (English and Italian). Cards still wait for the player. Gamepad Back now opens the card menu, as Esc does.
+
+`tools/autoplay-probe.mjs` (real time, no input): first action 50 ms after the fight starts; Reyes won, Dag and Pike lost (the bot's win rates are 90.5, 67.5 and 44.0%, so a loss is normal); every fight ended in a KO in 16 to 38 s. A J press stopped autoplay within 2 ticks and the badge went; the next bout resumed it.
+
+### Result cards
+
+The win, lose and final cards get a Punches row: "2 of 2 landed (100%) · 7.1 s" (counters `thrown`, `landed`, `time` in `G.log`; a blocked or dodged punch is not landed). The defence line was English only; it is localised now, with singular forms.
+
+### Checked
+
+| Check | Result |
+| --- | --- |
+| `tools/regression.mjs` | 34 of 34 (new: voice sources and settings with a stubbed speech engine, autoplay acts and yields, saved across reload, punch stats in both languages) |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, identical |
+| `tools/step-probe.mjs` | identical at 20 to 144 fps, 600 of 600 single ticks naturally |
+| `tools/ai-probe.mjs`, `combat-probe.mjs`, `ui-probe.mjs`, `input-probe.mjs`, `font-probe.mjs` | no failures |
+| `tools/env-probe.mjs` | draws 43 to 46 (41 to 43 in S23, not traced; the AUTO badge is DOM), GPU about 1.6 ms, no console errors |
+
+Screenshots: `tuning/s24-voice-settings.jpg`, `tuning/s24-auto-badge.jpg`, `tuning/s24-result-card.jpg`.
+
+Not done: how the browser voice sounds on a real Mac, phone or PC is unchecked (a stub stood in for the engine); the draw-count rise in env-probe was not traced; Italian voice lines depend on the device having an Italian voice.

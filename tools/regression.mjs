@@ -268,7 +268,7 @@ async function runHttpSuite(cdp) {
       while (G.state !== "fight") await raf();
       const E = S.E; E.ai.cd = 99; E.cfg.cd = 99; E.speed0 = 0; E.cfg.heavy = 0; E.cfg.dodge = 0; E.cfg.block = 0; S.P.pos.set(-0.5, 0, 0); E.pos.set(0.5, 0, 0);
       for (let i = 0; i < 4; i++) { key("j", true); key("j", false); for (let k = 0; k < 40; k++) await raf(); }
-      const lg = G.log; o.counts = lg.thrown >= 3 && lg.landed >= 1 && lg.landed <= lg.thrown && lg.time > 2;
+      const lg = G.log; lg.dodges = 1; lg.hits = 1; o.singular = /1 hit taken, [0-9]+ blocks, 1 dodge,/.test(S.fightLine()); o.counts = lg.thrown >= 3 && lg.landed >= 1 && lg.landed <= lg.thrown && lg.time > 2;
       S.qaEndBout(true); await sleep(200);
       const rows = $("cRows").textContent;
       o.enRow = /Punches/.test(rows) && /[0-9]+ of [0-9]+ landed \\([0-9]+%\\)/.test(rows);
