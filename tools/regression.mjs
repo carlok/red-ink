@@ -556,6 +556,25 @@ async function runHttpSuite(cdp) {
     return { warned: r.warned, quietWhenSaved: r.quietWhenSaved };
   });
 
+  await test("title_card_continue_for_a_player_with_wins", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, $ = (i) => document.getElementById(i), o = {};
+      const title = async (wins, dock) => { $("wrap").hidden = true; S.qaResetProgress(); S.progress.wins = wins; S.progress.dock = dock; S.titleCard(); await sleep(120); return { shown: !$("cardAssist").hidden, text: $("cardAssist").textContent }; };
+      o.none = (await title(0, 0)).shown === false;
+      const three = await title(3, 1); o.threeShown = three.shown && three.text.includes("4") && three.text.includes(S.BOUTS[3].foe) && three.text.includes(S.STR.continue_btn.en);
+      $("cardAssist").click(); await sleep(150);
+      o.opensHub = $("cTitle").textContent === S.STR.hub_title.en && $("cRows").textContent.includes(S.BOUTS[3].foe);
+      const two = await title(2, 0); o.dockFirst = two.shown; $("cardAssist").click(); await sleep(150);
+      o.dockCard = $("cTitle").textContent === S.STR.dock_title.en;
+      o.cleared = (await title(6, 1)).shown === false;
+      S.setLang("it"); await sleep(50); await title(3, 1);
+      o.italian = $("cardAssist").textContent.includes(S.STR.continue_btn.it) && !$("cardAssist").hidden;
+      S.setLang("en"); S.qaResetProgress(); $("wrap").hidden = true;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("esc_opens_menu_on_every_card", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })), o = {};

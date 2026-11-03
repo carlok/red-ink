@@ -468,6 +468,7 @@ const STR={
   row_punches:{en:'Punches',it:'Pugni'},
   row_assist:{en:'Assist',it:'Aiuto'},
   assist_btn:{en:'Try Easy',it:'Prova Facile'},
+  continue_btn:{en:'Continue: bout',it:'Continua: match'},
   assist_body:{en:'Three losses here. Easy slows his reactions; Settings changes it back.',it:'Tre sconfitte qui. Facile rallenta le sue reazioni; lo cambi nelle Impostazioni.'},
   st_line:{en:'{h} hits taken, {b} blocks, {d} dodges, {c} s in the corner',it:"{h} colpi subiti, {b} parate, {d} schivate, {c} s all'angolo"},
   st_punch:{en:'{l} of {t} landed ({a}%) · {s} s',it:'{l} su {t} a segno ({a}%) · {s} s'},
@@ -2744,11 +2745,17 @@ function introCard(i,lead){
   showCard({stamp:L('bout_stamp')+' '+(i+1)+' / '+BOUTS.length,kick:lead||L('company_kick'),title:c.foe,body:boutPlace(c)+' · '+boutRole(c)+'. '+L(c.introKey),
     rows:dossierRows(c),btn:L('bout_btn'),showcase:true,mood:'dossier',moodArg:i,go:()=>{ maybeAutoFullscreen(); startBout(i); }});
 }
+/* A player with bouts won gets a second action on the title card that goes on from the rule board, where Play still starts a new run at bout 1. The dock mission is skipped by dockMission itself once it has been seen. */
+function continueAction(){
+  const w=progress.wins;
+  if(!(w>0&&w<BOUTS.length)) return null;
+  return {label:L('continue_btn')+' '+(w+1)+' · '+BOUTS[w].foe,go:()=>{ if(w>=2) dockMission(()=>hubCard(w)); else hubCard(w); }};
+}
 function titleCard(){
   G.practice=false;
   $('linkPractice').hidden=!(progress.wins>0);
   showCard({stamp:L('card_title_stamp'),kick:L('company_form'),title:L('card_title_name'),
-    body:L('card_title_body'),rows:titleRows(),avatar:true,links:true,btn:L('card_title_btn'),go:()=>introCard(0)});
+    body:L('card_title_body'),rows:titleRows(),avatar:true,links:true,btn:L('card_title_btn'),go:()=>introCard(0),assist:continueAction()});
 }
 function hubCard(nextIdx){
   G.practice=false;
