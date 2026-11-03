@@ -248,7 +248,7 @@ dl.rows dd a{color:inherit}
         <dl class="rows" id="cRows"></dl>
         <div class="avatar" id="avatarBox">
           <div class="top">
-            <div class="nm"><b>FIGHTER</b> &middot; <span id="avName">Auditor (placeholder)</span></div>
+            <div class="nm"><b id="avLbl">FIGHTER</b> &middot; <span id="avName">Auditor (placeholder)</span></div>
             <div class="acts">
               <label class="btn2" for="glb" tabindex="0" id="glbLbl">Load .glb</label>
               <input id="glb" type="file" accept=".glb,model/gltf-binary" hidden>
@@ -374,7 +374,7 @@ const STR={
   blocktog_pause:{en:'Block toggle',it:'Parata a interruttore'},
   tutor_tog:{en:'WASD moves. {jab} jabs, {heavy} heavy. Tap {block} to guard, again to drop. {dodge} dodges.',it:'WASD muove. {jab} diretto, {heavy} potente. Tocca {block} per parare, ancora per smettere. {dodge} schiva.'},
   tutor_pad_tog:{en:'Left stick moves. X jabs, Y heavy. Press LT to guard, again to drop. A dodges.',it:'Levetta sinistra muove. X diretto, Y potente. Premi LT per parare, ancora per smettere. A schiva.'},
-  tutor_touch_tog:{en:'Stick moves. Tap Jab or Heavy. Tap Block to guard, again to drop. Tap Dodge.',it:'Joystick muove. Tocca Jab o Heavy. Tocca Block per parare, ancora per smettere.'},
+  tutor_touch_tog:{en:'Stick moves. Tap Jab or Heavy. Tap Block to guard, again to drop. Tap Dodge.',it:'Joystick muove. Tocca Diretto o Potente. Tocca Para per parare, ancora per smettere.'},
   auto_badge:{en:'AUTO · press a key to take over',it:'AUTO · premi un tasto per riprendere'},
   voice_auto:{en:'Auto (male)',it:'Auto (maschile)'},
   voice_hear:{en:'Hear',it:'Ascolta'},
@@ -496,8 +496,41 @@ const STR={
   dock_ok_btn:{en:'To the hub',it:'Al hub'},
   tutor:{en:'WASD moves. {jab} jabs, {heavy} heavy. Hold {block} to block. {dodge} dodges. Esc pauses.',it:'WASD muove. {jab} diretto, {heavy} potente. Tieni {block} per parare. {dodge} schiva. Esc pausa.'},
   tutor_pad:{en:'Left stick moves. X jabs, Y heavy. Hold LT to block. A dodges. Start pauses.',it:'Levetta sinistra muove. X diretto, Y potente. Tieni LT per parare. A schiva. Start pausa.'},
-  tutor_touch:{en:'Stick moves. Tap Jab or Heavy. Hold Block. Tap Dodge.',it:'Il joystick muove. Tocca Jab o Heavy. Tieni Block. Tocca Dodge.'},
+  tutor_touch:{en:'Stick moves. Tap Jab or Heavy. Hold Block. Tap Dodge.',it:'Il joystick muove. Tocca Diretto o Potente. Tieni Para. Tocca Schiva.'},
   key_space:{en:'Space',it:'Spazio'},
+  snd_on:{en:'Sound on',it:'Suono acceso'},
+  snd_off:{en:'Sound off',it:'Suono spento'},
+  got_it:{en:'Got it',it:'Capito'},
+  act_jab:{en:'Jab',it:'Diretto'},
+  act_heavy:{en:'Heavy',it:'Potente'},
+  act_block:{en:'Block',it:'Para'},
+  act_dodge:{en:'Dodge',it:'Schiva'},
+  diff_easy:{en:'Easy',it:'Facile'},
+  diff_normal:{en:'Normal',it:'Normale'},
+  diff_hard:{en:'Hard',it:'Difficile'},
+  rumble_lbl:{en:'Rumble',it:'Vibrazione'},
+  hits_lbl:{en:'Hits',it:'Colpi'},
+  autofs_lbl:{en:'Auto fullscreen on phone',it:'Schermo intero automatico su telefono'},
+  fighter_lbl:{en:'FIGHTER',it:'LOTTATORE'},
+  av_placeholder:{en:'Auditor (placeholder)',it:'Auditor (segnaposto)'},
+  glb_load:{en:'Load .glb',it:'Carica .glb'},
+  av_reset:{en:'Use placeholder',it:'Usa il segnaposto'},
+  av_hint:{en:'Export a cartoon avatar as GLB (MetaPerson or Avaturn), then pick it here or drop it anywhere on this page.',it:'Esporta un avatar cartoon in GLB (MetaPerson o Avaturn), poi sceglilo qui o trascinalo ovunque in questa pagina.'},
+  drop_hint:{en:'Drop your .glb to replace the fighter',it:'Trascina qui il tuo .glb per sostituire il lottatore'},
+  fail_msg:{en:'The 3D engine could not be loaded. Check your connection and reload the page.',it:'Il motore 3D non si è caricato. Controlla la connessione e ricarica la pagina.'},
+  aria_hp:{en:'Your health',it:'La tua salute'},
+  aria_st:{en:'Your stamina',it:'La tua resistenza'},
+  aria_ehp:{en:'Opponent health',it:"Salute dell'avversario"},
+  aria_view:{en:'Fight arena, 3D view',it:'Arena di combattimento, vista 3D'},
+  word_blok:{en:'BLOK',it:'PARA!'},
+  kw_move:{en:'move',it:'muovi'},
+  kw_jab:{en:'jab',it:'diretto'},
+  kw_heavy:{en:'heavy',it:'potente'},
+  kw_block:{en:'block',it:'para'},
+  kw_dodge:{en:'dodge',it:'schiva'},
+  kw_menu:{en:'menu',it:'menu'},
+  kw_hold:{en:'hold',it:'tieni'},
+  kw_toggle:{en:'toggle',it:'interruttore'},
   pad_gone:{en:'Controller disconnected. Plug it back in, or use the keyboard.',it:'Controller scollegato. Ricollegalo, oppure usa la tastiera.'},
   gl_none_title:{en:'This game needs WebGL',it:'Questo gioco richiede WebGL'},
   gl_none_body:{en:'Your browser cannot start WebGL. Turn on hardware acceleration in its settings, or try Chrome, Firefox or Edge.',it:"Il browser non riesce ad avviare WebGL. Attiva l'accelerazione hardware nelle impostazioni, oppure prova Chrome, Firefox o Edge."},
@@ -563,6 +596,25 @@ function paintLang(){
   set('spPlayTxt','play_btn'); set('spCredits','credits_btn'); set('spKick','company_form'); set('spTitle','card_title_name');
   set('linkCredits','credits_btn'); set('cardMenu','card_menu'); set('voiceHear','voice_hear'); lab('voiceOn','voice_lbl'); lab('pVoice','voice_lbl'); lab('autoOn','auto_lbl'); lab('blockTog','blocktog_lbl'); lab('pBlockTog','blocktog_pause'); if($('cardAssist')&&!$('cardAssist').hidden&&G.lastCard&&G.lastCard.assist) $('cardAssist').textContent=L('assist_btn'); lab('pAuto','auto_pause'); if($('voiceSel')&&$('voiceSel').options[0]) $('voiceSel').options[0].textContent=L('voice_auto'); set('linkOut','out_btn'); set('menuBtn','menu_btn');
   lab('pMusic','music_lbl'); lab('pAmb','amb_lbl'); lab('lessMotion2','motion_lbl');
+  /* everything else that is written into the page by hand: the document language, the HUD, the settings box, the touch buttons, the aria labels */
+  document.documentElement.lang=lang;
+  const first=(id,k)=>{ const el=$(id)&&$(id).parentNode; if(el&&el.firstChild&&el.firstChild.nodeType===3) el.firstChild.textContent=L(k)+' '; };
+  if($('cardAssist')&&$('cardAssist').hidden) set('cardAssist','assist_btn'); set('noGLTitle','gl_none_title'); set('noGLBody','gl_none_body'); set('noGLBtn','gl_reload');
+  set('tutorGo','got_it'); set('avLbl','fighter_lbl'); set('glbLbl','glb_load'); set('avReset','av_reset'); set('dropHint','drop_hint'); set('fail','fail_msg');
+  if($('avReset')&&$('avReset').hidden) set('avName','av_placeholder');
+  { const h=$('avHint'); if(h&&(h.textContent===STR.av_hint.en||h.textContent===STR.av_hint.it)) h.textContent=L('av_hint'); }
+  first('rumble','rumble_lbl'); first('sfxVol','hits_lbl'); first('musVol','music_lbl'); first('ambVol','amb_lbl');
+  lab('lessMotion','motion_lbl'); lab('autoFs','autofs_lbl');
+  document.querySelectorAll('[data-diff]').forEach(b=>{ b.textContent=L('diff_'+b.dataset.diff); });
+  document.querySelectorAll('.tb[data-act]').forEach(b=>{ b.textContent=L('act_'+b.dataset.act); });
+  document.querySelectorAll('[data-bind]').forEach(b=>{ if(b.firstChild&&b.firstChild.nodeType===3) b.firstChild.textContent=L('act_'+b.dataset.bind)+' '; });
+  { const A={pHp:'aria_hp',pSt:'aria_st',eHp:'aria_ehp'}; Object.keys(A).forEach(id=>{ const el=$(id); if(el&&el.parentNode) el.parentNode.setAttribute('aria-label',L(A[id])); }); }
+  $('view').setAttribute('aria-label',L('aria_view')); if($('voiceSel')) $('voiceSel').setAttribute('aria-label',L('voice_lbl'));
+  if(typeof paintAudio==='function') paintAudio();
+  if(typeof paintBinds==='function') paintBinds();
+  if(padOn) $('keys').innerHTML=padHtml();
+  if(P&&G.bout!==undefined&&$('roundLbl')) $('roundLbl').textContent=roundText(G.bout);
+  if(WORDS.BLOK){ WORDS.BLOK.text=L('word_blok'); drawWords(); }
 }
 function boutPlace(c){ return L(c.placeKey); }
 function boutRole(c){ return L(c.roleKey); }
@@ -999,7 +1051,7 @@ function buildWords(){
     const p=B.MeshBuilder.CreatePlane('word'+w[0],{width:2.24,height:1.4},scene);
     p.billboardMode=B.Mesh.BILLBOARDMODE_ALL; p.isPickable=false; p.setEnabled(false);
     const m=new B.StandardMaterial('wm'+w[0],scene); m.emissiveTexture=tex; m.opacityTexture=tex; m.disableLighting=true; m.backFaceCulling=false; m.fogEnabled=false; m.specularColor=new C3(0,0,0);
-    p.material=m; WORDS[w[0]]={tex,plane:p,color:w[1],text:w[0]==='KO'?'K.O.!':w[0]==='BLOK'?'BLOK':w[0]+'!'};
+    p.material=m; WORDS[w[0]]={tex,plane:p,color:w[1],text:w[0]==='KO'?'K.O.!':w[0]==='BLOK'?L('word_blok'):w[0]+'!'};
   });
 }
 function drawWords(){
@@ -1069,7 +1121,7 @@ function paintAudio(){
   if(a) a.value=String(Math.round(volAmb*100));
   if($('pMusic')) $('pMusic').checked=volMusic>0;
   if($('pAmb')) $('pAmb').checked=volAmb>0;
-  if(b) b.textContent=muted?'Sound off':'Sound on';
+  if(b) b.textContent=L(muted?'snd_off':'snd_on');
 }
 function applyBus(){
   if(sfxGain) sfxGain.gain.value=volSfx;
@@ -1347,7 +1399,7 @@ let blockToggle=false;
 function loadBlockPrefs(){ try{ blockToggle=localStorage.getItem('sublevel-blocktoggle')==='1'; }catch(e){} }
 function saveBlockPrefs(){ try{ localStorage.setItem('sublevel-blocktoggle',blockToggle?'1':'0'); }catch(e){} }
 function paintBlockTog(){ if($('blockTog')) $('blockTog').checked=blockToggle; if($('pBlockTog')) $('pBlockTog').checked=blockToggle; }
-const blockWord=()=>blockToggle?'toggle':'hold';
+const blockWord=()=>L(blockToggle?'kw_toggle':'kw_hold');
 function loadAutoPrefs(){ try{ autoOn=localStorage.getItem('sublevel-auto')==='1'; }catch(e){} try{ if(new URLSearchParams(location.search).get('auto')==='1') autoOn=true; }catch(e){} }
 function saveAutoPrefs(){ try{ localStorage.setItem('sublevel-auto',autoOn?'1':'0'); }catch(e){} }
 function paintAuto(){ if($('autoOn')) $('autoOn').checked=autoOn; if($('pAuto')) $('pAuto').checked=autoOn; }
@@ -2141,16 +2193,19 @@ function loadRumble(){
 }
 function saveRumble(){ try{ localStorage.setItem('sublevel-rumble', String(rumbleAmt)); }catch(e){} }
 function keyLabel(k){ return k==='space'?'Space':k.length===1?k.toUpperCase():k; }
+const keyName2=k=>k==='space'?L('key_space'):keyLabel(k); /* a key as the player reads it in the current language */
+const strikeText=()=>keyName2(binds.jab)+' '+L('kw_jab')+', '+keyName2(binds.heavy)+' '+L('kw_heavy');
+const defendText=()=>keyName2(binds.block)+' '+L('kw_block')+' ('+blockWord()+'), '+keyName2(binds.dodge)+' '+L('kw_dodge');
 function paintBinds(){
   document.querySelectorAll('[data-bind]').forEach(el=>{
-    const kbd=el.querySelector('kbd'); if(kbd) kbd.textContent=keyLabel(binds[el.dataset.bind]);
+    const kbd=el.querySelector('kbd'); if(kbd) kbd.textContent=keyName2(binds[el.dataset.bind]);
     el.classList.toggle('listen', listenAct===el.dataset.bind);
   });
-  keysHtml='<kbd data-k="move">WASD</kbd> move <kbd data-k="jab">'+keyLabel(binds.jab)+'</kbd> jab <kbd data-k="heavy">'+keyLabel(binds.heavy)+'</kbd> heavy <kbd data-k="block">'+keyLabel(binds.block)+'</kbd> block ('+blockWord()+') <kbd data-k="dodge">'+keyLabel(binds.dodge)+'</kbd> dodge <kbd>Esc</kbd> menu';
+  keysHtml='<kbd data-k="move">WASD</kbd> '+L('kw_move')+' <kbd data-k="jab">'+keyName2(binds.jab)+'</kbd> '+L('kw_jab')+' <kbd data-k="heavy">'+keyName2(binds.heavy)+'</kbd> '+L('kw_heavy')+' <kbd data-k="block">'+keyName2(binds.block)+'</kbd> '+L('kw_block')+' ('+blockWord()+') <kbd data-k="dodge">'+keyName2(binds.dodge)+'</kbd> '+L('kw_dodge')+' <kbd>Esc</kbd> '+L('kw_menu');
   if(!padOn) $('keys').innerHTML=keysHtml;
   document.querySelectorAll('#cRows dt').forEach(dt=>{
-    if(dt.textContent==='Strike') dt.nextElementSibling.textContent=keyLabel(binds.jab)+' jab, '+keyLabel(binds.heavy)+' heavy';
-    if(dt.textContent==='Defend') dt.nextElementSibling.textContent=keyLabel(binds.block)+' block ('+blockWord()+'), '+keyLabel(binds.dodge)+' dodge';
+    if(dt.textContent===L('row_strike')) dt.nextElementSibling.textContent=strikeText();
+    if(dt.textContent===L('row_defend')) dt.nextElementSibling.textContent=defendText();
   });
 }
 function actionFor(k){
@@ -2245,7 +2300,7 @@ function playerIntent(){
 }
 /* gamepad (standard mapping): left stick or d-pad move, X jab, Y heavy, A dodge, LT/RT/LB/RB/B block */
 let padIdx=-1, padVec={x:0,y:0}, padBlock=false, padBlockRaw=false, padPrev=[], padOn=false;
-const padHtml=()=>'<kbd>L stick</kbd> move <kbd>X</kbd> jab <kbd>Y</kbd> heavy <kbd>LT</kbd> block ('+blockWord()+') <kbd>A</kbd> dodge';
+const padHtml=()=>'<kbd>L stick</kbd> '+L('kw_move')+' <kbd>X</kbd> '+L('kw_jab')+' <kbd>Y</kbd> '+L('kw_heavy')+' <kbd>LT</kbd> '+L('kw_block')+' ('+blockWord()+') <kbd>A</kbd> '+L('kw_dodge');
 paintBinds();
 document.querySelectorAll('[data-bind]').forEach(el=>{
   el.addEventListener('click',()=>{ listenAct=el.dataset.bind; paintBinds(); });
@@ -2569,7 +2624,7 @@ function boutRows(i){
 }
 function titleRows(){
   if(isTouch) return [[L('row_move'),L('move_touch')],[L('row_strike'),L('strike_touch')],[L('row_defend'),L('defend_touch')]];
-  return [[L('row_move'),L('move_keys')],[L('row_strike'),keyLabel(binds.jab)+' jab, '+keyLabel(binds.heavy)+' heavy'],[L('row_defend'),keyLabel(binds.block)+' block ('+blockWord()+'), '+keyLabel(binds.dodge)+' dodge'],[L('pad_row'),L('pad_hint')]];
+  return [[L('row_move'),L('move_keys')],[L('row_strike'),strikeText()],[L('row_defend'),defendText()],[L('pad_row'),L('pad_hint')]];
 }
 /* The opponent dossier: shown before each bout. The next opponent stands in the place he will fight in, the camera walks all the way round him,
    and the card lists what he is good and bad at. The numbers are the bout's own table (BOUTS), ranked against the six, so a retune shows up. */
@@ -2637,6 +2692,7 @@ function winCard(){
 }
 
 /* ---------- flow ---------- */
+const roundText=i=>L('bout_stamp').toUpperCase()+' '+(i+1)+' / '+BOUTS.length;
 function startBout(i){
   if(G.state==='splash') splashHold=false; /* a bout started by a probe from the splash, which the interface cannot do */
   musicMoodSet('card'); if($('splash')) $('splash').hidden=true; audOut=false; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
@@ -2646,7 +2702,7 @@ function startBout(i){
   resetFighter(E,2.3,-Math.PI/2,cfg.hp);
   const php=(i===0||G.retry)?100:Math.min(100,P.hp+35); G.retry=false;
   resetFighter(P,-2.3,Math.PI/2,100); P.hp=php;
-  $('eName').textContent=cfg.foe; $('roundLbl').textContent='BOUT '+(i+1)+' / '+BOUTS.length;
+  $('eName').textContent=cfg.foe; $('roundLbl').textContent=roundText(i);
   Object.keys(cache).forEach(k=>delete cache[k]);
   G.state='ready'; G.readyT=0; G.winner=null; hudEl.hidden=false; $('touch').hidden=!isTouch; $('pause').hidden=true;
   showTutor();
@@ -2661,8 +2717,8 @@ function fightLine(){
 }
 /* punches thrown and landed (a block or a dodge is not landed) and the length of the bout, for the result cards */
 function punchLine(){
-  const g=G.log||{thrown:0,landed:0,time:0};
-  return L('st_punch').replace('{l}',g.landed).replace('{t}',g.thrown).replace('{a}',g.thrown?Math.round(g.landed/g.thrown*100):0).replace('{s}',Math.round(g.time*10)/10);
+  const g=G.log||{}, t=g.thrown||0, l=g.landed||0;
+  return L('st_punch').replace('{l}',l).replace('{t}',t).replace('{a}',t?Math.round(l/t*100):0).replace('{s}',Math.round((g.time||0)*10)/10);
 }
 /* Three losses in a row on one bout: the lose card offers a retry on Easy (the setting stays changed; Settings undoes it). */
 function afterKO(){
@@ -2769,7 +2825,7 @@ function clearAvatar(){
   P.avatar.anchor.dispose(false,true);
   for(let i=rl.length-1;i>=0;i--){ if(rl[i].isDisposed()) rl.splice(i,1); }
   P.avatar=null; P.vis.setEnabled(true);
-  $('avName').textContent='Auditor (placeholder)'; $('avReset').hidden=true;
+  $('avName').textContent=L('av_placeholder'); $('avReset').hidden=true;
 }
 async function useAvatar(file){
   if(!file) return;
@@ -3695,7 +3751,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,STR,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

@@ -347,6 +347,38 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("italian_has_no_english_leftovers", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, o = {};
+      /* 1. every STR entry has both languages (a few words are the same in both) */
+      const same = new Set(["kw_menu", "menu_btn", "act_jab", "auto_pause", "auto_lbl", "key_space"]);
+      const missing = Object.keys(S.STR).filter((k) => !S.STR[k].it || !S.STR[k].en);
+      o.parity = missing.length === 0 ? true : missing;
+      /* 2. every key the code asks for exists */
+      const src = await (await fetch("index.html")).text();
+      const used = new Set(); for (const m of src.matchAll(/\\bL\\('([a-z0-9_]+)'\\)/g)) used.add(m[1]);
+      for (const m of src.matchAll(/\\b(?:set|lab|first)\\('[A-Za-z0-9]+','([a-z0-9_]+)'\\)/g)) used.add(m[1]);
+      const gone = [...used].filter((k) => !S.STR[k] && !/^(diff_|act_|kw_|tb_)/.test(k));
+      o.keysExist = gone.length === 0 ? true : gone;
+      /* 3. with Italian on, the static page holds none of these English words */
+      S.setLang("it"); S.titleCard(); await sleep(250);
+      const deny = /\\b(Sound on|Sound off|Got it|Jab|Heavy|Block|Dodge|Easy|Normal|Hard|Rumble|Hits|Music|Ambience|Less motion|Auto fullscreen|FIGHTER|placeholder|Load \\.glb|Drop your|Reload|Your health|Opponent health|BOUT)\\b/;
+      const bad = []; document.querySelectorAll("body *").forEach((el) => {
+        if (["SCRIPT", "STYLE", "OPTION"].includes(el.tagName)) return;
+        const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(" ") + " " + (el.getAttribute("aria-label") || "");
+        if (deny.test(own) && !el.closest("[data-lang]")) bad.push((el.id || el.className || el.tagName) + ": " + own.trim().slice(0, 40));
+      });
+      o.noLeftovers = bad.length === 0 ? true : bad;
+      o.docLang = document.documentElement.lang === "it";
+      o.roundLabel = /^MATCH 1 \\/ 6$/.test(document.getElementById("roundLbl").textContent);
+      o.rowsFollowLang = /diretto/.test(document.getElementById("cRows").textContent);
+      S.setLang("en"); await sleep(100);
+      o.backToEnglish = document.documentElement.lang === "en" && document.getElementById("tutorGo").textContent === "Got it" && /jab/.test(document.getElementById("keys").textContent);
+      return o; })()`, true);
+    if (!Object.values(r).every((v) => v === true)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("autoplay_acts_and_yields", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
