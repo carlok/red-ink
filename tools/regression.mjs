@@ -282,6 +282,23 @@ async function runHttpSuite(cdp) {
     return v;
   });
 
+  await test("pad_unplug_pauses_fight", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const unplug = () => window.dispatchEvent(new Event("gamepaddisconnected"));
+      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf();
+      unplug(); await raf();
+      o.paused = G.state === "pause" && !$("pause").hidden && !$("pauseHint").hidden && /Controller disconnected/.test($("pauseHint").textContent);
+      $("resume").click(); await raf();
+      o.resumed = G.state === "fight" && $("pauseHint").hidden;
+      G.state = "card"; unplug(); await raf(); o.ignoredOnCard = G.state === "card";
+      S.setLang("it"); $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); unplug(); await raf(); o.italian = /scollegato/.test($("pauseHint").textContent);
+      $("resume").click(); S.setLang("en");
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("autoplay_acts_and_yields", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};

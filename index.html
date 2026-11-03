@@ -121,6 +121,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .tutor button{font:800 14px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:var(--tape);color:#111;border:0;padding:10px 12px;cursor:pointer}
 .pause{position:absolute;inset:0;display:grid;place-items:center;background:rgba(8,8,9,.55);z-index:5}
 .pauseCard{width:min(360px,calc(100% - 32px));background:var(--paper);color:var(--ink);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:8px 8px 0 var(--tape)}
+.pauseHint{margin:0;font:600 13px/1.35 var(--f-body);background:var(--tape);color:var(--ink);padding:6px 8px}
 .pauseCard h2{margin:0;font:800 36px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
 .pauseCard button,.pauseCard label{font:600 13px/1 var(--f-data);letter-spacing:.06em;text-transform:uppercase}
 .pauseCard button{background:#111;color:var(--tape);border:0;padding:12px 14px;cursor:pointer;text-align:left}
@@ -213,6 +214,7 @@ dl.rows dd a{color:inherit}
   <div class="pause" id="pause" hidden>
     <div class="pauseCard">
       <h2 id="pauseTitle">Paused</h2>
+      <p class="pauseHint" id="pauseHint" role="status" hidden></p>
       <button id="resume" type="button">Resume</button>
       <button id="restart" type="button">Restart bout</button>
       <button id="quitTitle" type="button" class="quiet">Quit to title</button>
@@ -489,6 +491,7 @@ const STR={
   tutor_pad:{en:'Left stick moves. X jabs, Y heavy. Hold LT to block. A dodges. Start pauses.',it:'Levetta sinistra muove. X diretto, Y potente. Tieni LT per parare. A schiva. Start pausa.'},
   tutor_touch:{en:'Stick moves. Tap Jab or Heavy. Hold Block. Tap Dodge.',it:'Il joystick muove. Tocca Jab o Heavy. Tieni Block. Tocca Dodge.'},
   key_space:{en:'Space',it:'Spazio'},
+  pad_gone:{en:'Controller disconnected. Plug it back in, or use the keyboard.',it:'Controller scollegato. Ricollegalo, oppure usa la tastiera.'},
   gl_none_title:{en:'This game needs WebGL',it:'Questo gioco richiede WebGL'},
   gl_none_body:{en:'Your browser cannot start WebGL. Turn on hardware acceleration in its settings, or try Chrome, Firefox or Edge.',it:"Il browser non riesce ad avviare WebGL. Attiva l'accelerazione hardware nelle impostazioni, oppure prova Chrome, Firefox o Edge."},
   gl_lost_title:{en:'Graphics were reset',it:'Grafica reimpostata'},
@@ -2368,7 +2371,15 @@ function resumeFight(){
   if(G.state!=='pause') return;
   G.state=G.pauseFrom||'fight';
   if($('pause')) $('pause').hidden=true;
+  if($('pauseHint')) $('pauseHint').hidden=true;
 }
+/* The pad in use is unplugged in a fight: pause, and say why. */
+window.addEventListener('gamepaddisconnected',e=>{
+  if(e.gamepad&&padIdx>=0&&e.gamepad.index!==padIdx) return;
+  if(G.state!=='fight'&&G.state!=='ready') return;
+  pauseFight();
+  if($('pauseHint')){ $('pauseHint').textContent=L('pad_gone'); $('pauseHint').hidden=false; }
+});
 /* The menu over a card: the pause card without Restart, and Resume reads Back. Esc, Back or the Menu button toggles it. */
 function openMenu(){
   if(G.menuOpen||G.state!=='card'||wrapEl.hidden) return;
