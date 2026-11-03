@@ -77,7 +77,10 @@ function report() {
 
 /* Each result is logged as it lands (stderr, so the JSON on stdout stays whole). A test that times out leaves the page in an unknown state,
    so the run stops there with what it has instead of running 20 more tests against it. */
+const ONLY = process.argv.includes("--only") ? process.argv[process.argv.indexOf("--only") + 1] : "";   /* run the tests whose name contains this, for a quick loop */
+
 async function test(name, fn) {
+  if (ONLY && !name.includes(ONLY)) return;
   const t0 = Date.now();
   let timer;
   const late = new Promise((_, reject) => {
@@ -429,7 +432,7 @@ async function runHttpSuite(cdp) {
       localStorage.removeItem("sublevel-log");
       await bout(true); await bout(false);
       const a = S.logRead();
-      o.two = a.length === 2 && a[0].win === true && a[1].win === false && a[0].bout === 1 && a[0].foe === "Reyes" && a[0].v === 1;
+      o.two = a.length === 2 && a[0].win === true && a[1].win === false && a[0].bout === 1 && a[0].foe === "Reyes" && a[0].v === 2 && a[0].tries === 0;
       o.fields = ["secs", "hits", "blocks", "dodges", "thrown", "landed", "diff", "ctl", "toggle", "practice", "t"].every((k) => k in a[0]) && a[0].ctl === "human" && /^[0-9]{4}-/.test(a[0].t);
       const j = JSON.parse(S.logJson()); o.json = j.app === "sublevel-three" && j.version === 1 && j.entries.length === 2;
       o.button = /\\(2\\)/.test($("logExport").textContent);
@@ -575,6 +578,59 @@ async function runHttpSuite(cdp) {
       const was = $("cTitle").textContent;   /* the title card's Play opens the dossier, which is a card too, so compare the title text */
       document.body.focus(); enter(window); await sleep(300);
       o.bodyStillWorks = $("cTitle").textContent !== was;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("held_esc_and_enter_do_not_repeat", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const key = (k, repeat) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, repeat, bubbles: true, cancelable: true }));
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight");
+      key("Escape", false); o.paused = G.state === "pause";
+      key("Escape", true); o.heldEscStaysPaused = G.state === "pause";   /* one repeat, not two: two would toggle back and pass either way */
+      key("Escape", false); o.escResumes = G.state === "fight";
+      $("wrap").hidden = true; S.qaResetProgress(); S.titleCard(); await sleep(150);
+      const was = $("cTitle").textContent;
+      key("Enter", true); await sleep(200);
+      o.heldEnterIgnored = $("cTitle").textContent === was;
+      key("Enter", false); await sleep(200);
+      o.enterStillWorks = $("cTitle").textContent !== was;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("input_is_cleared_on_pause_and_resume", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const key = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight");
+      key("j"); o.buffered = S.buf.jab > 0;
+      S.pauseFight(); o.clearedOnPause = S.buf.jab === 0 && G.state === "pause";
+      key("j"); key("k"); o.bufferedWhilePaused = S.buf.jab > 0 && S.buf.heavy > 0;
+      S.resumeFight(); o.clearedOnResume = S.buf.jab === 0 && S.buf.heavy === 0;
+      await raf(); await raf();
+      o.noPunchOnResume = S.P.state !== "attack";
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("dodge_stat_counts_evasions_not_presses", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight");
+      S.P.hp = 100; G.log.hits = G.log.dodges = G.log.dodgeTries = 0;
+      S.P.inv = 0.2; S.strike(S.E, S.P, S.ATK.jab);
+      o.evadedCounts = G.log.dodges === 1 && G.log.hits === 0 && S.P.hp === 100;
+      S.P.inv = 0; S.P.state = "idle"; S.strike(S.E, S.P, S.ATK.jab);
+      o.hitCountsAsHit = G.log.dodges === 1 && G.log.hits === 1;
+      S.P.state = "idle"; S.P.cd = 0; S.P.stam = 100; G.log.dodges = 0;
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true, cancelable: true }));
+      await raf(); await raf(); await raf(); await raf();
+      o.pressCountsAsTry = G.log.dodgeTries === 1 && G.log.dodges === 0;
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
