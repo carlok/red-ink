@@ -320,6 +320,33 @@ async function runHttpSuite(cdp) {
     return rows;
   });
 
+  await test("block_toggle_option", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const key = (k, d) => window.dispatchEvent(new KeyboardEvent(d ? "keydown" : "keyup", { key: k, bubbles: true }));
+      const tap = async (k) => { key(k, true); key(k, false); await raf(); };
+      const frames = async (n) => { for (let i = 0; i < n; i++) await raf(); };
+      o.offByDefault = !$("blockTog").checked && !!$("pBlockTog");
+      $("wrap").hidden = true; S.seed(5); S.startBout(0); while (G.state !== "fight") await raf();
+      const E = S.E; E.ai.cd = 99; E.cfg.cd = 99; E.speed0 = 0; E.cfg.heavy = 0; E.cfg.dodge = 0; E.cfg.block = 0; S.P.pos.set(-1.2, 0, 0); E.pos.set(1.2, 0, 0); S.P.hp = S.P.maxHp = 1e6; S.P.stam = 100;
+      await tap("l"); await frames(20); o.holdModeTapDoesNothing = S.P.state !== "block";
+      $("blockTog").checked = true; $("blockTog").dispatchEvent(new Event("change"));
+      o.saved = localStorage.getItem("sublevel-blocktoggle") === "1" && $("pBlockTog").checked && /toggle/.test(document.getElementById("keys").textContent);
+      await tap("l"); await frames(30); o.tapHoldsGuard = S.P.state === "block";
+      await tap("l"); await frames(8); o.secondTapDrops = S.P.state !== "block";
+      await tap("l"); await frames(10); const guarded = S.P.state === "block"; await tap("j"); await frames(4);
+      o.jabEndsGuard = guarded && (S.P.state === "attack" || S.P.started === "jab") && !G.blockLatch;
+      await frames(60);
+      await tap("l"); await frames(10); S.startBout(0); o.newBoutClears = !G.blockLatch; while (G.state !== "fight") await raf();
+      o.tutor = /Tap L to guard/.test(S.tutorLine("keys")) && /again to drop/.test(S.tutorLine("pad")) && /Tap Block/.test(S.tutorLine("touch")) && ["keys", "pad", "touch"].every((m) => S.tutorLine(m).split(/\\s+/).length <= 16);
+      $("pBlockTog").checked = false; $("pBlockTog").dispatchEvent(new Event("change"));
+      o.pauseSwitchOff = !$("blockTog").checked && localStorage.getItem("sublevel-blocktoggle") === "0" && /hold/.test(document.getElementById("keys").textContent);
+      key("l", true); await frames(10); o.holdStillWorks = S.P.state === "block"; key("l", false); await frames(6);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("autoplay_acts_and_yields", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
@@ -344,6 +371,16 @@ async function runHttpSuite(cdp) {
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
+  });
+
+  await test("block_toggle_saved_across_reload", async () => {
+    await cdp.eval(`localStorage.setItem('sublevel-blocktoggle','1')`);
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await bootSublevel(cdp);
+    const v = await cdp.eval(`({ box: document.getElementById("blockTog").checked, strip: /toggle/.test(document.getElementById("keys").textContent) })`);
+    await cdp.eval(`localStorage.setItem('sublevel-blocktoggle','0')`);
+    if (!v.box || !v.strip) throw new Error(JSON.stringify(v));
+    return v;
   });
 
   await test("autoplay_saved_across_reload", async () => {
