@@ -210,6 +210,42 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("autoplay_acts_and_yields", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const key = (k, d) => window.dispatchEvent(new KeyboardEvent(d ? "keydown" : "keyup", { key: k, bubbles: true }));
+      const act = () => { const P = S.P; return P.state === "attack" || P.state === "dodge" || P.state === "block" || P.started; };
+      o.offByDefault = !S.autoState().on && !$("autoOn").checked;
+      $("autoOn").checked = true; $("autoOn").dispatchEvent(new Event("change"));
+      o.saved = localStorage.getItem("sublevel-auto") === "1" && $("pAuto").checked;
+      document.getElementById("wrap").hidden = true; S.seed(5); S.startBout(0);
+      while (G.state !== "fight") await raf();
+      let moved = false, acted = false; const p0 = S.P.pos.clone();
+      for (let i = 0; i < 180; i++) { await raf(); if (S.P.pos.subtract(p0).length() > 0.3) moved = true; if (act()) acted = true; }
+      o.movesWithoutInput = moved && !S.autoState().taken && !$("autoTag").hidden;
+      S.P.hp = S.P.maxHp = 1e6; S.E.hp = S.E.maxHp = 1e6;
+      key("j", true); key("j", false); await raf(); await raf();
+      o.keyTakesOver = S.autoState().taken && $("autoTag").hidden;
+      S.startBout(1); while (G.state !== "fight") await raf();
+      o.nextBoutResumes = !S.autoState().taken && !$("autoTag").hidden;
+      key("Escape", true); key("Escape", false); await raf(); key("Escape", true); key("Escape", false); await raf();
+      $("pAuto").checked = false; $("pAuto").dispatchEvent(new Event("change"));
+      o.pauseSwitchOff = !S.autoState().on && localStorage.getItem("sublevel-auto") === "0" && !$("autoOn").checked;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("autoplay_saved_across_reload", async () => {
+    await cdp.eval(`localStorage.setItem('sublevel-auto','1')`);
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await bootSublevel(cdp);
+    const v = await cdp.eval(`({ on: window.__sublevel.autoState().on, box: document.getElementById("autoOn").checked })`);
+    await cdp.eval(`localStorage.setItem('sublevel-auto','0')`);
+    if (!v.on || !v.box) throw new Error(JSON.stringify(v));
+    return v;
+  });
+
   await test("win_and_lose_themes_differ", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), g = S.audioGraph(), o = {};
