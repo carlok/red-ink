@@ -537,6 +537,25 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("win_card_warns_when_progress_cannot_be_saved", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const win = async () => { $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); return $("cRows").textContent; };
+      S.qaResetProgress();
+      const prior = Storage.prototype.setItem;
+      Storage.prototype.setItem = function () { throw new DOMException("quota"); };
+      try { o.blocked = await win(); } finally { Storage.prototype.setItem = prior; }
+      o.warned = o.blocked.includes(S.STR.save_failed.en) && o.blocked.includes(S.STR.row_save.en);
+      o.winStillShown = o.blocked.includes(S.STR.row_you.en);
+      o.normal = await win();
+      o.quietWhenSaved = !o.normal.includes(S.STR.save_failed.en);
+      o.italian = S.STR.save_failed.it.length > 20 && S.STR.row_save.it !== S.STR.row_save.en;
+      S.qaResetProgress();
+      return o; })()`, true);
+    if (!r.warned || !r.winStillShown || !r.quietWhenSaved || !r.italian) throw new Error(JSON.stringify(r));
+    return { warned: r.warned, quietWhenSaved: r.quietWhenSaved };
+  });
+
   await test("esc_opens_menu_on_every_card", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })), o = {};

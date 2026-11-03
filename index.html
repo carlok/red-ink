@@ -397,6 +397,8 @@ const STR={
   banner_ko:{en:'K.O.',it:'K.O.'},
   banner_down:{en:'DOWN',it:'A TERRA'},
   row_perfect:{en:'Perfect',it:'Perfetto'},
+  row_save:{en:'Saving',it:'Salvataggio'},
+  save_failed:{en:'Not saved: this browser blocks storage, so the win is lost when you close the page.',it:'Non salvato: il browser blocca la memoria, quindi la vittoria si perde alla chiusura della pagina.'},
   perfect_v:{en:'You took no hits.',it:'Non hai preso colpi.'},
   card_menu:{en:'Menu · Esc',it:'Menu · Esc'},
   dos_health:{en:'Health',it:'Salute'},
@@ -2766,11 +2768,12 @@ function showFinalCard(){
 }
 function winCard(){
   const i=G.bout, next=i+1, uLabel=unlockLabel(i);
-  grantWin(i);
+  const saved=grantWin(i);
   const rows=[[L('row_you'),fightLine()],[L('row_punches'),punchLine()]], perfect=!!(G.log&&G.log.hits===0);
   if(perfect) rows.unshift([L('row_perfect'),L('perfect_v')]);
   if(uLabel) rows.unshift([L('row_unlock'),uLabel]);
   if(next<BOUTS.length) rows.unshift([L('row_next'),boutPlace(BOUTS[next])]);
+  if(!saved) rows.unshift([L('row_save'),L('save_failed')]);   /* localStorage threw (private mode, full storage): say so rather than lose the win in silence */
   const goNext=()=>{
     if(i===1) dockMission(()=>hubCard(next));
     else if(next<BOUTS.length) hubCard(next);
