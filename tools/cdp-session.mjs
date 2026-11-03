@@ -60,8 +60,19 @@ export class CDP {
     this.ws = ws;
     this.id = 0;
     this.pending = new Map();
+    /** Page errors seen since the caller last emptied this list: uncaught exceptions, console.error, and the browser's own error log (a 404 on an asset lands here). */
+    this.errors = [];
     ws.addEventListener("message", (ev) => {
       const msg = JSON.parse(ev.data);
+      const p = msg.params;
+      if (msg.method === "Runtime.exceptionThrown") {
+        const d = p.exceptionDetails;
+        this.errors.push(`exception: ${(d.exception?.description || d.text || "").split("\n")[0]}`);
+      } else if (msg.method === "Runtime.consoleAPICalled" && (p.type === "error" || p.type === "assert")) {
+        this.errors.push(`console.${p.type}: ${p.args.map((a) => a.value ?? a.description ?? "").join(" ").slice(0, 200)}`);
+      } else if (msg.method === "Log.entryAdded" && p.entry.level === "error") {
+        this.errors.push(`log: ${p.entry.text}${p.entry.url ? ` (${p.entry.url})` : ""}`.slice(0, 240));
+      }
       if (msg.id && this.pending.has(msg.id)) {
         const { resolve, reject } = this.pending.get(msg.id);
         this.pending.delete(msg.id);
@@ -145,6 +156,7 @@ export async function withPage(fn, opts = {}) {
     const cdp = new CDP(ws);
     await cdp.send("Page.enable");
     await cdp.send("Runtime.enable");
+    await cdp.send("Log.enable");
     await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: PAGE_HELPERS });
     await cdp.send("Page.navigate", { url });
     await fn(cdp);

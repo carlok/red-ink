@@ -51,6 +51,19 @@ function minimalGlb() {
 const GLB_B64 = minimalGlb();
 const results = [];
 
+/* Page errors (uncaught exceptions, console.error, the browser's error log such as a 404) fail the test they happened in. A test that
+   provokes an error on purpose lists it here, with the reason; anything else is a bug or a missing asset. */
+const EXPECTED_ERRORS = {
+  /* the game throws on purpose when the page has no WebGL, after it has shown its message */
+  webgl_missing_shows_message: [/needs WebGL/],
+};
+let activeCdp = null;
+function takeErrors(name) {
+  const all = activeCdp ? activeCdp.errors.splice(0) : [];
+  const ok = EXPECTED_ERRORS[name] || [];
+  return all.filter((m) => !ok.some((re) => re.test(m)));
+}
+
 const RESULT_FILE = join(ROOT, "regression-result.json");
 const TEST_MS = 120000;
 
@@ -72,9 +85,12 @@ async function test(name, fn) {
   });
   try {
     const detail = await Promise.race([fn(), late]);
+    const bad = takeErrors(name);
+    if (bad.length) throw new Error(`page errors: ${bad.join(" | ")}`);
     results.push({ name, pass: true, ms: Date.now() - t0, detail });
     console.error(`  ok    ${name} (${Date.now() - t0} ms)`);
   } catch (e) {
+    activeCdp?.errors.splice(0);
     results.push({ name, pass: false, ms: Date.now() - t0, error: e.message });
     console.error(`  FAIL  ${name} (${Date.now() - t0} ms): ${e.message.slice(0, 200)}`);
     if (e.timeout) {
@@ -87,6 +103,7 @@ async function test(name, fn) {
 }
 
 async function runHttpSuite(cdp) {
+  activeCdp = cdp;
   await bootSublevel(cdp);
 
   await test("title_card", async () => {
@@ -969,6 +986,7 @@ async function runHttpSuite(cdp) {
 }
 
 async function runFileSuite(cdp) {
+  activeCdp = cdp;
   await bootSublevel(cdp);
   await test("offline_file_boot", async () => {
     const v = await cdp.eval(`({
