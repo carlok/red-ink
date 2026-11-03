@@ -1493,17 +1493,25 @@ function voiceClipsInit(){
   const pack=window.SUBLEVEL_VOICE||{};
   Object.keys(pack).forEach(w=>{ if(voiceClips[w]||!pack[w]) return; const a=new Audio(pack[w]); a.preload='auto'; a.addEventListener('error',()=>{ a.bad=true; }); voiceClips[w]=a; });
 }
+/* The clip and the browser voice do not go through the audio graph, so suspending or muting it does not stop them. voiceCancel drops a line that is
+   waiting on its delay, one being spoken and one being played: pause, mute, a hidden tab and Quit call it. */
+let voiceTimer=0;
+function voiceCancel(){
+  clearTimeout(voiceTimer); voiceTimer=0;
+  try{ const ss=window.speechSynthesis; if(ss&&ss.cancel) ss.cancel(); }catch(e){}
+  Object.keys(voiceClips).forEach(w=>{ const a=voiceClips[w]; try{ if(a&&!a.paused){ a.pause(); a.currentTime=0; } }catch(e){} });
+}
 function voiceClip(word,delay){
   const a=voiceClips[word]; if(!a||a.bad||a.readyState<3) return false;
   const go=()=>{ try{ a.volume=clamp(volSfx,0,1); a.currentTime=0; const p=a.play(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} };
-  if(delay) setTimeout(go,delay*1000); else go(); return true;
+  if(delay){ clearTimeout(voiceTimer); voiceTimer=setTimeout(go,delay*1000); } else go(); return true;
 }
 function voiceSpeak(word,delay){
   const ss=window.speechSynthesis; if(!ss||!window.SpeechSynthesisUtterance||!VOICE_TEXT[lang]) return false;
   const v=voicePick(ss.getVoices?ss.getVoices():[],lang,voiceName); if(!v) return false;
   const u=new SpeechSynthesisUtterance(VOICE_TEXT[lang][word]); u.voice=v; u.lang=v.lang; u.pitch=.7; u.rate=.95; u.volume=clamp(volSfx,0,1);
   const go=()=>{ try{ ss.cancel(); ss.speak(u); }catch(e){} };
-  if(delay) setTimeout(go,delay*1000); else go(); return true;
+  if(delay){ clearTimeout(voiceTimer); voiceTimer=setTimeout(go,delay*1000); } else go(); return true;
 }
 function voiceSay(word,delay){
   if(splashHold||audOut||muted||!voiceOn||document.hidden||!ac||ac.state!=='running') return;
@@ -1702,7 +1710,7 @@ function setAudio(o){
   if(!o) return;
   if(o.sfx!=null) volSfx=clamp(Number(o.sfx),0,1);
   if(o.music!=null) volMusic=clamp(Number(o.music),0,1);
-  if(o.mute!=null) muted=!!o.mute;
+  if(o.mute!=null){ muted=!!o.mute; if(muted) voiceCancel(); }
   saveAudioPrefs(); applyBus(); paintAudio();
 }
 const SFX={
@@ -2380,7 +2388,7 @@ const dropKeys=()=>{ keys.clear(); clearInput(); document.querySelectorAll('#key
 window.addEventListener('blur',()=>{ dropKeys(); if(G.state==='fight'||G.state==='ready') pauseFight(); });
 let audWasRunning=false;
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden){ dropKeys(); if(G.state==='fight'||G.state==='ready') pauseFight(); }
+  if(document.hidden){ dropKeys(); voiceCancel(); if(G.state==='fight'||G.state==='ready') pauseFight(); }
   /* a background tab is silent: the context stops while the page is hidden and starts again, if it was running, when it comes back */
   if(ac){ if(document.hidden){ audWasRunning=ac.state==='running'; ac.suspend(); } else if(audWasRunning){ audWasRunning=false; ac.resume(); } }
 });
@@ -2537,7 +2545,7 @@ function pauseFight(){
   if(G.state!=='fight'&&G.state!=='ready') return;
   G.pauseFrom=G.state;
   G.state='pause';
-  clearInput();
+  clearInput(); voiceCancel();
   if($('pause')) $('pause').hidden=false;
 }
 function resumeFight(){
@@ -2575,7 +2583,7 @@ function restartBout(){
 function toSplash(withNote){
   try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen(); else if(document.webkitFullscreenElement&&document.webkitExitFullscreen) document.webkitExitFullscreen(); }catch(e){}
   if($('pause')) $('pause').hidden=true; G.menuOpen=false; $('pause').dataset.mode='fight'; $('resume').textContent=L('resume_btn'); $('pauseTitle').textContent=L('pause_title'); wrapEl.hidden=true; hudEl.hidden=true; $('touch').hidden=true;
-  G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
+  G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0; voiceCancel();
   G.state='splash'; splashHold=true; audOut=true; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
   if(ac&&ac.state!=='closed'){ try{ ac.suspend(); }catch(e){} }
   $('spNote').textContent=withNote?L('out_saved_v').replace('{n}',progress.wins).replace('{m}',BOUTS.length):'';
@@ -3423,7 +3431,7 @@ async function skinOn(on,model){
 /* ---------- boot ---------- */
 wrapEl.addEventListener('pointerdown',()=>{ audCardT=0; });
 if(isTouch&&$('menuBtn')) $('menuBtn').hidden=false;
-$('snd').addEventListener('click',()=>{ muted=!muted; saveAudioPrefs(); paintAudio(); audioInit('click'); if(!muted) SFX.ui(); });
+$('snd').addEventListener('click',()=>{ muted=!muted; if(muted) voiceCancel(); saveAudioPrefs(); paintAudio(); audioInit('click'); if(!muted) SFX.ui(); });
 buildWorld(); buildCrowd(); buildParticles(); buildWords(); applyEnv(0);
 P=makeFighter(LOOKS.auditor,true); P.cfg={foe:'Auditor'}; P.speed0=4.4; P.reach=1; P.dmgMul=1; resetFighter(P,-2.3,Math.PI/2,100);
 E=makeFighter(LOOKS.reyes,false); E.cfg=BOUTS[0]; E.speed0=2.7; E.reach=1; E.dmgMul=.8; resetFighter(E,2.3,-Math.PI/2,70);

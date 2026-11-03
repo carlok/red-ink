@@ -256,6 +256,27 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("queued_voice_is_cancelled_by_pause_mute_hide_and_quit", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, g = S.audioGraph(), $ = (i) => document.getElementById(i), o = {};
+      S.setAudio({ mute: false }); if (g.ac.state !== "running") { await g.ac.resume(); for (let i = 0; i < 20 && g.ac.state !== "running"; i++) await sleep(50); }
+      const fake = { voices: [{ name: "Daniel", lang: "en-GB", localService: true }], spoken: [], cancelled: 0, getVoices() { return this.voices; }, cancel() { this.cancelled++; }, speak(u) { this.spoken.push(u.text); } };
+      Object.defineProperty(window, "speechSynthesis", { value: fake, configurable: true }); const U = window.SpeechSynthesisUtterance; window.SpeechSynthesisUtterance = function (t) { this.text = t; };
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); await sleep(300);
+      fake.spoken.length = 0; S.voiceSay("fight", 0.4); S.pauseFight(); await sleep(700);
+      o.pauseDropsQueuedLine = fake.spoken.length === 0; S.resumeFight();
+      let c = fake.cancelled; S.pauseFight(); o.pauseCancels = fake.cancelled > c; S.resumeFight();
+      c = fake.cancelled; $("snd").click(); o.muteClickCancels = fake.cancelled > c; S.setAudio({ mute: false });
+      c = fake.cancelled; S.setAudio({ mute: true }); o.muteSettingCancels = fake.cancelled > c; S.setAudio({ mute: false });
+      c = fake.cancelled; Object.defineProperty(document, "hidden", { value: true, configurable: true }); document.dispatchEvent(new Event("visibilitychange"));
+      o.hideCancels = fake.cancelled > c; delete document.hidden; document.dispatchEvent(new Event("visibilitychange")); if (G.state === "pause") S.resumeFight();
+      c = fake.cancelled; S.toSplash(true); o.quitCancels = fake.cancelled > c; S.play();
+      delete window.speechSynthesis; window.SpeechSynthesisUtterance = U;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("tutor_line_follows_binds_and_input", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, o = {};
