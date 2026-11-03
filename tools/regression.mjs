@@ -210,6 +210,233 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("tutor_line_follows_binds_and_input", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, o = {};
+      const kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+      const rebind = async (act, key) => { document.querySelector('[data-bind="' + act + '"]').click(); kd(key); await sleep(30); };
+      o.defaults = S.tutorLine("keys") === "WASD moves. J jabs, K heavy. Hold L to block. Space dodges. Esc pauses.";
+      await rebind("jab", "u"); await rebind("dodge", "v");
+      o.rebound = /^WASD moves\\. U jabs, K heavy\\. Hold L to block\\. V dodges/.test(S.tutorLine("keys"));
+      await rebind("jab", "j"); await rebind("dodge", " ");
+      o.restored = S.tutorLine("keys") === "WASD moves. J jabs, K heavy. Hold L to block. Space dodges. Esc pauses.";
+      o.pad = /Left stick/.test(S.tutorLine("pad")) && /LT/.test(S.tutorLine("pad"));
+      o.touch = /Tap Jab/.test(S.tutorLine("touch")) && !/ J /.test(S.tutorLine("touch"));
+      S.setLang("it"); o.italian = S.tutorLine("keys") === "WASD muove. J diretto, K potente. Tieni L per parare. Spazio schiva. Esc pausa."; S.setLang("en");
+      o.words = ["keys", "pad", "touch"].every((m) => S.tutorLine(m).split(/\\s+/).length <= 15);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("easy_offered_after_three_losses", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const lose = async (bout) => { $("wrap").hidden = true; S.startBout(bout); while (G.state !== "fight") await raf(); S.qaEndBout(false); await sleep(120); };
+      document.querySelector('[data-diff="normal"]').click(); G.loss = null;
+      await lose(0); await lose(0); o.noneAtTwo = $("cardAssist").hidden;
+      await lose(1); o.resetOnOtherBout = $("cardAssist").hidden;
+      await lose(0); await lose(0); await lose(0);
+      o.offeredAtThree = !$("cardAssist").hidden && /Easy/.test($("cardAssist").textContent) && /Assist/.test($("cRows").textContent);
+      $("cardAssist").click(); await sleep(50);
+      o.switched = S.diffNow() === "easy" && localStorage.getItem("sublevel-diff") === "easy" && (G.state === "ready" || G.state === "fight") && G.bout === 0;
+      G.state = "pause"; await lose(0); await lose(0); await lose(0); o.noneWhenEasy = $("cardAssist").hidden;
+      document.querySelector('[data-diff="normal"]').click();
+      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); await sleep(120); o.winClears = G.loss.n === 0 && $("cardAssist").hidden;
+      S.setLang("it"); await lose(0); await lose(0); await lose(0); o.italian = /Prova Facile/.test($("cardAssist").textContent); S.setLang("en");
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("webgl_context_lost_shows_message", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const gl = window.BABYLON.Engine.LastCreatedEngine._gl, ext = gl.getExtension("WEBGL_lose_context");
+      if (!ext) return { skipped: true, noExtension: true };
+      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf();
+      ext.loseContext(); await sleep(300);
+      o.shown = !$("noGL").hidden && /reset/i.test($("noGLTitle").textContent) && /reload/i.test($("noGLBtn").textContent);
+      o.paused = G.state === "pause";
+      ext.restoreContext(); await sleep(500);
+      o.hidden = $("noGL").hidden;
+      return o; })()`, true);
+    if (r.skipped) return r;
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("webgl_missing_shows_message", async () => {
+    const stub = await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => { const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (t, ...a) { return /webgl/.test(t) ? null : g.call(this, t, ...a); }; })()` });
+    await cdp.send("Page.reload", { ignoreCache: true });
+    let v;
+    for (let i = 0; i < 40; i++) {
+      await new Promise((r) => setTimeout(r, 150));
+      v = await cdp.eval(`(() => { const e = document.getElementById("noGL"); return { shown: !!e && !e.hidden, title: e && e.querySelector("h2").textContent, button: e && e.querySelector("button").textContent, boot: !!window.__sublevel }; })()`);
+      if (v.shown) break;
+    }
+    await cdp.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: stub.identifier });
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await bootSublevel(cdp);
+    if (!v.shown || !/WebGL/.test(v.title) || v.boot) throw new Error(JSON.stringify(v));
+    return v;
+  });
+
+  await test("pad_unplug_pauses_fight", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const unplug = () => window.dispatchEvent(new Event("gamepaddisconnected"));
+      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf();
+      unplug(); await raf();
+      o.paused = G.state === "pause" && !$("pause").hidden && !$("pauseHint").hidden && /Controller disconnected/.test($("pauseHint").textContent);
+      $("resume").click(); await raf();
+      o.resumed = G.state === "fight" && $("pauseHint").hidden;
+      G.state = "card"; unplug(); await raf(); o.ignoredOnCard = G.state === "card";
+      S.setLang("it"); $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); unplug(); await raf(); o.italian = /scollegato/.test($("pauseHint").textContent);
+      $("resume").click(); S.setLang("en");
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("draw_budget_per_place", async () => {
+    /* Same method as tools/env-probe.mjs. Headless Chrome on one Mac measured 39 to 46 draws for the same scene across runs (S23 and S24 trees alike);
+       the budget is that top value plus a little, so it catches a real jump (a new mesh per fighter or per crowd member) and not that wobble. */
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, B = window.BABYLON, engine = B.Engine.LastCreatedEngine, scene = B.Engine.LastCreatedScene, out = [];
+      for (const b of [0, 5]) {
+        document.getElementById("wrap").hidden = true; document.getElementById("tutor").hidden = true; S.seed(5); S.startBout(b);
+        while (G.state !== "fight") await raf();
+        for (let i = 0; i < 160; i++) await raf();
+        S.E.ai.cd = 99; S.E.cfg.cd = 99; S.E.speed0 = 0; S.P.pos.set(-0.7, 0, 0); S.E.pos.set(0.7, 0, 0);
+        for (let i = 0; i < 90; i++) await raf();
+        const draws = []; let prev = engine._drawCalls.current; for (let i = 0; i < 40; i++) { await raf(); const n = engine._drawCalls.current; draws.push(n - prev); prev = n; }
+        out.push({ bout: b + 1, draws: draws.sort((x, y) => x - y)[20], active: scene.getActiveMeshes().length });
+      }
+      return JSON.stringify(out); })()`, true);
+    const rows = JSON.parse(r);
+    const bad = rows.filter((x) => x.draws > 48 || x.active > 52 || x.draws < 20);
+    if (bad.length) throw new Error(JSON.stringify(rows));
+    return rows;
+  });
+
+  await test("block_toggle_option", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const key = (k, d) => window.dispatchEvent(new KeyboardEvent(d ? "keydown" : "keyup", { key: k, bubbles: true }));
+      const tap = async (k) => { key(k, true); key(k, false); await raf(); };
+      const frames = async (n) => { for (let i = 0; i < n; i++) await raf(); };
+      o.offByDefault = !$("blockTog").checked && !!$("pBlockTog");
+      $("wrap").hidden = true; S.seed(5); S.startBout(0); while (G.state !== "fight") await raf();
+      const E = S.E; E.ai.cd = 99; E.cfg.cd = 99; E.speed0 = 0; E.cfg.heavy = 0; E.cfg.dodge = 0; E.cfg.block = 0; S.P.pos.set(-1.2, 0, 0); E.pos.set(1.2, 0, 0); S.P.hp = S.P.maxHp = 1e6; S.P.stam = 100;
+      await tap("l"); await frames(20); o.holdModeTapDoesNothing = S.P.state !== "block";
+      $("blockTog").checked = true; $("blockTog").dispatchEvent(new Event("change"));
+      o.saved = localStorage.getItem("sublevel-blocktoggle") === "1" && $("pBlockTog").checked && /toggle/.test(document.getElementById("keys").textContent);
+      await tap("l"); await frames(30); o.tapHoldsGuard = S.P.state === "block";
+      await tap("l"); await frames(8); o.secondTapDrops = S.P.state !== "block";
+      await tap("l"); await frames(10); const guarded = S.P.state === "block"; await tap("j"); await frames(4);
+      o.jabEndsGuard = guarded && (S.P.state === "attack" || S.P.started === "jab") && !G.blockLatch;
+      await frames(60);
+      await tap("l"); await frames(10); S.startBout(0); o.newBoutClears = !G.blockLatch; while (G.state !== "fight") await raf();
+      o.tutor = /Tap L to guard/.test(S.tutorLine("keys")) && /again to drop/.test(S.tutorLine("pad")) && /Tap Block/.test(S.tutorLine("touch")) && ["keys", "pad", "touch"].every((m) => S.tutorLine(m).split(/\\s+/).length <= 16);
+      $("pBlockTog").checked = false; $("pBlockTog").dispatchEvent(new Event("change"));
+      o.pauseSwitchOff = !$("blockTog").checked && localStorage.getItem("sublevel-blocktoggle") === "0" && /hold/.test(document.getElementById("keys").textContent);
+      key("l", true); await frames(10); o.holdStillWorks = S.P.state === "block"; key("l", false); await frames(6);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("italian_has_no_english_leftovers", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, o = {};
+      /* 1. every STR entry has both languages (a few words are the same in both) */
+      const same = new Set(["kw_menu", "menu_btn", "act_jab", "auto_pause", "auto_lbl", "key_space"]);
+      const missing = Object.keys(S.STR).filter((k) => !S.STR[k].it || !S.STR[k].en);
+      o.parity = missing.length === 0 ? true : missing;
+      /* 2. every key the code asks for exists */
+      const src = await (await fetch("index.html")).text();
+      const used = new Set(); for (const m of src.matchAll(/\\bL\\('([a-z0-9_]+)'\\)/g)) used.add(m[1]);
+      for (const m of src.matchAll(/\\b(?:set|lab|first)\\('[A-Za-z0-9]+','([a-z0-9_]+)'\\)/g)) used.add(m[1]);
+      const gone = [...used].filter((k) => !S.STR[k] && !/^(diff_|act_|kw_|tb_)/.test(k));
+      o.keysExist = gone.length === 0 ? true : gone;
+      /* 3. with Italian on, the static page holds none of these English words */
+      S.setLang("it"); S.titleCard(); await sleep(250);
+      const deny = /\\b(Sound on|Sound off|Got it|Jab|Heavy|Block|Dodge|Easy|Normal|Hard|Rumble|Hits|Music|Ambience|Less motion|Auto fullscreen|FIGHTER|placeholder|Load \\.glb|Drop your|Reload|Your health|Opponent health|BOUT)\\b/;
+      const bad = []; document.querySelectorAll("body *").forEach((el) => {
+        if (["SCRIPT", "STYLE", "OPTION"].includes(el.tagName)) return;
+        const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(" ") + " " + (el.getAttribute("aria-label") || "");
+        if (deny.test(own) && !el.closest("[data-lang]")) bad.push((el.id || el.className || el.tagName) + ": " + own.trim().slice(0, 40));
+      });
+      o.noLeftovers = bad.length === 0 ? true : bad;
+      o.docLang = document.documentElement.lang === "it";
+      o.roundLabel = /^MATCH 1 \\/ 6$/.test(document.getElementById("roundLbl").textContent);
+      o.rowsFollowLang = /diretto/.test(document.getElementById("cRows").textContent);
+      S.setLang("en"); await sleep(100);
+      o.backToEnglish = document.documentElement.lang === "en" && document.getElementById("tutorGo").textContent === "Got it" && /jab/.test(document.getElementById("keys").textContent);
+      return o; })()`, true);
+    if (!Object.values(r).every((v) => v === true)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("playtest_log_records_and_exports", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const bout = async (win) => { $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(win); await sleep(120); };
+      localStorage.removeItem("sublevel-log");
+      await bout(true); await bout(false);
+      const a = S.logRead();
+      o.two = a.length === 2 && a[0].win === true && a[1].win === false && a[0].bout === 1 && a[0].foe === "Reyes" && a[0].v === 1;
+      o.fields = ["secs", "hits", "blocks", "dodges", "thrown", "landed", "diff", "ctl", "toggle", "practice", "t"].every((k) => k in a[0]) && a[0].ctl === "human" && /^[0-9]{4}-/.test(a[0].t);
+      const j = JSON.parse(S.logJson()); o.json = j.app === "sublevel-three" && j.version === 1 && j.entries.length === 2;
+      o.button = /\\(2\\)/.test($("logExport").textContent);
+      for (let i = 0; i < 210; i++) S.logFight(true);
+      o.capped = S.logRead().length === 200;
+      $("logClear").click(); o.armed = /again/i.test($("logClear").textContent) && S.logRead().length === 200;
+      $("logClear").click(); o.cleared = S.logRead().length === 0;
+      const set = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error("quota"); };
+      let threw = false; try { await bout(true); } catch (e) { threw = true; }
+      Storage.prototype.setItem = set;
+      o.survivesFullStorage = !threw && G.state === "card";
+      S.setLang("it"); await sleep(50); o.italian = /registro/i.test($("logExport").textContent) && /Svuota/.test($("logClear").textContent); S.setLang("en");
+      localStorage.removeItem("sublevel-log");
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("practice_mode_leaves_progress_alone", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const key = (k) => { window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })); window.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true })); };
+      const fight = async (b) => { $("wrap").hidden = true; S.startBout(b); while (G.state !== "fight") await raf(); };
+      const prog = () => localStorage.getItem("sublevel-progress");
+      S.qaResetProgress(); S.titleCard(); await sleep(60); o.hiddenAtStart = $("linkPractice").hidden;
+      await fight(0); S.qaEndBout(true); await sleep(120); S.titleCard(); await sleep(60); o.shownAfterAWin = !$("linkPractice").hidden;
+      const before = prog(); localStorage.removeItem("sublevel-log");
+      $("linkPractice").click(); await sleep(150);
+      o.card = G.state === "card" && $("cTitle").textContent === "Reyes" && /Practice/.test($("cStamp").textContent) && !$("cardBack").hidden && $("cardAssist").hidden;
+      $("go").click(); await sleep(60); while (G.state !== "fight") await raf();
+      o.fighting = G.practice === true && G.bout === 0 && S.P.hp === 100;
+      S.qaEndBout(true); await sleep(150);
+      o.noGrant = prog() === before && /Practice/.test($("cStamp").textContent) && /Progress unchanged/.test($("cBody").textContent) && !$("cardBack").hidden;
+      o.logged = S.logRead().length === 1 && S.logRead()[0].practice === true;
+      $("cardBack").click(); await sleep(150); o.backToChooser = $("cTitle").textContent === "Reyes" && /Practice/.test($("cStamp").textContent);
+      key("Escape"); await sleep(150); o.escToTitle = /Level Three|Livello/.test($("cTitle").textContent) || $("avatarBox").hidden === false; o.flagCleared = G.practice === false;
+      await fight(1); S.qaEndBout(true); await sleep(120); S.titleCard(); await sleep(60);
+      $("linkPractice").click(); await sleep(150);
+      o.twoOpponents = $("cTitle").textContent === "Reyes" && !$("cardAssist").hidden; $("cardAssist").click(); await sleep(150);
+      o.cycles = $("cTitle").textContent === "Dag";
+      $("go").click(); await sleep(60); while (G.state !== "fight") await raf(); S.qaEndBout(false); await sleep(150);
+      o.lossKeepsPractice = G.practice === true && /Retry|Riprova/.test($("cRows").textContent);
+      S.titleCard(); await sleep(60); o.normalAgain = G.practice === false;
+      S.setLang("it"); $("linkPractice").click(); await sleep(150); o.italian = /Allenamento/.test($("cStamp").textContent) && /Indietro/.test($("cardBack").textContent); S.setLang("en"); S.titleCard();
+      S.qaResetProgress(); localStorage.removeItem("sublevel-log");
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("autoplay_acts_and_yields", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
@@ -234,6 +461,16 @@ async function runHttpSuite(cdp) {
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
+  });
+
+  await test("block_toggle_saved_across_reload", async () => {
+    await cdp.eval(`localStorage.setItem('sublevel-blocktoggle','1')`);
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await bootSublevel(cdp);
+    const v = await cdp.eval(`({ box: document.getElementById("blockTog").checked, strip: /toggle/.test(document.getElementById("keys").textContent) })`);
+    await cdp.eval(`localStorage.setItem('sublevel-blocktoggle','0')`);
+    if (!v.box || !v.strip) throw new Error(JSON.stringify(v));
+    return v;
   });
 
   await test("autoplay_saved_across_reload", async () => {

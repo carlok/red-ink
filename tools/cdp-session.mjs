@@ -110,7 +110,7 @@ export async function withPage(fn, opts = {}) {
   let ws;
   try {
     let page = null;
-    for (let i = 0; i < 50 && !page; i++) {
+    for (let i = 0; i < 200 && !page; i++) { /* up to 20 s: a cold CI runner can be slow to open the debugging port */
       try {
         const list = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json();
         page = list.find((t) => t.type === "page" && t.webSocketDebuggerUrl);

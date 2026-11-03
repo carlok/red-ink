@@ -2,6 +2,62 @@
 
 Ideas that were suggested or left out of a sprint and are not built. Nothing here is promised. Pick one, set numbers to measure first (see `CONTINUE.md`), then build it.
 
+## Ranking
+
+Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. Next up is item 11.
+
+### Tier 1: Sprint 25 (all ten built; see `TUNING_LOG.md`)
+
+| # | Item | Size | Score |
+| --- | --- | --- | --- |
+| 1 | CI runs the regression (`.github/workflows/test.yml`) | S | 4.0 |
+| 2 | The tutor line built from the binds and the input in use | S | 4.0 |
+| 3 | Offer Easy after repeated losses | S | 4.0 |
+| 4 | WebGL failure message and a context-lost handler | S | 3.0 |
+| 5 | A pad unplugged mid-fight pauses with a hint | S | 3.0 |
+| 6 | Env-probe budgets in the regression; trace the draw-count rise | S | 3.0 |
+| 7 | Toggle-to-block option | S | 3.0 |
+| 8 | Finish Italian: HUD, menus, key strips, BLOK, `lang`, title, a parity test | S+ | 2.7 |
+| 9 | Playtest log with export | S+ | 2.7 |
+| 10 | Practice mode | M | 2.0 |
+
+### Tier 2: next
+
+| # | Item | Size | Score |
+| --- | --- | --- | --- |
+| 11 | A harder pass and modifiers after bout 6 | M | 2.0 |
+| 12 | Repo hygiene: README line 70, `CHANGELOG.md`, a `probes` script, loose files | S | 2.0 |
+| 13 | Mobile haptics | S | 2.0 |
+| 14 | Controls reference card | S | 2.0 |
+| 15 | Progress export and import | S | 2.0 |
+| 16 | Voice variety | S | 2.0 |
+| 17 | Page weight budget in CI | S | 2.0 |
+| 18 | Difficulty descriptions in the settings | S | 2.0 |
+| 19 | Credits note on the voice | S | 2.0 |
+| 20 | Cards and the pause menu as modal dialogs | M | 1.5 |
+| 21 | The quality ladder recovers | M | 1.5 |
+| 22 | Photo mode | M | 1.5 |
+| 23 | Time attack, best times and a per-bout stats screen | M | 1.5 |
+| 24 | Regression gaps (`localStorage` throwing, rebinding, reduced motion, difficulty, blur, language) | M | 1.5 |
+| 25 | Screen-reader announcements for the fight | M | 1.5 |
+| 26 | Contrast and text-size options | M | 1.5 |
+| 27 | Gamepad remapping | M | 1.5 |
+| 28 | Attract mode | M | 1.5 |
+| 29 | One `localStorage` helper in place of a dozen pairs | S | 1.5 |
+| 30 | An in-game low-quality switch | S | 1.5 |
+| 31 | Replay of the last knockout | M-L | 1.3 |
+
+### Tier 3: later
+
+Settings card (M), daily challenge and share line (M, needs 11), installable offline app (M), visual diff of the six places (M), third language (M), long functions in `makeFighter` and `aiIntent` (M), more voice lines, footsteps, crowd roar and gasp, a referee, hair styles, beards and caps, a second punch and right-hand clips, head look-at and breathing, an optional CRT look, a luminance measurement of the rim light, shirts against the floor and the crowd, and a thin move set with combos, counters and a parry (L, needs `balance-run` tuning).
+
+### Yours (needs a person's eyes or ears, so not ranked)
+
+- Listen to the voice on a Mac, a phone and a PC, and to FIGHT against its banner.
+- A listening test of the music and the mix.
+- A real phone and an integrated-GPU check.
+- Italian voice lines recorded by a native speaker, and a native read of the Italian text.
+
 ## From Sprint 24
 
 - **Attract mode.** After 30 s idle on the splash, start a self-playing demo: autoplay plus cards that advance on their own, any key returns to the splash. Needs: a timer on the splash, an `attract` flag that makes cards press their own button, and a check that audio stays silent until Play.
@@ -58,7 +114,7 @@ Found by reading the code, not by playing. Items marked "(guess)" were not check
 - **The quality ladder only goes down** (`Q.lvl`): one hitch during a card or a tab switch lowers it for the whole session. Add a step back up after some seconds above 58 fps. Small.
 - **No WebGL failure path:** `new B.Engine(...)` has no try/catch and no `webglcontextlost` handler, so an unsupported browser gets a blank page. Small.
 - **No in-game low-quality switch;** only `?skin=0` and the ladder, which waits about 1.8 s. Small.
-- **A pad unplugged mid-fight** just drops input; pause and show a hint. Small.
+- ~~A pad unplugged mid-fight~~ pauses with a hint (Sprint 25).
 
 ### Code health and tests
 
@@ -73,3 +129,31 @@ Found by reading the code, not by playing. Items marked "(guess)" were not check
 - **README is stale:** line 70 still says a formant synthesiser says FIGHT "in a robot voice" (true before Sprint 24); check the rest of the audio text too. Small.
 - **`CHANGELOG.md` is far behind `TUNING_LOG.md`** (its newest section is an early sprint). Update it or drop it. Small.
 - **Loose files in the working tree:** `CLAUDE.md` (context-mode routing rules) is untracked, and `tuning/s5-tell.jpg` shows as modified. Decide whether to commit or ignore the first, and find out why the second changed. Small.
+
+## A second look, before Sprint 25
+
+New ideas, each with a rough size. They are ranked above.
+
+- **Offer Easy after repeated losses.** After three losses in a row on one bout, the lose card offers to switch to Easy. Small.
+- **Playtest log with export.** Each finished bout stores result, time, hits, blocks, dodges, punches, difficulty and whether autoplay was used, in a capped local list; an Export button writes JSON. It gives real human numbers to set against the bot table. Local only, nothing is sent. Small to medium.
+- **Env-probe budgets in the regression, and the draw-count rise traced.** S24 showed 43 to 46 draws against 41 to 43 in S23 and nobody found why. Small.
+- **Controls reference card.** One card from the title and pause menus with the current keys, the pad and touch layout, move costs and the opponent's tell. Small.
+- **Progress export and import.** Copy and paste a save code between devices. Small.
+- **Mobile haptics.** `navigator.vibrate` on a hit and on K.O., tied to the Rumble slider (Android only; iOS Safari has no such API). Small.
+- **Photo mode.** Hide the HUD, orbit the paused camera, save a PNG (`canvas.toBlob`). Medium.
+- **Voice variety.** Two or three phrasings per word for the browser voice, and numbered clip names (`fight2.ogg`) for your own recordings. Small.
+- **Difficulty descriptions.** The settings say what Easy and Hard change (the bot's reaction time x1.45 and x0.72). Small.
+- **Daily challenge and share line.** A seeded bout with a modifier per date, and a "copy my result" line on the win card; no server. Medium, needs the modifiers item.
+- **Installable offline app.** A manifest, a service worker, `theme-color` and an icon. Medium.
+- **Settings card.** The title settings box holds a dozen rows; split it into a Settings card with sections. Medium.
+- **Third language.** Spanish or French through the `STR` table, once the English leaks are fixed and a native speaker can read it. Medium.
+- **Credits note on the voice.** Say that the voice is the device's own and that any clips are their owner's. Small.
+- **Page weight budget in CI.** Fail if the gzip total of `index.html`, `lib/` and `assets/` passes a limit (now about 4.4 MB raw). Small.
+- **Visual diff of the six places.** Compare `env-probe` screenshots against stored ones. Medium.
+
+## Found while building Sprint 25
+
+- **The first-fight hint covers the touch buttons** on a phone for its 12 s (`#tutor` sits over the Heavy and Block buttons in portrait). Small.
+- **The sign texts painted in the arena** ("NO COUNTING", "NO WEAPONS") and the licence lines in Credits are English in Italian mode. Small, and the signs are a canvas texture.
+- **The `pages.yml` deploy gate has not run yet:** check the first master run after the Sprint 25 merge. Small.
+
