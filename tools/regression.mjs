@@ -210,6 +210,25 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("tutor_line_follows_binds_and_input", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, o = {};
+      const kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+      const rebind = async (act, key) => { document.querySelector('[data-bind="' + act + '"]').click(); kd(key); await sleep(30); };
+      o.defaults = S.tutorLine("keys") === "WASD moves. J jabs, K heavy. Hold L to block. Space dodges. Esc pauses.";
+      await rebind("jab", "u"); await rebind("dodge", "v");
+      o.rebound = /^WASD moves\\. U jabs, K heavy\\. Hold L to block\\. V dodges/.test(S.tutorLine("keys"));
+      await rebind("jab", "j"); await rebind("dodge", " ");
+      o.restored = S.tutorLine("keys") === "WASD moves. J jabs, K heavy. Hold L to block. Space dodges. Esc pauses.";
+      o.pad = /Left stick/.test(S.tutorLine("pad")) && /LT/.test(S.tutorLine("pad"));
+      o.touch = /Tap Jab/.test(S.tutorLine("touch")) && !/ J /.test(S.tutorLine("touch"));
+      S.setLang("it"); o.italian = S.tutorLine("keys") === "WASD muove. J diretto, K potente. Tieni L per parare. Spazio schiva. Esc pausa."; S.setLang("en");
+      o.words = ["keys", "pad", "touch"].every((m) => S.tutorLine(m).split(/\\s+/).length <= 15);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("autoplay_acts_and_yields", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};

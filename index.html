@@ -470,7 +470,10 @@ const STR={
   dock_ok_title:{en:'Relay pulled',it:'Relè tolto'},
   dock_ok_body:{en:'The fuse drops on the manifest scanner. Monday will list forty ghost pallets. The hub door clicks unlocked.',it:'Saltano i fusibili dello scanner. Lunedì compariranno quaranta pallet fantasma. La porta del hub scatta aperta.'},
   dock_ok_btn:{en:'To the hub',it:'Al hub'},
-  tutor:{en:'WASD moves. J jabs, K heavy. Hold L to block. Space dodges. Esc pauses.',it:'WASD muove. J diretto, K potente. Tieni L per parare. Spazio schiva. Esc pausa.'},
+  tutor:{en:'WASD moves. {jab} jabs, {heavy} heavy. Hold {block} to block. {dodge} dodges. Esc pauses.',it:'WASD muove. {jab} diretto, {heavy} potente. Tieni {block} per parare. {dodge} schiva. Esc pausa.'},
+  tutor_pad:{en:'Left stick moves. X jabs, Y heavy. Hold LT to block. A dodges. Start pauses.',it:'Levetta sinistra muove. X diretto, Y potente. Tieni LT per parare. A schiva. Start pausa.'},
+  tutor_touch:{en:'Stick moves. Tap Jab or Heavy. Hold Block. Tap Dodge.',it:'Il joystick muove. Tocca Jab o Heavy. Tieni Block. Tocca Dodge.'},
+  key_space:{en:'Space',it:'Spazio'},
   unlock_outfit_san:{en:'Sanitation cap (wear in fights)',it:'Cappello sanificazione (nei match)'},
   unlock_arena_dock:{en:'Dock sodium lights (arena)',it:'Luci sodio banchina (arena)'},
   unlock_outfit_stripe:{en:'Safety stripe shirt',it:'Maglia strisce sicurezza'},
@@ -2279,7 +2282,14 @@ function pollPad(){
 const camPos=new V3(0,5,-11.5), camTgt=new V3(0,1.2,0);
 let reduceMotion=false;
 const TUTOR_S=12;
-function tutorLine(){ return L('tutor'); }
+/* The first-fight hint names the keys the player has bound, or the pad or touch controls when those are in use. */
+function tutorLine(mode){
+  mode=mode||(padOn?'pad':isTouch?'touch':'keys');
+  if(mode==='pad') return L('tutor_pad');
+  if(mode==='touch') return L('tutor_touch');
+  const k=a=>binds[a]==='space'?L('key_space'):keyLabel(binds[a]);
+  return L('tutor').replace('{jab}',k('jab')).replace('{heavy}',k('heavy')).replace('{block}',k('block')).replace('{dodge}',k('dodge'));
+}
 let tutorLeft=0;
 function loadMotion(){
   try{
@@ -3614,7 +3624,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,fightLine,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,fightLine,tutorLine,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
