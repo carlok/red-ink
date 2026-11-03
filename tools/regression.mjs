@@ -636,6 +636,31 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("two_tabs_cannot_erase_each_others_progress", async () => {
+    const r = await cdp.eval(`(async () => {
+      const S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {}, KEY = "sublevel-progress";
+      const stored = () => JSON.parse(localStorage.getItem(KEY));
+      S.qaResetProgress();
+      /* another tab has moved the save on to 5 wins behind this tab's back */
+      localStorage.setItem(KEY, JSON.stringify({ v: 2, wins: 5, outfit: "exec", arena: 3, dock: 1, pass2: 2 }));
+      o.memoryStillOld = S.progress.wins === 0;
+      $("wrap").hidden = true; S.startBout(1); await __until(() => G.state === "fight", "fight");
+      S.qaEndBout(true);   /* this tab wins bout 2 */
+      const s = stored();
+      o.winsKept = s.wins === 5 && S.progress.wins === 5;
+      o.unlocksKept = s.outfit === "exec" && s.arena === 3 && s.dock === 1 && s.pass2 === 2;
+      /* the same save arriving as a storage event is taken as it is */
+      localStorage.setItem(KEY, JSON.stringify({ v: 2, wins: 6, outfit: "exec", arena: 3, dock: 1, pass2: 3 }));
+      window.dispatchEvent(new StorageEvent("storage", { key: KEY }));
+      o.eventLoaded = S.progress.wins === 6 && S.progress.pass2 === 3;
+      /* a reset still overwrites */
+      S.qaResetProgress();
+      o.resetExact = stored().wins === 0 && S.progress.wins === 0;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("win_card_warns_when_progress_cannot_be_saved", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};

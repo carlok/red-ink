@@ -1023,9 +1023,25 @@ function loadProgress(){
   }catch(e){}
   applyArena(progress.arena);
 }
-function saveProgressData(){
+/* Another tab may have moved the save on since this one loaded it. Unless the caller means to overwrite (a reset, a probe), a save first takes
+   what the stored copy has beyond ours: the larger counts, and the outfit and arena of whichever side has won more. */
+function mergeStoredProgress(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY); if(!raw) return;
+    const s=migrateProgress(JSON.parse(raw)); if(!s||typeof s!=='object') return;
+    const ahead=Number.isFinite(s.wins)&&s.wins>progress.wins;
+    if(ahead){ progress.wins=s.wins; if(typeof s.outfit==='string') progress.outfit=s.outfit; if(Number.isFinite(s.arena)) progress.arena=s.arena; }
+    if(Number.isFinite(s.pass2)&&s.pass2>(progress.pass2||0)) progress.pass2=s.pass2;
+    if(Number.isFinite(s.dock)&&s.dock>(progress.dock||0)) progress.dock=s.dock;
+    if(ahead) applyArena(progress.arena);
+  }catch(e){}
+}
+function saveProgressData(exact){
+  if(!exact) mergeStoredProgress();
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); return true; }catch(e){ return false; }
 }
+/* A save made in another tab arrives as a storage event: take it, so this tab does not show (or overwrite) an older copy. */
+window.addEventListener('storage',e=>{ if(e.key===SAVE_KEY||e.key===null) loadProgress(); });
 function grantWin(boutIdx){
   if(boutIdx+1>progress.wins) progress.wins=boutIdx+1;
   const u=UNLOCK_CHAIN[boutIdx];
@@ -2622,7 +2638,7 @@ if($('logClear')) $('logClear').addEventListener('click',()=>{
 let resetArmed=false, resetTimer=0;
 function resetProgress(){
   progress=progressDefaults();
-  saveProgressData(); applyArena(0); syncPlayerOutfit(); skinEnsure(P);
+  saveProgressData(true); applyArena(0); syncPlayerOutfit(); skinEnsure(P);
 }
 function onResetClick(){
   const b=$('resetBtn'); if(!b) return;
@@ -3509,7 +3525,7 @@ function saveProbe(opt){
       const p=raw?JSON.parse(raw):null;
       roundTrip=roundTrip&&!!(p&&p.outfit==='exec'&&p.wins===6&&p.dock===1);
     }catch(e){ roundTrip=false; }
-    progress=snap; saveProgressData();
+    progress=snap; saveProgressData(true);
   }
   return {key:SAVE_KEY,roundTrip,survivedThrow};
 }
@@ -3530,7 +3546,7 @@ function qaClickGo(){
 }
 function qaResetProgress(){
   progress=progressDefaults();
-  saveProgressData();
+  saveProgressData(true);
   applyArena(0);
   syncPlayerOutfit();
   return Object.assign({},progress);
