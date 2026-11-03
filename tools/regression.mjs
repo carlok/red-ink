@@ -229,6 +229,26 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("easy_offered_after_three_losses", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const lose = async (bout) => { $("wrap").hidden = true; S.startBout(bout); while (G.state !== "fight") await raf(); S.qaEndBout(false); await sleep(120); };
+      document.querySelector('[data-diff="normal"]').click(); G.loss = null;
+      await lose(0); await lose(0); o.noneAtTwo = $("cardAssist").hidden;
+      await lose(1); o.resetOnOtherBout = $("cardAssist").hidden;
+      await lose(0); await lose(0); await lose(0);
+      o.offeredAtThree = !$("cardAssist").hidden && /Easy/.test($("cardAssist").textContent) && /Assist/.test($("cRows").textContent);
+      $("cardAssist").click(); await sleep(50);
+      o.switched = S.diffNow() === "easy" && localStorage.getItem("sublevel-diff") === "easy" && (G.state === "ready" || G.state === "fight") && G.bout === 0;
+      G.state = "pause"; await lose(0); await lose(0); await lose(0); o.noneWhenEasy = $("cardAssist").hidden;
+      document.querySelector('[data-diff="normal"]').click();
+      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf(); S.qaEndBout(true); await sleep(120); o.winClears = G.loss.n === 0 && $("cardAssist").hidden;
+      S.setLang("it"); await lose(0); await lose(0); await lose(0); o.italian = /Prova Facile/.test($("cardAssist").textContent); S.setLang("en");
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("autoplay_acts_and_yields", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
