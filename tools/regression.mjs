@@ -575,6 +575,32 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("movement_follows_the_physical_key", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      $("wrap").hidden = true; S.startBout(0); while (G.state !== "fight") await raf();
+      const ev = (type, key, code) => window.dispatchEvent(new KeyboardEvent(type, { key, code, bubbles: true }));
+      const moves = (key, code) => { ev("keydown", key, code); const i = S.intent(), m = Math.hypot(i.mx, i.mz) > 0.5; ev("keyup", key, code); return m; };
+      o.qwerty = moves("w", "KeyW");
+      o.azertyZ = moves("z", "KeyW");
+      o.azertyQ = moves("q", "KeyA");
+      o.dvorakComma = moves(",", "KeyW");
+      o.noCode = moves("w", undefined);
+      o.arrow = moves("ArrowUp", "ArrowUp");
+      /* the key typed W on AZERTY sits where QWERTY has Z; on Dvorak it sits where QWERTY has comma: neither moves */
+      o.azertyTypedW = !moves("w", "KeyZ");
+      o.dvorakTypedW = !moves("w", "Comma");
+      o.released = Math.hypot(S.intent().mx, S.intent().mz) < 0.01;
+      /* the hints follow the layout map when it reports other caps */
+      const before = $("keys").textContent;
+      S.setMoveCaps("ZQSD"); o.capStrip = $("keys").textContent.includes("ZQSD") && !$("keys").textContent.includes("WASD");
+      o.capTutor = S.tutorLine("keys").includes("ZQSD") || S.tutorLine().includes("ZQSD");
+      S.setMoveCaps("WASD"); o.capBack = $("keys").textContent === before;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("esc_opens_menu_on_every_card", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })), o = {};
