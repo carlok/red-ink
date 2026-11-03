@@ -4,9 +4,9 @@ Ideas that were suggested or left out of a sprint and are not built. Nothing her
 
 ## Ranking
 
-Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten are built in Sprint 25.
+Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. Next up is item 11.
 
-### Tier 1: Sprint 25
+### Tier 1: Sprint 25 (all ten built; see `TUNING_LOG.md`)
 
 | # | Item | Size | Score |
 | --- | --- | --- | --- |
@@ -114,7 +114,7 @@ Found by reading the code, not by playing. Items marked "(guess)" were not check
 - **The quality ladder only goes down** (`Q.lvl`): one hitch during a card or a tab switch lowers it for the whole session. Add a step back up after some seconds above 58 fps. Small.
 - **No WebGL failure path:** `new B.Engine(...)` has no try/catch and no `webglcontextlost` handler, so an unsupported browser gets a blank page. Small.
 - **No in-game low-quality switch;** only `?skin=0` and the ladder, which waits about 1.8 s. Small.
-- **A pad unplugged mid-fight** just drops input; pause and show a hint. Small.
+- ~~A pad unplugged mid-fight~~ pauses with a hint (Sprint 25).
 
 ### Code health and tests
 
@@ -150,3 +150,10 @@ New ideas, each with a rough size. They are ranked above.
 - **Credits note on the voice.** Say that the voice is the device's own and that any clips are their owner's. Small.
 - **Page weight budget in CI.** Fail if the gzip total of `index.html`, `lib/` and `assets/` passes a limit (now about 4.4 MB raw). Small.
 - **Visual diff of the six places.** Compare `env-probe` screenshots against stored ones. Medium.
+
+## Found while building Sprint 25
+
+- **The first-fight hint covers the touch buttons** on a phone for its 12 s (`#tutor` sits over the Heavy and Block buttons in portrait). Small.
+- **The sign texts painted in the arena** ("NO COUNTING", "NO WEAPONS") and the licence lines in Credits are English in Italian mode. Small, and the signs are a canvas texture.
+- **The `pages.yml` deploy gate has not run yet:** check the first master run after the Sprint 25 merge. Small.
+

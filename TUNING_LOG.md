@@ -1471,3 +1471,37 @@ The win, lose and final cards get a Punches row: "2 of 2 landed (100%) · 7.1 s"
 Screenshots: `tuning/s24-voice-settings.jpg`, `tuning/s24-auto-badge.jpg`, `tuning/s24-result-card.jpg`.
 
 Not done: how the browser voice sounds on a real Mac, phone or PC is unchecked (a stub stood in for the engine); the draw-count rise in env-probe was not traced; Italian voice lines depend on the device having an Italian voice.
+
+## Sprint 25: the ten best-ranked backlog items
+
+`BACKLOG.md` got a second round of ideas and a ranking of every item (value over effort; the scores are a judgement). The first ten were built, one commit each. None touches the sim, `rng()` or the attack table.
+
+| # | Item | What it does | Test |
+| --- | --- | --- | --- |
+| 1 | CI | `.github/workflows/test.yml` runs the regression on every pull request; `pages.yml` runs it first and deploys only if it passes | green on this PR; the deploy gate itself only runs on master, so it is untested until this merges |
+| 2 | Tutor line | built from your binds (Space reads Spazio) and switches to a pad or touch line | defaults, a rebind and restore, pad, touch, Italian, 15 words or fewer |
+| 3 | Easy offer | third straight loss on one bout: Try Easy on the lose card; sets and saves the difficulty | none at two, reset by another bout, offered at three, switches, none on Easy, a win clears it |
+| 4 | WebGL | a message with Reload when WebGL is missing; a "Graphics were reset" message and pause on context loss, hidden on restore | the real engine's context lost and restored; `getContext` stubbed to null |
+| 5 | Pad unplug | pauses a fight and says why | synthetic event only |
+| 6 | Draw budget | bisected the S24 draw "rise" against a worktree of S23: S23 gave 39-42 draws, now 41-44, S23 itself moves by 2 between runs; it was wobble, not a change. New test: at most 48 draws and 52 active meshes in bouts 1 and 6 | 41 and 41 draws |
+| 7 | Block toggle | saved setting; one press starts the guard, the next ends it; a jab, heavy or dodge press, a hit and a new bout end it; key, touch and pad | tap holds 30 frames, second tap drops, jab ends it, new bout clears it, hold mode intact, survives a reload |
+| 8 | Italian | audit of every visible string found English in the HUD, menus, key strips, labels, aria labels and BLOK (now PARA!); the Strike and Defend rows had also stopped following a rebind in Italian | every STR key has both languages, every `L()` key exists, a deny list finds no English word on the page in Italian; no overflow at 390x844 and 844x390 |
+| 9 | Playtest log | one entry per bout in the newest 200, Export (JSON) and Clear; local only | entries and fields, valid JSON, cap, two-tap clear, throwing `setItem`, Italian |
+| 10 | Practice | title-card link after a first win; any beaten opponent; no wins, unlocks or save | saved progress string identical after a practice win, log flag, Back and Esc, cycling, a loss keeps the flag |
+
+Small fixes on the way: the punches line showed "undefined" when a card was opened without a bout; the CI runner needed up to 20 s to open Chrome's debugging port once (one run failed with "no Chrome page", the next passed), so the wait went from 5 to 20 s; README line 70 still described the robot voice.
+
+### Checked
+
+| Check | Result |
+| --- | --- |
+| `tools/regression.mjs` | 45 of 45 (S24 had 34; 11 new tests); also green on CI |
+| Bout table, 200 fights, seed 1, 60 Hz | 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0%, identical |
+| `tools/step-probe.mjs`, `ai-probe.mjs`, `combat-probe.mjs`, `ui-probe.mjs`, `input-probe.mjs`, `font-probe.mjs` | unchanged, no failures |
+| `tools/autoplay-probe.mjs` | takeover in 2 ticks, the next bout resumes |
+| `tools/env-probe.mjs` | 41-43 draws, GPU about 1.9 ms, no console errors |
+
+Screenshots: `tuning/s25-it-p.jpg`, `s25-it-l.jpg` (Italian HUD on a phone), `s25-title-settings.jpg`, `s25-practice-card.jpg`.
+
+Not done: a real pad unplug, a real phone for the toggle, and a native read of the Italian; the `pages.yml` deploy gate is unrun; a tutor strip still sits over the touch buttons on a phone for its 12 s (older than this sprint); the sign texts painted in the arena and the licence lines in Credits are English.
+
