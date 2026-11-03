@@ -1,5 +1,5 @@
 /**
- * Run seeded bot meets. Usage: node tools/balance-run.mjs [n] [skill] [seed] [diff] [bouts] [hz]
+ * Run seeded bot meets. Usage: node tools/balance-run.mjs [n] [skill] [seed] [diff] [bouts] [hz] [--pass2]
  * bouts: comma list (default 0,1,2) or all / 0-5 for six foes.
  * hz is the step rate of the sim, default 60. Use 30 or 144 to see what frame rate does to the table.
  */
@@ -11,18 +11,21 @@ import { fileURLToPath } from "node:url";
 import { CHROME } from "./chrome.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const N = Number(process.argv[2] || 200);
-const SKILL = process.argv[3] || "normal";
-const SEED = Number(process.argv[4] || 1);
-const DIFFNAME = process.argv[5] || "normal";
-const BOUTS_ARG = process.argv[6] || "0,1,2";
+/* --pass2 anywhere on the line runs the second pass (Hard set plus the bout's change) instead of the first. */
+const PASS2 = process.argv.includes("--pass2");
+const ARGS = process.argv.slice(2).filter((a) => a !== "--pass2");
+const N = Number(ARGS[0] || 200);
+const SKILL = ARGS[1] || "normal";
+const SEED = Number(ARGS[2] || 1);
+const DIFFNAME = ARGS[3] || "normal";
+const BOUTS_ARG = ARGS[4] || "0,1,2";
 
 function parseBouts(arg) {
   if (arg === "all" || arg === "0-5") return [0, 1, 2, 3, 4, 5];
   return arg.split(",").map((s) => Number(s.trim())).filter((n) => n >= 0 && n < 6);
 }
 const BOUT_LIST = parseBouts(BOUTS_ARG);
-const HZ = Number(process.argv[7] || 60);
+const HZ = Number(ARGS[5] || 60);
 
 function serve() {
   const types = { ".html": "text/html", ".js": "text/javascript", ".txt": "text/plain" };
@@ -94,7 +97,7 @@ try {
       if (performance.now() - t > 15000) throw new Error("boot");
       await new Promise((r) => requestAnimationFrame(r));
     }
-    const rows = window.__sublevel.simMeet({ n: ${N}, skill: ${JSON.stringify(SKILL)}, seed: ${SEED}, diff: ${JSON.stringify(DIFFNAME)}, bouts: ${JSON.stringify(BOUT_LIST)}, dt: ${1 / HZ} });
+    const rows = window.__sublevel.simMeet({ n: ${N}, skill: ${JSON.stringify(SKILL)}, seed: ${SEED}, diff: ${JSON.stringify(DIFFNAME)}, bouts: ${JSON.stringify(BOUT_LIST)}, dt: ${1 / HZ}, pass2: ${PASS2} });
     return { ms: Math.round(performance.now() - t), rows };
   })()`;
   const out = await cdp.send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });

@@ -566,7 +566,7 @@ async function runHttpSuite(cdp) {
       o.opensHub = $("cTitle").textContent === S.STR.hub_title.en && $("cRows").textContent.includes(S.BOUTS[3].foe);
       const two = await title(2, 0); o.dockFirst = two.shown; $("cardAssist").click(); await sleep(150);
       o.dockCard = $("cTitle").textContent === S.STR.dock_title.en;
-      o.cleared = (await title(6, 1)).shown === false;
+      const six = await title(6, 1); o.cleared = six.shown && six.text.includes(S.STR.pass2_btn.en) && !six.text.includes(S.STR.continue_btn.en);   /* every bout won: the action is the second pass, not Continue */
       S.setLang("it"); await sleep(50); await title(3, 1);
       o.italian = $("cardAssist").textContent.includes(S.STR.continue_btn.it) && !$("cardAssist").hidden;
       S.setLang("en"); S.qaResetProgress(); $("wrap").hidden = true;
@@ -596,6 +596,45 @@ async function runHttpSuite(cdp) {
       S.setMoveCaps("ZQSD"); o.capStrip = $("keys").textContent.includes("ZQSD") && !$("keys").textContent.includes("WASD");
       o.capTutor = S.tutorLine("keys").includes("ZQSD") || S.tutorLine().includes("ZQSD");
       S.setMoveCaps("WASD"); o.capBack = $("keys").textContent === before;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("second_pass_after_bout_six", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const toFight = async () => { const t = performance.now(); while (G.state !== "fight" && performance.now() - t < 8000) await raf(); };
+      $("wrap").hidden = true; S.qaResetProgress(); S.progress.wins = 6; S.progress.outfit = "exec"; S.progress.arena = 3; S.progress.dock = 1;
+      /* the first pass is not touched: the same cfg with no pass index, and the change only with one */
+      o.firstPass = S.scaleCfg(S.BOUTS[0]).hp === 70 && S.scaleCfg(S.BOUTS[0], -1).hp === 70;
+      o.changed = S.scaleCfg(S.BOUTS[0], 0).hp === 98 && S.scaleCfg(S.BOUTS[2], 2).dmg > S.scaleCfg(S.BOUTS[2]).dmg;
+      /* the entry is on the title card once every bout is won, and it names the bout */
+      S.titleCard(); await sleep(120);
+      o.entry = !$("cardAssist").hidden && $("cardAssist").textContent.includes(S.STR.pass2_btn.en) && $("cardAssist").textContent.includes(S.BOUTS[0].foe);
+      $("cardAssist").click(); await sleep(150);
+      o.card = $("cStamp").textContent === S.STR.pass2_stamp.en && $("cRows").textContent.includes(S.STR.mod_iron.en);
+      $("go").click(); await toFight();
+      o.running = G.pass2 === true && S.E.cfg.hp === 98 && /II/.test($("roundLbl").textContent);
+      /* a loss keeps the pass: Retry runs the same changed fighter */
+      S.qaEndBout(false); await sleep(150); $("go").click(); await toFight();
+      o.retryKeeps = G.pass2 === true && S.E.cfg.hp === 98;
+      /* a win counts in pass2 and in nothing else */
+      S.qaEndBout(true); await sleep(150);
+      o.counted = S.progress.pass2 === 1 && S.progress.wins === 6 && S.progress.outfit === "exec" && S.progress.arena === 3;
+      o.winCard = $("cRows").textContent.includes(S.STR.mod_iron.en) && $("goTxt").textContent === S.STR.pass2_next.en;
+      o.saved = JSON.parse(localStorage.getItem("sublevel-progress")).pass2 === 1;
+      $("go").click(); await sleep(150);
+      o.nextCard = $("cTitle").textContent === S.BOUTS[1].foe && $("cRows").textContent.includes(S.STR.mod_quick.en);
+      /* the last bout ends the pass; the title then offers it again */
+      S.progress.pass2 = 5; $("wrap").hidden = true; G.pass2 = true; S.startBout(5); await toFight(); S.qaEndBout(true); await sleep(150);
+      o.last = S.progress.pass2 === 6 && $("cBody").textContent === S.STR.pass2_done.en && $("goTxt").textContent === S.STR.back_btn.en;
+      $("go").click(); await sleep(150);
+      o.again = !$("cardAssist").hidden && $("cardAssist").textContent === S.STR.pass2_again.en && G.pass2 === false;
+      /* leaving the pass by the title card clears it, and the next normal bout is the first-pass fighter again */
+      $("wrap").hidden = true; S.startBout(0); await toFight();
+      o.firstAgain = S.E.cfg.hp === 70 && !/II/.test($("roundLbl").textContent);
+      S.qaResetProgress(); $("wrap").hidden = true;
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
@@ -669,7 +708,7 @@ async function runHttpSuite(cdp) {
     const out = {};
     /* a Sprint 25 save has no version: it loads intact, and the next save stamps v */
     await load('{"wins":3,"outfit":"sanitation","arena":2,"dock":1}');
-    out.old = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, a = { wins: p.wins, outfit: p.outfit, arena: p.arena, dock: p.dock, v: p.v }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { loaded: a, stamped: r.v, kept: r.wins === 3 && r.outfit === 'sanitation' && r.arena === 2 && r.dock === 1 }; })()`);
+    out.old = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, a = { wins: p.wins, outfit: p.outfit, arena: p.arena, dock: p.dock, v: p.v, pass2: p.pass2 }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { loaded: a, stamped: r.v, kept: r.wins === 3 && r.outfit === 'sanitation' && r.arena === 2 && r.dock === 1 }; })()`);
     /* broken JSON gives the defaults, at the current version */
     await load('{nope');
     out.bad = await cdp.eval(`(() => { const p = window.__sublevel.progress; return { wins: p.wins, v: p.v }; })()`);
@@ -677,8 +716,8 @@ async function runHttpSuite(cdp) {
     await load('{"v":99,"wins":2,"outfit":"auditor","arena":0,"dock":0,"future":"keep"}');
     out.future = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, before = { v: p.v, future: p.future }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { before, after: { v: r.v, future: r.future, wins: r.wins } }; })()`);
     await cdp.eval(`window.__sublevel.qaResetProgress()`);
-    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 1 && out.old.stamped === 1 && out.old.kept
-      && out.bad.wins === 0 && out.bad.v === 1
+    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 2 && out.old.loaded.pass2 === 0 && out.old.stamped === 2 && out.old.kept
+      && out.bad.wins === 0 && out.bad.v === 2
       && out.future.before.v === 99 && out.future.before.future === "keep" && out.future.after.v === 99 && out.future.after.future === "keep" && out.future.after.wins === 2;
     if (!ok) throw new Error(JSON.stringify(out));
     return out;
