@@ -75,6 +75,14 @@ The fight steps at a fixed 60 Hz and the view interpolates, so reaction times an
 
 Quality steps down resolution, then shadow filtering, then shadows, when the frame rate stays under 44 for 1.8 seconds. The floor is half the starting resolution.
 
+## Autoplay and voice
+
+- **Autoplay** (title settings or the pause menu, or `?auto=1`): the AI plays your side in a fight. Pressing a move or attack key, touching the stick or buttons, or using the pad takes over at once; the next bout starts with autoplay again. Cards still wait for you. It is also an accessibility aid for anyone who cannot play the fights but wants to see the story.
+- **Voice** (title settings or the pause menu): the game says FIGHT, K.O., WIN and LOSE. It plays a clip from `assets/voice/` if you have added one, else your browser's own male voice for the game's language (pick another in the list, Hear plays it), else a small synthesised voice. Nothing is bundled: recordings you add are yours, and the repo's own audio stays CC0.
+- **Adding your own voice clips:** record `fight`, `ko`, `win`, `lose` and `perfect` (any of them), save as `.ogg`, `.mp3` or `.wav` in `assets/voice/`, and list them in `assets/voice/voice.js` (see `assets/voice/README.txt`). They are listed, not probed, so the game also works from `file://`.
+
+Ideas not built yet are in `BACKLOG.md`.
+
 ## Credits
 
 The same list is in the game: Credits on the title card and in the pause menu.

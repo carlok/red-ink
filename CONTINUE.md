@@ -49,7 +49,9 @@ Do not redo these. Read `TUNING_LOG.md` before changing a number.
 - S23. Esc: `openMenu`/`closeMenu` reuse `#pause` over any card (`G.menuOpen`, `G.lastCard`, a Menu button on each card). Music: 80s voices (`vLead`, `vBass`, `vSnare` with a gated plateau, `vClap`, `vTom`, `vStab`, a shared convolver reverb, a chorus per layer, a sidechain pump, hats from two automated noise chains), moods `win`/`lose`/`dossier` via `showCard({mood})` and `musicMoodSet`. Voice: `VOICE` table and `voiceSay(word, delay)` (a formant synthesiser; triggers: the FIGHT banner, the knockout, the win and lose cards). `MUS.log` records notes and voice words for tests; `MUS.hold` freezes the layer gains for probes. Probes: `tools/voice-probe.mjs`, the snare tail and node count in `tools/audio-bed-probe.mjs` (`BOUT=n`).
 - S18. Camera: `CAM.pitch/frac/yaw/follow` (portrait keeps `pitchPortrait`, `yawPortrait` 0), `camKick` springs and roll, KO slow-motion (`G.koSlow`) and push-in, ready `reveal`; `tools/cam-sweep.mjs` sweeps the angles. Skin: `skinMarks` (face flush and bruise from `f.marks`), creases from bone weights, hit flash (`f.flash`), Fresnel rim (`skinRim`, needs `FresnelParameters` in `tools/engine-entry.js`), outline, hand wraps, `SKIN.walkK`; `skinLite()` drops outline and rim at quality step 2. `tools/foot-probe.mjs` measures foot skating. skinShade reads palette rows as `floor(v*32)`.
 
-S9 and S12 are logged in TUNING_LOG.md. S11 was not done: the avatar path is now the skinned fighter, see S15.
+- S24. Voice: `voiceSay` picks a clip from `assets/voice/voice.js`, else a male browser voice (`voicePick`, `VOICE_NOVELTY` skips macOS novelty voices; a Voice checkbox and list are in the title settings and the pause menu), else the formant robot. Autoplay: `autoOn` (`sublevel-auto`, `?auto=1`), `simTick` uses `botIntent(P,E,dt,diff)` until `G.autoTaken`; `tools/autoplay-probe.mjs`. Result cards show `punchLine()` from `G.log.thrown/landed/time`. Gamepad Back opens the card menu.
+
+S9 and S12 are logged in TUNING_LOG.md. Ideas not built are in `BACKLOG.md`. S11 was not done: the avatar path is now the skinned fighter, see S15.
 
 ## Sprint 9, do this one
 
