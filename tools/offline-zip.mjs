@@ -24,6 +24,7 @@ const files = [
   "assets/quaternius-human/animated-human.js",
   "assets/quaternius-human/License.txt",
   "assets/fonts",
+  "assets/voice",
 ];
 
 for (const f of files) {

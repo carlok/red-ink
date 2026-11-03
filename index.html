@@ -45,6 +45,7 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .name{font:600 12px/1 var(--f-data);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .bar{position:relative;width:100%;height:18px;background:#0a0a0b;border:2px solid var(--paper);transform:skewX(-14deg);overflow:hidden;box-sizing:border-box}
 .right .bar{transform:skewX(14deg)}
+.autoTag{font:600 11px/1 var(--f-data);letter-spacing:.14em;text-transform:uppercase;color:var(--ink);background:var(--tape);padding:3px 7px;align-self:flex-start;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar.thin{height:8px;border-width:1px;width:68%;border-color:var(--mute)}
 .bar i,.bar b{position:absolute;top:0;bottom:0;left:0;width:100%;display:block}
 .right .bar i,.right .bar b{left:auto;right:0}
@@ -178,6 +179,7 @@ dl.rows dd a{color:inherit}
         <div class="name" id="pName">Auditor</div>
         <div class="bar" role="img" aria-label="Your health"><b id="pGhost"></b><i id="pHp"></i></div>
         <div class="bar thin" role="img" aria-label="Your stamina"><i class="st" id="pSt"></i></div>
+        <div class="autoTag" id="autoTag" hidden>AUTO</div>
       </div>
       <div class="round"><span id="roundLbl">BOUT 1 / 6</span></div>
       <div class="fighter right">
@@ -207,6 +209,8 @@ dl.rows dd a{color:inherit}
       <label for="lessMotion2"><input id="lessMotion2" type="checkbox"> Less motion</label>
       <label for="pMusic"><input id="pMusic" type="checkbox" checked> Music</label>
       <label for="pAmb"><input id="pAmb" type="checkbox" checked> Ambience</label>
+      <label for="pVoice"><input id="pVoice" type="checkbox" checked> Voice</label>
+      <label for="pAuto"><input id="pAuto" type="checkbox"> Autoplay</label>
     </div>
   </div>
 
@@ -259,6 +263,9 @@ dl.rows dd a{color:inherit}
             <label class="tuneRow rumble" for="ambVol">Ambience <input id="ambVol" type="range" min="0" max="100" value="100"></label>
             <label class="tuneRow rumble" for="lessMotion"><input id="lessMotion" type="checkbox"> Less motion</label>
             <label class="tuneRow rumble" for="autoFs"><input id="autoFs" type="checkbox" checked> Auto fullscreen on phone</label>
+            <label class="tuneRow rumble" for="voiceOn"><input id="voiceOn" type="checkbox" checked> Voice</label>
+            <div class="tuneRow"><select id="voiceSel" aria-label="Voice"><option value="">Auto (male)</option></select><button type="button" class="bind" id="voiceHear">Hear</button></div>
+            <label class="tuneRow rumble" for="autoOn"><input id="autoOn" type="checkbox"> Autoplay (the AI fights for you)</label>
             <div class="tuneRow"><button type="button" class="bind" id="resetBtn">Reset progress</button></div>
           </div>
           <small id="avHint">Export a cartoon avatar as GLB (MetaPerson or Avaturn), then pick it here or drop it anywhere on this page.</small>
@@ -289,6 +296,7 @@ dl.rows dd a{color:inherit}
 
 <script src="lib/babylon.js"></script>
 <script src="audio/samples.js"></script>
+<script src="assets/voice/voice.js"></script>
 <script src="assets/quaternius-human/animated-human.js"></script>
 <script>
 (function(){
@@ -343,6 +351,15 @@ const STR={
   card_title_body:{en:'You audit pallet counts from ten to six. Totals always reconcile. You have not slept in eleven months. Pike slides you a keycard toward a door missing from the floor plan.',it:'Controlli i pallet dalle dieci alle sei. I totali tornano sempre. Non dormi da undici mesi. Pike ti passa una tessera verso una porta assente dalla pianta.'},
   card_title_btn:{en:'Take the stairs',it:'Scendi le scale'},
   credits_btn:{en:'Credits',it:'Crediti'},
+  voice_lbl:{en:'Voice',it:'Voce'},
+  auto_lbl:{en:'Autoplay (the AI fights for you)',it:"Autoplay (l'IA combatte per te)"},
+  auto_pause:{en:'Autoplay',it:'Autoplay'},
+  auto_badge:{en:'AUTO · press a key to take over',it:'AUTO · premi un tasto per riprendere'},
+  voice_auto:{en:'Auto (male)',it:'Auto (maschile)'},
+  voice_hear:{en:'Hear',it:'Ascolta'},
+  banner_fight:{en:'FIGHT!',it:'COMBATTI!'},
+  banner_ko:{en:'K.O.',it:'K.O.'},
+  banner_down:{en:'DOWN',it:'A TERRA'},
   row_perfect:{en:'Perfect',it:'Perfetto'},
   perfect_v:{en:'You took no hits.',it:'Non hai preso colpi.'},
   card_menu:{en:'Menu · Esc',it:'Menu · Esc'},
@@ -410,6 +427,9 @@ const STR={
   row_tip:{en:'Tip',it:'Consiglio'},
   row_next:{en:'Next',it:'Prossimo'},
   row_you:{en:'You',it:'Tu'},
+  row_punches:{en:'Punches',it:'Pugni'},
+  st_line:{en:'{h} hits taken, {b} blocks, {d} dodges, {c} s in the corner',it:"{h} colpi subiti, {b} parate, {d} schivate, {c} s all'angolo"},
+  st_punch:{en:'{l} of {t} landed ({a}%) · {s} s',it:'{l} su {t} a segno ({a}%) · {s} s'},
   row_retry:{en:'Retry',it:'Riprova'},
   row_unlock:{en:'Unlocked',it:'Sbloccato'},
   row_rules:{en:'Rules',it:'Regole'},
@@ -508,7 +528,7 @@ function paintLang(){
   set('pauseTitle','pause_title'); set('resume','resume_btn'); set('restart','restart_btn'); set('quitTitle','quit_btn'); set('pauseCredits','credits_btn');
   if(!resetArmed) set('resetBtn','reset_btn');
   set('spPlayTxt','play_btn'); set('spCredits','credits_btn'); set('spKick','company_form'); set('spTitle','card_title_name');
-  set('linkCredits','credits_btn'); set('cardMenu','card_menu'); set('linkOut','out_btn'); set('menuBtn','menu_btn');
+  set('linkCredits','credits_btn'); set('cardMenu','card_menu'); set('voiceHear','voice_hear'); lab('voiceOn','voice_lbl'); lab('pVoice','voice_lbl'); lab('autoOn','auto_lbl'); lab('pAuto','auto_pause'); if($('voiceSel')&&$('voiceSel').options[0]) $('voiceSel').options[0].textContent=L('voice_auto'); set('linkOut','out_btn'); set('menuBtn','menu_btn');
   lab('pMusic','music_lbl'); lab('pAmb','amb_lbl'); lab('lessMotion2','motion_lbl');
 }
 function boutPlace(c){ return L(c.placeKey); }
@@ -1270,10 +1290,66 @@ const VOICE={
   lose:{gain:.7,f0:[118,92],segs:[['v',.07,360,1300,2500,500,900,2400,.8],['v',.2,500,900,2400,420,800,2300,1],['f',.17,5500,0,0,5500,0,0,.45]]}
 };
 const VOICE_GAIN=.9;
+/* The voice is, in order: a recording you listed in assets/voice/voice.js, then a male voice the device already has (the browser's speech
+   synthesis, in the game's language), then the formant robot above. The browser voice is not bundled, so there is nothing to license. */
+let voiceOn=true, voiceName='';
+/* Autoplay: the balance bot plays the player's side in a fight until the human presses a move or attack key (or touches or pads); the next bout starts with it again. */
+let autoOn=false;
+function loadAutoPrefs(){ try{ autoOn=localStorage.getItem('sublevel-auto')==='1'; }catch(e){} try{ if(new URLSearchParams(location.search).get('auto')==='1') autoOn=true; }catch(e){} }
+function saveAutoPrefs(){ try{ localStorage.setItem('sublevel-auto',autoOn?'1':'0'); }catch(e){} }
+function paintAuto(){ if($('autoOn')) $('autoOn').checked=autoOn; if($('pAuto')) $('pAuto').checked=autoOn; }
+const VOICE_TEXT={en:{fight:'Fight!',ko:'K.O.!',win:'You win!',lose:'You lose!',perfect:'Perfect!'},it:{fight:'Combatti!',ko:'K.O.!',win:'Hai vinto!',lose:'Hai perso!',perfect:'Perfetto!'}};
+const VOICE_PREFER=['Daniel','Alex','Oliver','Arthur','Aaron','Gordon','Google UK English Male','Microsoft David','Microsoft Mark','Microsoft George','Luca','Cosimo'];
+const VOICE_MALE=/\b(daniel|alex|david|mark|george|james|thomas|oliver|arthur|aaron|gordon|rishi|luca|cosimo|male)\b/i,
+  VOICE_FEMALE=/\b(female|samantha|karen|moira|tessa|zira|susan|hazel|fiona|victoria|allison|ava|serena|kate|catherine|alice|elsa|paola|federica|nicky|google us english|google italiano)\b/i,
+  VOICE_NOVELTY=/\b(albert|bahh|bad news|bells|boing|bubbles|cellos|good news|bollicine|buone notizie|brutte notizie|campane|jester|organ|superstar|trinoids|whisper|zarvox|wobble|junior|ralph|fred|kathy|princess|deranged|hysterical|grandma|grandpa|nonno|nonna)\b/i;
+/* A male voice the device has, in the game's language: the preferred names first, then any name that reads as male, then any that does not read as female;
+   the novelty voices a Mac ships (Bahh, Bells, Fred...) are never picked on their own. A name chosen in the list always wins. */
+function voicePick(list,lg,name){
+  const same=list.filter(v=>(v.lang||'').toLowerCase().replace('_','-').startsWith(lg)).sort((a,b)=>(b.localService?1:0)-(a.localService?1:0));
+  if(name){ const v=same.find(x=>x.name===name); if(v) return v; }
+  const ok=same.filter(v=>!VOICE_NOVELTY.test(v.name));
+  for(const pref of VOICE_PREFER){ const v=ok.find(x=>x.name.toLowerCase().includes(pref.toLowerCase())&&!VOICE_FEMALE.test(x.name)); if(v) return v; }
+  const male=ok.filter(v=>VOICE_MALE.test(v.name)&&!/female/i.test(v.name)); if(male.length) return male[0];
+  return ok.find(v=>!VOICE_FEMALE.test(v.name))||null;
+}
+const voiceClips={};
+function voiceClipsInit(){
+  const pack=window.SUBLEVEL_VOICE||{};
+  Object.keys(pack).forEach(w=>{ if(voiceClips[w]||!pack[w]) return; const a=new Audio(pack[w]); a.preload='auto'; a.addEventListener('error',()=>{ a.bad=true; }); voiceClips[w]=a; });
+}
+function voiceClip(word,delay){
+  const a=voiceClips[word]; if(!a||a.bad||a.readyState<3) return false;
+  const go=()=>{ try{ a.volume=clamp(volSfx,0,1); a.currentTime=0; const p=a.play(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} };
+  if(delay) setTimeout(go,delay*1000); else go(); return true;
+}
+function voiceSpeak(word,delay){
+  const ss=window.speechSynthesis; if(!ss||!window.SpeechSynthesisUtterance||!VOICE_TEXT[lang]) return false;
+  const v=voicePick(ss.getVoices?ss.getVoices():[],lang,voiceName); if(!v) return false;
+  const u=new SpeechSynthesisUtterance(VOICE_TEXT[lang][word]); u.voice=v; u.lang=v.lang; u.pitch=.7; u.rate=.95; u.volume=clamp(volSfx,0,1);
+  const go=()=>{ try{ ss.cancel(); ss.speak(u); }catch(e){} };
+  if(delay) setTimeout(go,delay*1000); else go(); return true;
+}
 function voiceSay(word,delay){
-  if(!ac||!MUS.bus||ac.state!=='running'||splashHold||audOut||muted||!sfxGain) return;
-  const W=VOICE[word]; if(!W) return;
+  if(splashHold||audOut||muted||!voiceOn||document.hidden||!ac||ac.state!=='running') return;
   if(MUS.log) MUS.log.push('voice:'+word);
+  duckHit(1.1);
+  const src=voiceClip(word,delay)?'clip':voiceSpeak(word,delay)?'browser':(voiceRobot(word,delay),'robot');
+  if(MUS.log) MUS.log.push('voice-src:'+src);
+}
+function voiceFillList(){
+  const sel=$('voiceSel'), ss=window.speechSynthesis; if(!sel) return;
+  const keep=voiceName, list=(ss&&ss.getVoices?ss.getVoices():[]).filter(v=>(v.lang||'').toLowerCase().replace('_','-').startsWith(lang)&&(!VOICE_NOVELTY.test(v.name)||v.name===keep));
+  sel.innerHTML=''; const o0=document.createElement('option'); o0.value=''; o0.textContent=L('voice_auto'); sel.appendChild(o0);
+  list.forEach(v=>{ const o=document.createElement('option'); o.value=v.name; o.textContent=v.name+' ('+v.lang+')'; sel.appendChild(o); });
+  sel.value=list.some(v=>v.name===keep)?keep:'';
+}
+function loadVoicePrefs(){ try{ voiceOn=localStorage.getItem('sublevel-voice')!=='0'; voiceName=localStorage.getItem('sublevel-voicename')||''; }catch(e){} }
+function saveVoicePrefs(){ try{ localStorage.setItem('sublevel-voice',voiceOn?'1':'0'); localStorage.setItem('sublevel-voicename',voiceName); }catch(e){} }
+function paintVoice(){ if($('voiceOn')) $('voiceOn').checked=voiceOn; if($('pVoice')) $('pVoice').checked=voiceOn; }
+function voiceRobot(word,delay){
+  if(!ac||!MUS.bus||ac.state!=='running'||!sfxGain) return;
+  const W=VOICE[word]; if(!W) return;
   const t0=ac.currentTime+.03+(delay||0), total=W.segs.reduce((a,b)=>a+b[1],0);
   const out=ac.createGain(); out.gain.value=VOICE_GAIN*W.gain; out.connect(sfxGain); revSend(out,.22);
   const cd=ac.createDelay(.05), cf=ac.createGain(), cw=ac.createGain(); cd.delayTime.value=.0095; cf.gain.value=.42; cw.gain.value=.5; out.connect(cd); cd.connect(cf); cf.connect(cd); cd.connect(cw); cw.connect(sfxGain);
@@ -1769,9 +1845,10 @@ function applyPose(f,dt){
 
 /* ---------- combat ---------- */
 const G={menuOpen:false,lastCard:null,showcase:null,state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
-function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0}; }
+function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0,thrown:0,landed:0,time:0}; }
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
+  G.log.time+=dt;
   if(Math.hypot(P.pos.x,P.pos.z)>R*.85) G.log.corner+=dt;
 }
 let P=null,E=null;
@@ -1780,7 +1857,7 @@ const IDLE={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
 function startAtk(f,type){
   const D=ATK[type];
   f.state='attack'; f.atk={type,def:D,t:0,done:false}; f.stam-=D.cost; f.stamDelay=.55; f.started=type;
-  if(f.isPlayer){ f.hist.push(type); if(f.hist.length>3) f.hist.shift(); }
+  if(f.isPlayer){ f.hist.push(type); if(f.hist.length>3) f.hist.shift(); G.log.thrown++; }
   SFX.whoosh();
 }
 function startDodge(f,I,dirO){
@@ -1802,6 +1879,7 @@ function strike(a,d,D){
   if(d.inv>0){ SFX.whoosh(); return; }
   const dir=d.pos.subtract(a.pos); dir.y=0; dir.normalize();
   if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
+  else if(a.isPlayer&&d.state!=='block') G.log.landed++;
   if(d.state==='block'){
     d.hp=Math.max(1,d.hp-D.dmg*.1); d.stam-=D.dmg*.95; d.vel.addInPlace(dir.scale(D.kb*3)); a.stam=Math.max(0,a.stam-4);
     camKick(dir,.03); fxWord('BLOK',mid); SFX.block(); G.shake=Math.max(G.shake,.25); G.hitstop=.035; G.cheer=Math.max(G.cheer,.4);
@@ -1825,7 +1903,7 @@ function strike(a,d,D){
 function endBout(w,l,mid){
   l.state='ko'; l.koT=0; l.atk=null; w.state='win'; w.atk=null; w.t=0;
   rumble(1,1,420); G.state='ko'; G.koTimer=2.4; G.koSlow=.45; G.koClock=0; G.winner=w; fxWord('KO',mid); SFX.ko(); musicSting('ko'); voiceSay('ko',.2); G.cheer=1.4; G.shake=1.1; G.hitstop=.14;
-  banner(w.isPlayer?'K.O.':'DOWN');
+  banner(w.isPlayer?L('banner_ko'):L('banner_down'));
 }
 
 function step(f,o,I,dt){
@@ -2083,6 +2161,7 @@ window.addEventListener('keydown',e=>{
   if(e.repeat) return;
   keys.add(k); capLight(k,true);
   const act=actionFor(k);
+  if(autoOn&&G.state==='fight'&&(act||MOVE_KEYS.has(k))) G.autoTaken=true;
   if(act==='jab') buf.jab=INPUT.buf;
   else if(act==='heavy') buf.heavy=INPUT.buf;
   else if(act==='dodge') buf.dodge=INPUT.buf;
@@ -2138,6 +2217,18 @@ function wireSwitch(id, get, set, last){
 wireSwitch('pMusic',()=>volMusic,v=>{ volMusic=v; },v=>{ if(v!==undefined) musLast=v; return musLast; });
 wireSwitch('pAmb',()=>volAmb,v=>{ volAmb=v; },v=>{ if(v!==undefined) ambLast=v; return ambLast; });
 paintAudio();
+/* voice: the checkbox (title and pause), the list of voices, Hear */
+loadVoicePrefs(); paintVoice(); voiceFillList();
+loadAutoPrefs(); paintAuto();
+const setAutoOn=v=>{ autoOn=!!v; saveAutoPrefs(); paintAuto(); };
+if($('autoOn')) $('autoOn').addEventListener('change',e=>setAutoOn(e.target.checked));
+if($('pAuto')) $('pAuto').addEventListener('change',e=>setAutoOn(e.target.checked));
+const setVoiceOn=v=>{ voiceOn=!!v; saveVoicePrefs(); paintVoice(); };
+if($('voiceOn')) $('voiceOn').addEventListener('change',e=>setVoiceOn(e.target.checked));
+if($('pVoice')) $('pVoice').addEventListener('change',e=>setVoiceOn(e.target.checked));
+if($('voiceSel')) $('voiceSel').addEventListener('change',e=>{ voiceName=e.target.value; saveVoicePrefs(); });
+if($('voiceHear')) $('voiceHear').addEventListener('click',()=>{ audioInit('click'); const keep=voiceOn; voiceOn=true; voiceSay('fight'); voiceOn=keep; });
+if(window.speechSynthesis&&window.speechSynthesis.addEventListener) window.speechSynthesis.addEventListener('voiceschanged',voiceFillList);
 function rumble(strong,weak,ms){
   if(rumbleAmt<=0||padIdx<0||!navigator.getGamepads) return;
   const gp=navigator.getGamepads()[padIdx], v=gp&&gp.vibrationActuator;
@@ -2157,7 +2248,7 @@ function pollPad(){
   const analog=i=>{ const b=gp.buttons[i]; return !!(b&&(b.value||0)>=.5); };
   padBlock=analog(6)||analog(7)||pr(4)||pr(5)||pr(1);
   if(G.state==='pause'){ if(dn(9)||dn(0)) resumeFight(); }
-  else if(!$('wrap').hidden){ if(dn(0)||dn(9)) $('go').click(); }
+  else if(!$('wrap').hidden){ if(dn(8)){ if(G.menuOpen) closeMenu(); else if(!cardEsc) openMenu(); } else if(dn(0)||dn(9)) $('go').click(); }
   else {
     if(dn(9)) pauseFight();
     if(dn(2)) buf.jab=.22; if(dn(3)) buf.heavy=.22; if(dn(0)) buf.dodge=.22;
@@ -2266,7 +2357,7 @@ function playGame(){
   if(G.state!=='splash') return;
   $('splash').hidden=true; splashHold=false; audOut=false;
   audioInit('click'); if(ac&&ac.state==='suspended'){ try{ ac.resume(); }catch(e){} }
-  SFX.ui(); titleCard(); setTimeout(()=>musicSting('play'),170);
+  voiceClipsInit(); SFX.ui(); titleCard(); setTimeout(()=>musicSting('play'),170);
 }
 const lnk=(u,t)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+'</a>';
 /* Credits as a card. back() says where Back goes: the title, or the pause menu it was opened from. */
@@ -2376,6 +2467,7 @@ function updateHud(){
   const cfg=E.cfg; let nm=cfg.foe;
   if(cfg.echo&&E.hp/E.maxHp<.35&&(G.t%1.4)<.14) nm='Auditor';
   if($('eName').textContent!==nm) $('eName').textContent=nm;
+  const tag=autoOn&&!G.autoTaken&&(G.state==='fight'||G.state==='ready'||G.state==='pause'); if($('autoTag').hidden===tag) $('autoTag').hidden=!tag; if(tag&&$('autoTag').textContent!==L('auto_badge')) $('autoTag').textContent=L('auto_badge');
 }
 function banner(text){
   bannerEl.textContent=text; bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
@@ -2449,12 +2541,12 @@ function dockMission(next){
 }
 function showFinalCard(){
   showCard({stamp:L('final_stamp'),kick:L('final_kick'),title:L('final_title'),body:L('final_body'),
-    rows:[[L('row_next'),L('final_next')],[L('row_you'),fightLine()]],btn:L('final_btn'),go:()=>{ G.bout=0; titleCard(); }});
+    rows:[[L('row_next'),L('final_next')],[L('row_you'),fightLine()],[L('row_punches'),punchLine()]],btn:L('final_btn'),go:()=>{ G.bout=0; titleCard(); }});
 }
 function winCard(){
   const i=G.bout, next=i+1, uLabel=unlockLabel(i);
   grantWin(i);
-  const rows=[[L('row_you'),fightLine()]], perfect=!!(G.log&&G.log.hits===0);
+  const rows=[[L('row_you'),fightLine()],[L('row_punches'),punchLine()]], perfect=!!(G.log&&G.log.hits===0);
   if(perfect) rows.unshift([L('row_perfect'),L('perfect_v')]);
   if(uLabel) rows.unshift([L('row_unlock'),uLabel]);
   if(next<BOUTS.length) rows.unshift([L('row_next'),boutPlace(BOUTS[next])]);
@@ -2471,7 +2563,7 @@ function winCard(){
 function startBout(i){
   if(G.state==='splash') splashHold=false; /* a bout started by a probe from the splash, which the interface cannot do */
   musicMoodSet('card'); if($('splash')) $('splash').hidden=true; audOut=false; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
-  G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i]);
+  G.fightVoiced=false; G.autoTaken=false; P.bot=null; G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i]);
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
   resetFighter(E,2.3,-Math.PI/2,cfg.hp);
@@ -2482,18 +2574,24 @@ function startBout(i){
   G.state='ready'; G.readyT=0; G.winner=null; hudEl.hidden=false; $('touch').hidden=!isTouch; $('pause').hidden=true;
   showTutor();
   keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
-  banner('BOUT '+(i+1)); musicSting('ready');
+  banner(L('bout_stamp')+' '+(i+1)); musicSting('ready');
   skinBout(i);
 }
 function fightLine(){
-  const L=G.log||{hits:0,blocks:0,dodges:0,corner:0};
-  return L.hits+' hits, '+L.blocks+' blocks, '+L.dodges+' dodges, '+(Math.round(L.corner*10)/10)+' s in the corner';
+  const g=G.log||{hits:0,blocks:0,dodges:0,corner:0};
+  return L('st_line').replace('{h}',g.hits).replace('{b}',g.blocks).replace('{d}',g.dodges).replace('{c}',Math.round(g.corner*10)/10)
+    .replace(/\b1 (hit|block|dodge)s\b/g,'1 $1').replace(/\b1 colpi subiti/,'1 colpo subito').replace(/\b1 parate/,'1 parata').replace(/\b1 schivate/,'1 schivata');
+}
+/* punches thrown and landed (a block or a dodge is not landed) and the length of the bout, for the result cards */
+function punchLine(){
+  const g=G.log||{thrown:0,landed:0,time:0};
+  return L('st_punch').replace('{l}',g.landed).replace('{t}',g.thrown).replace('{a}',g.thrown?Math.round(g.landed/g.thrown*100):0).replace('{s}',Math.round(g.time*10)/10);
 }
 function afterKO(){
   if(G.winner===P) winCard();
   else {
     showCard({stamp:L('lose_stamp'),kick:L('bout_stamp')+' '+(G.bout+1),title:L('lose_title'),body:L('lose_body'),
-      rows:[[L('row_retry'),BOUTS[G.bout].foe+', '+boutPlace(BOUTS[G.bout])],[L('row_you'),fightLine()]],btn:L('lose_btn'),go:()=>{ G.retry=true; startBout(G.bout); },mood:'lose'}); voiceSay('lose',.5);
+      rows:[[L('row_retry'),BOUTS[G.bout].foe+', '+boutPlace(BOUTS[G.bout])],[L('row_you'),fightLine()],[L('row_punches'),punchLine()]],btn:L('lose_btn'),go:()=>{ G.retry=true; startBout(G.bout); },mood:'lose'}); voiceSay('lose',.5);
   }
 }
 
@@ -2536,8 +2634,13 @@ function simTick(){
   if(G.hitstop>0){ G.hitstop-=dt; dt*=.12; }
   buf.jab=Math.max(0,buf.jab-dt); buf.heavy=Math.max(0,buf.heavy-dt); buf.dodge=Math.max(0,buf.dodge-dt);
   const live=G.state==='fight';
-  if(G.state==='ready'){ G.readyT+=dt; if(G.readyT>1.15){ G.state='fight'; banner('FIGHT!'); voiceSay('fight'); } }
-  const Ip=live?playerIntent():IDLE, Ie=live?aiIntent(E,P,dt):IDLE;
+  if(G.state==='ready'){ G.readyT+=dt; if(!G.fightVoiced&&G.readyT>.95){ G.fightVoiced=true; voiceSay('fight'); } if(G.readyT>1.15){ G.state='fight'; banner(L('banner_fight')); } }
+  let Ip=live?playerIntent():IDLE;
+  if(live&&autoOn&&!G.autoTaken){
+    if(Ip.mx||Ip.mz||Ip.jab||Ip.heavy||Ip.dodge||Ip.block) G.autoTaken=true; /* touch, pad or a key held from before */
+    else Ip=botIntent(P,E,dt,diff);
+  }
+  const Ie=live?aiIntent(E,P,dt):IDLE;
   P.prev.copyFrom(P.pos); E.prev.copyFrom(E.pos);
   step(P,E,Ip,dt); if(P.started&&buf[P.started]!==undefined) buf[P.started]=0;
   step(E,P,Ie,dt);
@@ -3078,6 +3181,7 @@ document.querySelectorAll('[data-lang]').forEach(b=>{
   b.addEventListener('click',()=>{ lang=b.dataset.lang; saveLang(); paintLang(); if(G.state==='card'&&!wrapEl.hidden) titleCard(); });
 });
 function setLang(code){
+  setTimeout(()=>{ if(typeof voiceFillList==='function') voiceFillList(); },0);
   if(code==='en'||code==='it'){ lang=code; saveLang(); paintLang(); if(G.state==='card'&&!wrapEl.hidden) titleCard(); }
   return lang;
 }
@@ -3510,7 +3614,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={G,CAM,SKIN,INPUT,MIX,voiceSay,musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={G,CAM,SKIN,INPUT,MIX,fightLine,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>
