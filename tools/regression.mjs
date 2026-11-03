@@ -517,6 +517,26 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("enter_does_not_hijack_a_focused_control", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const enter = (target) => target.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      $("wrap").hidden = true; S.qaResetProgress(); S.progress.wins = 3;
+      S.practiceCard(0); await sleep(150);
+      o.cardUp = !$("wrap").hidden && G.state === "card" && !$("cardBack").hidden;
+      $("cardBack").focus(); enter($("cardBack")); await sleep(250);
+      o.backFocused = G.state === "card" && !$("wrap").hidden && !G.practice;
+      $("go").focus(); enter($("go")); await sleep(300);
+      o.goStillWorks = G.state !== "card";
+      $("wrap").hidden = true; S.qaResetProgress(); S.titleCard(); await sleep(150);
+      const was = $("cTitle").textContent;   /* the title card's Play opens the dossier, which is a card too, so compare the title text */
+      document.body.focus(); enter(window); await sleep(300);
+      o.bodyStillWorks = $("cTitle").textContent !== was;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("esc_opens_menu_on_every_card", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })), o = {};

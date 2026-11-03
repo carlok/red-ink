@@ -2302,7 +2302,9 @@ window.addEventListener('keydown',e=>{
     else if(G.state==='pause') resumeFight();
     return;
   }
-  if(k==='enter'&&!$('wrap').hidden&&!G.menuOpen){ e.preventDefault(); $('go').click(); return; }
+  /* Enter starts the card's main action, unless focus is on another control (Back, the Easy retry, a link, a slider): then it belongs to that control. */
+  const onOther=e.target&&e.target!==$('go')&&e.target.closest&&e.target.closest('button,input,select,textarea,a[href],[role=button]');
+  if(k==='enter'&&!$('wrap').hidden&&!G.menuOpen&&!onOther){ e.preventDefault(); $('go').click(); return; }
   if(['space','arrowup','arrowdown','arrowleft','arrowright'].includes(k)&&$('wrap').hidden) e.preventDefault();
   if(e.repeat) return;
   keys.add(k); capLight(k,true);
