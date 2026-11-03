@@ -56,6 +56,8 @@ const results = [];
 const EXPECTED_ERRORS = {
   /* the game throws on purpose when the page has no WebGL, after it has shown its message */
   webgl_missing_shows_message: [/needs WebGL/],
+  /* the crash catcher test throws on purpose, in a timer, a promise and the render loop */
+  crash_catcher_shows_a_card_with_details: [/test crash in/],
 };
 let activeCdp = null;
 function takeErrors(name) {
@@ -1103,6 +1105,34 @@ async function runHttpSuite(cdp) {
     if (!b.title || b.wins !== 0 || b.bad !== "{nope") throw new Error("corrupt save: " + JSON.stringify(b));
     await cdp.eval(`(() => { ["sublevel-sfx","sublevel-music","sublevel-amb","sublevel-rumble","sublevel-diff","sublevel-binds","sublevel-progress-bad"].forEach((k) => localStorage.removeItem(k)); window.__sublevel.qaResetProgress(); })()`);
     return { a, b };
+  });
+
+  /* Also last: a throw inside the render loop kills the loop for good, so the page is reloaded afterwards. */
+  await test("crash_catcher_shows_a_card_with_details", async () => {
+    const o = {};
+    const card = () => cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), $ = (i) => document.getElementById(i);
+      await __until(() => !$("noGL").hidden, "the crash card", 3000);
+      await sleep(50);
+      return { title: $("noGLTitle").textContent, detail: $("noGLDetail").textContent, detailShown: !$("noGLDetail").hidden, copy: !$("noGLCopy").hidden, keep: !$("noGLKeep").hidden };
+    })()`, true);
+    await cdp.eval(`window.__sublevel.crashProbe.timer()`);
+    const t = await card();
+    o.timer = t.title === "Something broke" && t.detailShown && t.copy && t.keep && /crash report/.test(t.detail) && /test crash in timer/.test(t.detail) && /state /.test(t.detail) && /babylon /.test(t.detail);
+    await cdp.eval(`document.getElementById("noGLKeep").click()`);
+    o.keepDismisses = await cdp.eval(`document.getElementById("noGL").hidden`);
+    /* only one card per load, until the probe resets it */
+    await cdp.eval(`window.__sublevel.crashProbe.timer()`); await cdp.eval(`new Promise((r) => setTimeout(r, 600))`, true);
+    o.onceOnly = await cdp.eval(`document.getElementById("noGL").hidden`);
+    await cdp.eval(`window.__sublevel.crashProbe.reset(); window.__sublevel.crashProbe.promise()`);
+    const p = await card();
+    o.promise = /test crash in promise/.test(p.detail) && p.keep;
+    await cdp.eval(`window.__sublevel.crashProbe.reset(); window.__sublevel.crashProbe.frame()`);
+    const f = await card();
+    o.deadLoopOffersReloadOnly = /test crash in frame/.test(f.detail) && f.copy && !f.keep;
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    if (!Object.values(o).every(Boolean)) throw new Error(JSON.stringify({ o, t, p, f }));
+    return o;
   });
 
   if (SHOT) {
