@@ -1,0 +1,21 @@
+# Dependabot owns dependency bumps (see AGENTS.md). One weekly PR per ecosystem keeps the noise down.
+# The Babylon.js packages and esbuild are pinned on purpose: lib/babylon.js is a tree-shaken bundle built from them, and a new
+# engine version has to be re-measured against the bout table first. Bump those by hand in a sprint of their own.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "@babylonjs/*"
+      - dependency-name: esbuild
+    groups:
+      qa-tools:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3

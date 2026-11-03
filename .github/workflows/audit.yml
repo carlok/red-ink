@@ -1,0 +1,26 @@
+name: audit
+
+# Reports known advisories in the dev tooling. It never blocks a merge: a new advisory can appear any day and the deployed game
+# ships none of these packages. Dependabot opens the fix. (Every dependency here is a dev dependency, so --omit=dev would audit nothing.)
+on:
+  pull_request:
+    paths: [package.json, package-lock.json]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm audit --audit-level=high
