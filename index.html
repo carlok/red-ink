@@ -2092,7 +2092,7 @@ function applyPose(f,dt){
 /* ---------- combat ---------- */
 const G={menuOpen:false,lastCard:null,showcase:null,state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
 /* dodges counts punches the player evaded; dodgeTries counts dodge presses (it was the only count before Sprint 27) */
-function resetLog(){ G.log={hits:0,blocks:0,dodges:0,dodgeTries:0,corner:0,thrown:0,landed:0,time:0}; }
+function resetLog(){ G.log={hits:0,blocks:0,dodges:0,dodgeTries:0,corner:0,thrown:0,landed:0,time:0,jabHit:0,jabBlock:0,jabDodge:0}; }   /* jab*: how the foe received the player's jabs (balance-run reads them) */
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
   G.log.time+=dt;
@@ -2123,6 +2123,7 @@ function camKick(dir,amt){
 function strike(a,d,D){
   if(d.state==='ko') return;
   const mid=a.pos.add(d.pos).scale(.5); mid.y=1.25;
+  if(a.isPlayer&&D.dmg<=10) G.log[d.inv>0?'jabDodge':d.state==='block'?'jabBlock':'jabHit']++;
   if(d.inv>0){ if(d.isPlayer) G.log.dodges++; SFX.whoosh(); return; }
   const dir=d.pos.subtract(a.pos); dir.y=0; dir.normalize();
   if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
@@ -3682,7 +3683,7 @@ function simMeet(opt){
         if(G.state!=='fight') break;
       }
       rows.push({win:G.winner===P,t:Math.round(real*10)/10,empty:real?empty/real:0,gap:Math.round(maxGap*10)/10,ko:G.state==='ko',ehp:Math.max(0,Math.round(E.hp)),php:Math.max(0,Math.round(P.hp)),
-        hits:G.log.hits,blocks:G.log.blocks,dodges:G.log.dodges,corner:G.log.corner});
+        hits:G.log.hits,blocks:G.log.blocks,dodges:G.log.dodges,corner:G.log.corner,jh:G.log.jabHit,jb:G.log.jabBlock,jd:G.log.jabDodge});
     }
     const lens=rows.map(r=>r.t).sort((a,b)=>a-b);
     const empty=rows.reduce((s,r)=>s+r.empty,0)/n;
@@ -3699,7 +3700,8 @@ function simMeet(opt){
       hits:Math.round(rows.reduce((s,r)=>s+r.hits,0)/n*10)/10,
       blocks:Math.round(rows.reduce((s,r)=>s+r.blocks,0)/n*10)/10,
       dodges:Math.round(rows.reduce((s,r)=>s+r.dodges,0)/n*10)/10,
-      corner:Math.round(rows.reduce((s,r)=>s+r.corner,0)/n*10)/10
+      corner:Math.round(rows.reduce((s,r)=>s+r.corner,0)/n*10)/10,
+      jabAnswered:(()=>{ const h=rows.reduce((s,r)=>s+r.jh,0), a=rows.reduce((s,r)=>s+r.jb+r.jd,0); return h+a?Math.round(a/(h+a)*1000)/10:0; })()   /* % of the player's jabs that reached the foe and were blocked or dodged */
     });
   }
   rng=prevRng; diff=prevDiff;
