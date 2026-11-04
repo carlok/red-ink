@@ -4,7 +4,7 @@ Ideas that were suggested or left out of a sprint and are not built. Nothing her
 
 ## Ranking
 
-Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items, a fourth look, from the play flow, added 13, and a fifth look, from two reviews (combat and feel; web robustness and tooling), added 25 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; Sprint 27 built items 21 to 30; item 31 is next.
+Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items, a fourth look, from the play flow, added 13, and a fifth look, from two reviews (combat and feel; web robustness and tooling), added 25 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; Sprints 27 and 28 built items 21 to 31; item 32 is next.
 
 ### Tier 1: Sprint 25 (all ten built; see `TUNING_LOG.md`)
 
@@ -55,7 +55,7 @@ Every item below, best first. Score is value (1 to 5, counting risk removed) div
 
 | # | Item | Size | Score |
 | --- | --- | --- | --- |
-| 31 | Five of six foes cannot answer a jab (balance sprint: moves the bout table) | M | 2.0 |
+| 31 | Five of six foes cannot answer a jab (built in Sprint 28: `JAB_READ`, health retuned) | M | 2.0 |
 | 32 | Training room with a dummy and live move costs | S+ | 2.0 |
 | 33 | Tells you can hear, and shapes not only colour | S+ | 2.0 |
 | 34 | Medals per bout from the stats already counted | S+ | 2.0 |
@@ -311,7 +311,7 @@ Two read-only reviews went through the code: one on combat and feel, one on web 
 - **The regression can hang for 20 minutes.** About 12 tests use `while(G.state!=='fight') await raf()` with no bound, `test()` has no timeout, the JSON summary prints only at the end and `test.yml` uploads nothing on failure. Fixed sleeps such as `sleep(4300)` (:696) are the next flake. Small (item 21).
 - **The regression ignores page errors.** No `Runtime.exceptionThrown`, `consoleAPICalled`, `Log` or `Network.loadingFailed` subscription (grep gives 0), so a thrown handler or a 404 on a font passes CI. Small to medium (item 28).
 - **Docs disagree with the code.** `README.md:13` says "Three bouts" (there are six) and that Google Fonts load online (they are local). `CONTINUE.md` still says "Sprint 9, do this one" and "Sprint 12". `AGENTS.md` and `CONTINUE.md` give a 400 draw calls and 250 meshes budget while the regression enforces 48 and 52 (:318). Small to medium (item 29).
-- **Five of six foes cannot answer a jab.** A jab's `a1` is 0.20 s (:357). The AI answers only while `atk.t<a1` after waiting `react` (:2130-2133), and `react` at Normal is Reyes .08, Halvorsen .202, Pike .24, Voss .29, Dag .38, Chen .445. Only Reyes can block or dodge a jab, and nobody can on Easy, so the dossier's block and dodge percentages say little about jabs. It is a balance change: all six bout-table numbers move, so it needs a sprint of its own with `balance-run` before and after. Medium (item 31).
+- **Five of six foes cannot answer a jab (built in Sprint 28, item 31).** A jab's `a1` is 0.20 s (:357). The AI answers only while `atk.t<a1` after waiting `react` (:2130-2133), and `react` at Normal is Reyes .08, Halvorsen .202, Pike .24, Voss .29, Dag .38, Chen .445. Only Reyes can block or dodge a jab, and nobody can on Easy, so the dossier's block and dodge percentages say little about jabs. It is a balance change: all six bout-table numbers move, so it needs a sprint of its own with `balance-run` before and after. Medium (item 31).
 - **Missing cues.** A dodge that works plays `SFX.whoosh`, the same as a whiffed swing; there is no low-health cue (the vignette at :737 is unused for it); the foe's stamina is not shown, so the guard-break window is invisible. Small to medium (item 36).
 - **The knockout cannot be skipped.** `koTimer=2.4` (:2064) is fixed, which adds up over retries. Small (item 60).
 - **A blank page until about 4 MB of scripts parse.** `#splash` is `hidden` in the HTML (:313) and four synchronous scripts run at :327-330, with no spinner and no `noscript`. Small to medium (item 37).
