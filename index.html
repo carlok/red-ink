@@ -678,11 +678,11 @@ function boutRole(c){ return L(c.roleKey); }
 function boutTip(c){ return L(c.tipKey); }
 const BOUTS=[
   {foe:'Reyes',roleKey:'role_reyes',placeKey:'place_b1',introKey:'intro_b1',afterKey:'after_b1',tipKey:'tip_b1',look:'reyes',hp:70,speed:2.7,react:.08,cd:1.7,heavy:.18,block:.28,dodge:.04,dmg:.85,reach:1,style:'teach'},
-  {foe:'Dag',roleKey:'role_dag',placeKey:'place_b2',introKey:'intro_b2',afterKey:'after_b2',tipKey:'tip_b2',look:'dag',hp:115,speed:2.5,react:.38,cd:1.4,heavy:.42,block:.18,dodge:.06,dmg:1.15,reach:1.12,style:'punish'},
-  {foe:'Pike',roleKey:'role_pike',placeKey:'place_b3',introKey:'intro_b3',afterKey:'after_b3',tipKey:'tip_b3',look:'pike',hp:120,speed:3.7,react:.24,cd:1.05,heavy:.3,block:.18,dodge:.14,dmg:.49,reach:1,echo:true,style:'echo'},
-  {foe:'Voss',roleKey:'role_voss',placeKey:'place_b4',introKey:'intro_b4',afterKey:'after_b4',tipKey:'tip_b4',look:'voss',hp:175,speed:2.985,react:.29,cd:1.155,heavy:.335,block:.405,dodge:.10,dmg:1.20,reach:1.1,style:'teach'},
-  {foe:'Chen',roleKey:'role_chen',placeKey:'place_b5',introKey:'intro_b5',afterKey:'after_b5',tipKey:'tip_b5',look:'chen',hp:152,speed:2.66,react:.445,cd:1.17,heavy:.48,block:.31,dodge:.10,dmg:1.17,reach:1.12,style:'punish'},
-  {foe:'Halvorsen',roleKey:'role_halvor',placeKey:'place_b6',introKey:'intro_b6',afterKey:'after_b6',tipKey:'tip_b6',look:'halvor',hp:122,speed:3.435,react:.202,cd:1.03,heavy:.29,block:.17,dodge:.11,dmg:.498,reach:1,echo:true,style:'echo'}
+  {foe:'Dag',roleKey:'role_dag',placeKey:'place_b2',introKey:'intro_b2',afterKey:'after_b2',tipKey:'tip_b2',look:'dag',hp:105,speed:2.5,react:.38,cd:1.4,heavy:.42,block:.18,dodge:.06,dmg:1.15,reach:1.12,style:'punish'},
+  {foe:'Pike',roleKey:'role_pike',placeKey:'place_b3',introKey:'intro_b3',afterKey:'after_b3',tipKey:'tip_b3',look:'pike',hp:111,speed:3.7,react:.24,cd:1.05,heavy:.3,block:.18,dodge:.14,dmg:.49,reach:1,echo:true,style:'echo'},
+  {foe:'Voss',roleKey:'role_voss',placeKey:'place_b4',introKey:'intro_b4',afterKey:'after_b4',tipKey:'tip_b4',look:'voss',hp:150,speed:2.985,react:.29,cd:1.155,heavy:.335,block:.405,dodge:.10,dmg:1.20,reach:1.1,style:'teach'},
+  {foe:'Chen',roleKey:'role_chen',placeKey:'place_b5',introKey:'intro_b5',afterKey:'after_b5',tipKey:'tip_b5',look:'chen',hp:131,speed:2.66,react:.445,cd:1.17,heavy:.48,block:.31,dodge:.10,dmg:1.17,reach:1.12,style:'punish'},
+  {foe:'Halvorsen',roleKey:'role_halvor',placeKey:'place_b6',introKey:'intro_b6',afterKey:'after_b6',tipKey:'tip_b6',look:'halvor',hp:116,speed:3.435,react:.202,cd:1.03,heavy:.29,block:.17,dodge:.11,dmg:.498,reach:1,echo:true,style:'echo'}
 ];
 const UNLOCK_CHAIN=[
   {type:'outfit',id:'sanitation',labelKey:'unlock_outfit_san'},
@@ -1982,7 +1982,7 @@ function resetFighter(f,x,yaw,hp){
   f.marks=0; f.koKind=0;
   if(f.lag){ f.lag.tie=0; f.lag.hair=0; f.lag.shirt=0; f.lag.hem=0; }
   f.ai.cd=1.2; f.ai.tick=.5; f.ai.blockT=0; f.ai.atk=null; f.ai.dodgeNow=false; f.ai.move='in'; f.ai.moveT=.2; f.ai.side=1;
-  f.ai.tell=0; f.ai.pending=null; f.ai.feint=false; f.ai.watch=null; f.ai.waited=0; f.ai.answered=false; f.ai.punish=0; f.ai.punishFresh=0; f.ai.feintN=0; f.ai.rolled=0;
+  f.ai.read=0; f.ai.tell=0; f.ai.pending=null; f.ai.feint=false; f.ai.watch=null; f.ai.waited=0; f.ai.answered=false; f.ai.punish=0; f.ai.punishFresh=0; f.ai.feintN=0; f.ai.rolled=0;
   f.ai.echoKey=''; f.ai.echoQ=null; f.ai.echoIdx=0;
   f.hist.length=0;
 }
@@ -2092,7 +2092,7 @@ function applyPose(f,dt){
 /* ---------- combat ---------- */
 const G={menuOpen:false,lastCard:null,showcase:null,state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
 /* dodges counts punches the player evaded; dodgeTries counts dodge presses (it was the only count before Sprint 27) */
-function resetLog(){ G.log={hits:0,blocks:0,dodges:0,dodgeTries:0,corner:0,thrown:0,landed:0,time:0}; }
+function resetLog(){ G.log={hits:0,blocks:0,dodges:0,dodgeTries:0,corner:0,thrown:0,landed:0,time:0,jabHit:0,jabBlock:0,jabDodge:0}; }   /* jab*: how the foe received the player's jabs (balance-run reads them) */
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
   G.log.time+=dt;
@@ -2123,6 +2123,7 @@ function camKick(dir,amt){
 function strike(a,d,D){
   if(d.state==='ko') return;
   const mid=a.pos.add(d.pos).scale(.5); mid.y=1.25;
+  if(a.isPlayer&&D.dmg<=10) G.log[d.inv>0?'jabDodge':d.state==='block'?'jabBlock':'jabHit']++;
   if(d.inv>0){ if(d.isPlayer) G.log.dodges++; SFX.whoosh(); return; }
   const dir=d.pos.subtract(a.pos); dir.y=0; dir.normalize();
   if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
@@ -2197,9 +2198,14 @@ function resolveBodies(){
 }
 
 /* ---------- AI ---------- */
+/* A jab lands 0.10 s after it starts, so a foe that waits cfg.react (.24 to .445 s for five of the six) can never answer one, and jab after jab is free.
+   JAB_READ gives them a read instead: once a foe has seen the player attack within the last `mem` seconds he is ready for the next jab and answers it at once,
+   with his own block and dodge odds scaled by `f`. The first jab of a string is still free; a string is not. Foes whose react is already under a jab's
+   a1 (Reyes) are left as they were. */
+const JAB_READ={mem:2,f:.4};
 function aiIntent(e,p,dt){
   const A=e.ai,c=e.cfg,I={mx:0,mz:0,jab:false,heavy:false,block:false,dodge:false};
-  A.cd-=dt; A.blockT-=dt; A.moveT-=dt;
+  A.cd-=dt; A.blockT-=dt; A.moveT-=dt; if(A.read>0) A.read-=dt;
   if(A.tell>0) A.tell-=dt;
   if(e.state==='hit'||e.state==='ko'||e.state==='win'){ A.tell=0; A.pending=null; A.feint=false; }
   const to=p.pos.subtract(e.pos); to.y=0; const dist=to.length();
@@ -2211,6 +2217,14 @@ function aiIntent(e,p,dt){
   if(atk&&A.watch!==atk){
     if(A.watch&&style==='punish'&&!A.watch.done&&A.punish<=0){ A.punish=c.react; A.punishFresh=1; }
     A.watch=atk; A.waited=0; A.answered=false;
+    const read=atk.type==='jab'&&A.read>0&&c.react>=atk.def.a1;
+    A.read=JAB_READ.mem;
+    if(read&&dist<2.7&&e.state!=='attack'){
+      A.answered=true; A.tell=0; A.pending=null; A.feint=false;
+      const r=rng();
+      if(r<c.dodge*JAB_READ.f&&e.stam>=16&&e.cd<=0) A.dodgeNow=true;
+      else if(r<(c.dodge+c.block)*JAB_READ.f&&e.stam>1) A.blockT=Math.max(.25,atk.def.a1-atk.t);
+    }
   } else if(A.watch&&A.watch!==atk){
     if(style==='punish'&&!A.watch.done&&A.punish<=0){ A.punish=c.react; A.punishFresh=1; }
     A.watch=null;
@@ -3539,10 +3553,10 @@ let diff='normal';
    scaleCfg only reads this when it is given a bout index. The numbers are tuned with balance-run --pass2. */
 const PASS2_MODS=[
   {key:'mod_iron',apply:o=>{ o.hp=Math.round(o.hp*1.4); }},
-  {key:'mod_quick',apply:o=>{ o.react*=.8; o.cd*=.85; }},
+  {key:'mod_quick',apply:o=>{ o.react*=.8; o.cd*=.75; }},
   {key:'mod_heavy',apply:o=>{ o.dmg*=1.1; }},
   {key:'mod_heavy',apply:o=>{ o.dmg*=1.25; }},
-  {key:'mod_relentless',apply:o=>{ o.cd*=.8; }},
+  {key:'mod_relentless',apply:o=>{ o.cd*=.7; }},
   {key:'mod_iron',apply:o=>{ o.hp=Math.round(o.hp*1.06); }}
 ];
 function scaleCfg(cfg,pass2){
@@ -3682,7 +3696,7 @@ function simMeet(opt){
         if(G.state!=='fight') break;
       }
       rows.push({win:G.winner===P,t:Math.round(real*10)/10,empty:real?empty/real:0,gap:Math.round(maxGap*10)/10,ko:G.state==='ko',ehp:Math.max(0,Math.round(E.hp)),php:Math.max(0,Math.round(P.hp)),
-        hits:G.log.hits,blocks:G.log.blocks,dodges:G.log.dodges,corner:G.log.corner});
+        hits:G.log.hits,blocks:G.log.blocks,dodges:G.log.dodges,corner:G.log.corner,jh:G.log.jabHit,jb:G.log.jabBlock,jd:G.log.jabDodge});
     }
     const lens=rows.map(r=>r.t).sort((a,b)=>a-b);
     const empty=rows.reduce((s,r)=>s+r.empty,0)/n;
@@ -3699,7 +3713,8 @@ function simMeet(opt){
       hits:Math.round(rows.reduce((s,r)=>s+r.hits,0)/n*10)/10,
       blocks:Math.round(rows.reduce((s,r)=>s+r.blocks,0)/n*10)/10,
       dodges:Math.round(rows.reduce((s,r)=>s+r.dodges,0)/n*10)/10,
-      corner:Math.round(rows.reduce((s,r)=>s+r.corner,0)/n*10)/10
+      corner:Math.round(rows.reduce((s,r)=>s+r.corner,0)/n*10)/10,
+      jabAnswered:(()=>{ const h=rows.reduce((s,r)=>s+r.jh,0), a=rows.reduce((s,r)=>s+r.jb+r.jd,0); return h+a?Math.round(a/(h+a)*1000)/10:0; })()   /* % of the player's jabs that reached the foe and were blocked or dodged */
     });
   }
   rng=prevRng; diff=prevDiff;
@@ -4010,7 +4025,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={JAB_READ,step,aiIntent,resolveBodies,crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

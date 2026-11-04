@@ -1588,3 +1588,56 @@ Not done: a real AZERTY or Dvorak keyboard, the Italian second-pass and save-war
 - `balance-run.mjs` prints `dodges` per bout; that column now counts evasions, not presses.
 - Not done on purpose: the jab-answer fix (five of six foes cannot answer a jab; it moves all six numbers and is item 31 for a balance sprint of its own).
 - Not checked: holding Enter and Esc on a real keyboard, two real tabs, how the crash card reads on a phone, a native read of the five new Italian strings.
+
+## Sprint 28: the foes answer a string of jabs (backlog item 31)
+
+Hypothesis: a jab lands 0.10 s after it starts and five of the six foes wait `cfg.react` (.24 to .445 s) before they answer, so they never answer one. Jab after jab is free, the bot wins with nothing else, and the block and dodge numbers in the dossier do nothing against the move a player uses most. Metric: the share of the player's jabs that reach the foe and are blocked or dodged (`jabAnswered`, new in `balance-run`), with the bout table held within 3 points of the old one.
+
+### Baseline (master, bot at Normal, 200 fights per bout, seed 1)
+
+| | Reyes | Dag | Pike | Voss | Chen | Halvorsen |
+| --- | --- | --- | --- | --- | --- | --- |
+| Win % | 90.5 | 67.5 | 44.0 | 36.0 | 30.0 | 22.0 |
+| Jabs answered % | 30.4 | 0 | 0 | 0 | 0 | 0 |
+
+Counted another way (100 fights, a temporary counter, later replaced by the permanent one): against Dag, Pike, Voss, Chen and Halvorsen every one of about 1,500 to 2,200 jabs per bout landed; none was blocked or dodged. Against Reyes 69 percent landed, 27 blocked, 4 dodged. The bot throws no heavy that reaches a foe in these runs.
+
+### The change
+
+`JAB_READ = {mem: 2, f: .4}`, in `aiIntent`. When a foe first sees the player's attack and has seen an attack within the last `mem` seconds, and the attack is a jab, and his react is not under the jab's `a1` (so Reyes is left as he was), he answers at once with his own odds: dodge if `r < dodge * f`, else block if `r < (dodge + block) * f`. Seeing any attack restarts the 2 s memory. The first jab of a string is still free. It costs one `rng()` call per answered jab and no new state beyond `ai.read`.
+
+### Strength, before any retune (n = 100, health as before)
+
+| f | Reyes | Dag | Pike | Voss | Chen | Halvorsen | Jabs answered (Dag to Halvorsen) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 (off) | 92 | 62 | 33 | 35 | 25 | 27 | 0 each |
+| .3 | 92 | 47 | 22 | 22 | 8 | 22 | 5.4 / 3.3 / 9.6 / 7.6 / 2.3 |
+| .6 | 92 | 40 | 10 | 5 | 3 | 10 | 10.7 / 6.3 / 18.9 / 16.4 / 5.5 |
+| 1 | 92 | 37 | 6 | 0 | 1 | 3 | 18.1 / 10.5 / 30 / 26.4 / 8.6 |
+
+(The f 0 row differs from the baseline by sampling: n is 100 and the extra `rng()` call shifts the stream. Reyes is the same in every row, which is the control.) I chose .4: foes answer 4 to 13 percent of the jabs that reach them, well under their block and dodge odds, and the table loses 10 to 30 points that foe health then gives back.
+
+### Retune
+
+Foe health against win rate is steep and steps with the jab's 7 damage (Dag 105 hp wins 69, 107 wins 59.5), so health was set by measurement: Dag 115 to 105, Pike 120 to 111, Voss 175 to 150, Chen 152 to 131, Halvorsen 122 to 116. The second-pass cooldowns moved too, because the second pass sits on the same health and the old Dag change no longer separated it from the first pass (67.5 against 69): Dag x.85 to x.75 and Chen x.8 to x.7.
+
+### Result (bot at Normal, 200 fights, seed 1)
+
+| | Reyes | Dag | Pike | Voss | Chen | Halvorsen |
+| --- | --- | --- | --- | --- | --- | --- |
+| First pass, before | 90.5 | 67.5 | 44.0 | 36.0 | 30.0 | 22.0 |
+| First pass, now | 90.5 | 69.0 | 40.5 | 37.0 | 30.5 | 21.0 |
+| First pass, n = 400, mean of seeds 1 and 7 | 90.3 | 70.2 | 43.3 | 35.1 | 28.0 | 19.7 |
+| Second pass, before | 71.5 | 52.0 | 16.5 | 16.0 | 12.0 | 11.5 |
+| Second pass, now | 71.5 | 54.5 | 14.5 | 17.0 | 12.0 | 11.0 |
+| Jabs answered %, now | 30.4 | 7.1 | 4.4 | 13.3 | 10.3 | 4.0 |
+| Easy, before / now | 100 / 100 | 95.5 / 96 | 100 / 100 | 90 / 93.5 | 80.5 / 83 | 100 / 100 |
+| Hard, before / now | 86.5 / 86.5 | 30.5 / 36.5 | 0 / 0.5 | 4.5 / 4 | 3 / 5.5 | 0 / 0 |
+
+The bout table moved, by at most 3.5 points at n = 200 (Pike) and 2.7 on the n = 400 mean (Dag): the contract in `AGENTS.md` now reads 90.5 / 69.0 / 40.5 / 37.0 / 30.5 / 21.0. I did not chase the old numbers exactly: one hp point moves a bout by up to 10 points (the 7-damage steps), so matching seed 1 at n = 200 would fit the sample, not the game. The second pass still sits below the first in every bout and above 0.
+
+### What it took
+
+- The first test drove the wrong foe. Dag's style punishes a whiff with a heavy, so a "second jab" test against him measured the punish loop. The test uses Voss (style teach), pins both fighters at jab range and silences the foe's own attacks, then checks: the first jab lands, the next is answered (f forced high), the read fades after 2 s, f 0 turns it off, and Reyes gives the same result with the read on and off. It fails with the read removed.
+- `step-probe`: identical to 60 fps over 900 ticks at 20, 30, 60, 120 and 144 fps. Regression: 61 of 61.
+- Not measured: how this feels to a human. The bot throws a jab every 1.55 s; a person who chains jabs faster meets the read earlier. The number of jabs a person lands on each foe is the thing to watch in the playtest log (`G.log` now carries `jabHit`, `jabBlock`, `jabDodge`, but the exported log entries do not yet).

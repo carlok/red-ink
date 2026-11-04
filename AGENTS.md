@@ -17,7 +17,7 @@ The bout table is the balance contract. After any change that could touch the si
 node tools/balance-run.mjs 200 normal 1 normal 0-5
 ```
 
-and expect 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0. Render-only code (camera, particles, sound, DOM) must not touch the fixed 1/60 s sim or `rng()`. If a table value changes, the change is a balance change: say so, measure it and log it in `TUNING_LOG.md`.
+and expect 90.5 / 69.0 / 40.5 / 37.0 / 30.5 / 21.0 (Reyes, Dag, Pike, Voss, Chen, Halvorsen; the numbers before Sprint 28 were 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0). `--pass2` on the same command gives the second pass: 71.5 / 54.5 / 14.5 / 17.0 / 12.0 / 11.0. Each row also prints `jabAnswered`, the share of the player's jabs the foe blocked or dodged (30.4 / 7.1 / 4.4 / 13.3 / 10.3 / 4.0). Render-only code (camera, particles, sound, DOM) must not touch the fixed 1/60 s sim or `rng()`. If a table value changes, the change is a balance change: say so, measure it and log it in `TUNING_LOG.md`.
 
 Budgets that still hold: under 400 draw calls and under 250 active meshes (the ceiling), keyboard to attack state under 80 ms. The regression also holds each of the six places to a tighter guard of 20 to 48 draws and at most 52 active meshes (`draw_budget_per_place`); that is the number a change is most likely to trip.
 

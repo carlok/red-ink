@@ -685,6 +685,47 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("foes_read_a_string_of_jabs", async () => {
+    const r = await cdp.eval(`(async () => {
+      const S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {}, dt = 1 / 60;
+      const idle = { mx: 0, mz: 0, jab: false, heavy: false, block: false, dodge: false };
+      /* one player jab against a quiet foe at jab range; returns how the foe received it */
+      const jab = (E, P) => {
+        const before = { ...G.log }; let thrown = false;
+        for (let t = 0; t < 90; t++) {
+          const ip = !thrown && P.state === "idle" && P.cd <= 0 ? { ...idle, jab: true } : idle; thrown = thrown || ip.jab;
+          S.step(P, E, ip, dt); E.ai.cd = 99; S.step(E, P, S.aiIntent(E, P, dt), dt); S.resolveBodies();
+          P.pos.set(-0.7, 0, 0); E.pos.set(0.7, 0, 0); E.vel.set(0, 0, 0);   /* pinned at jab range: the foe's footwork is not what is tested */
+        }
+        return { hit: G.log.jabHit - before.jabHit, block: G.log.jabBlock - before.jabBlock, dodge: G.log.jabDodge - before.jabDodge };
+      };
+      const setup = (bout) => { $("wrap").hidden = true; S.startBout(bout); S.seed(3); const E = S.E, P = S.P; G.state = "fight"; P.pos.set(-0.7, 0, 0); E.pos.set(0.7, 0, 0); return [E, P]; };
+      const saved = { ...S.JAB_READ };
+      const tick = async () => { await __until(() => G.state === "fight", "fight"); };
+      /* Voss (bout 4, style teach so no punish loop): react .29 s, far over a jab's .20 s */
+      S.JAB_READ.f = 10; S.JAB_READ.mem = 2;
+      let [E, P] = setup(3); await tick(); [E, P] = setup(3);
+      const first = jab(E, P), second = jab(E, P);
+      o.firstJabIsFree = first.hit === 1 && first.block + first.dodge === 0;
+      o.nextJabIsAnswered = second.hit === 0 && second.block + second.dodge === 1;
+      /* the read fades: after more than mem seconds of nothing, the next jab is free again */
+      for (let t = 0; t < 150; t++) { S.step(P, E, idle, dt); E.ai.cd = 99; S.step(E, P, S.aiIntent(E, P, dt), dt); S.resolveBodies(); P.pos.set(-0.7, 0, 0); E.pos.set(0.7, 0, 0); E.vel.set(0, 0, 0); E.stam = 100; }
+      const third = jab(E, P);
+      o.readFades = third.hit === 1 && third.block + third.dodge === 0;
+      /* with the read turned off (f 0) the second jab lands */
+      S.JAB_READ.f = 0; [E, P] = setup(3);
+      const a = jab(E, P), b = jab(E, P);
+      o.offMeansFree = a.hit === 1 && b.hit === 1;
+      /* Reyes (bout 1) answers jabs by his own reaction time and is not touched by the read: same result with it on and off */
+      S.JAB_READ.f = 10; [E, P] = setup(0); const r1 = jab(E, P); const r2 = jab(E, P);
+      S.JAB_READ.f = 0; [E, P] = setup(0); const q1 = jab(E, P); const q2 = jab(E, P);
+      o.reyesUnchanged = JSON.stringify([r1, r2]) === JSON.stringify([q1, q2]);
+      Object.assign(S.JAB_READ, saved);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("win_card_warns_when_progress_cannot_be_saved", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
