@@ -10,7 +10,7 @@ Browser fighting game. One HTML file, no account, no build step to play.
 
 You audit pallet counts on the night shift at Halvorsen Freight. The totals always reconcile. Tonight Pike hands you a keycard and points at a door that is not on the floor plan.
 
-Three bouts, on a taped circle in a warehouse. Reyes teaches, Dag punishes a miss, Pike repeats your last three punches. Keyboard, standard gamepad, and touch. Drop a `.glb` on the title card to fight as an imported avatar. The engine is a tree-shaken Babylon.js build. The game runs from the files on disk. Google Fonts load when you are online and fall back to system fonts when you are not.
+Six bouts, each in its own place under the warehouse. Reyes teaches, Dag punishes a miss, Pike repeats your last three punches, and three more wait after them. Keyboard, standard gamepad, and touch. Drop a `.glb` on the title card to fight as an imported avatar. The engine is a tree-shaken Babylon.js build. The game runs from the files on disk and calls no other host: the fonts are local too.
 
 ## Topics
 
@@ -89,6 +89,8 @@ Quality steps down resolution, then shadow filtering, then shadows, when the fra
 - **Movement by position:** the keys where W, A, S and D sit on a QWERTY board move the fighter on any layout (ZQSD on AZERTY), and the hints say so where the browser reports the layout (Chromium). Jab, heavy, block and dodge stay by the letter on the key.
 - **Saves:** the progress save carries a version and is upgraded when the game loads it; a save from a newer build is left as it is. If the browser blocks storage, the win card says that the win will not be kept.
 - **Pad unplugged** in a fight: the fight pauses and says why.
+- **Crash card:** an uncaught error shows one card with Reload, Copy details (the browser, the state, the last five logged bouts and the error) and, while the game is still drawing, Keep playing. Nothing is sent anywhere.
+- **Held keys:** holding Esc or Enter does not repeat; a press made while paused does not fire on Resume; a voice line already queued is dropped on pause, mute, a hidden tab and Quit; a second tab cannot overwrite a save that has more wins.
 - **Playtest log:** each finished bout adds one line (result, time, hits taken, blocks, dodges, punches thrown and landed, difficulty, who controlled it) to a list of the newest 200 in this browser's local storage. Nothing is sent anywhere. *Export playtest log* in the title settings saves it as JSON; *Clear log* empties it. It exists so real players' numbers can be set against the bot table.
 - **No WebGL:** the page says what is needed instead of staying blank. Tests run on every pull request (`.github/workflows/test.yml`) and before each deploy.
 

@@ -20,9 +20,9 @@ Never regress: keyboard, standard-mapping gamepad, touch, phone portrait, GLB dr
 
 Test in headless Chrome against `window.__sublevel`. On this Mac the binary is `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`. Use `--headless=new` and a fresh user-data dir. Do not pass width and height to `Target.createTarget`. Attach to the existing page, then `Emulation.setDeviceMetricsOverride`. Fixed seeds for any balance run. `node tools/balance-run.mjs [n] [skill] [seed] [diff] [bouts] [hz]` calls `simMeet` (bouts default to 0,1,2; 60 Hz unless told otherwise). Headless frames are vsync-capped at 16.7 ms, so judge speed by draw calls, mesh count, and GPU time, and ask for a confirm on a real iGPU. Draw calls are the per-frame delta of `engine._drawCalls`, not `.current`.
 
-Budgets that still hold: under 400 draw calls, under 250 active meshes, input to the attack state under 80 ms. The 55 fps budget at 1080p on an iGPU was never proven on hardware. Last measured fight (S14) was about 147 draws and 115 active meshes. GPU time on this machine was about 1.2 to 1.4 ms.
+Budgets that still hold: under 400 draw calls and under 250 active meshes (the ceiling, checked by the last scene test in `tools/regression.mjs`), and in `draw_budget_per_place` a tighter guard of 20 to 48 draws and at most 52 active meshes in each of the six places (S25 measured 39 to 46 draws). Input to the attack state under 80 ms. The 55 fps budget at 1080p on an iGPU was never proven on hardware. Last measured fight (S14) was about 147 draws and 115 active meshes. GPU time on this machine was about 1.2 to 1.4 ms.
 
-`window.__sublevel` exposes `G`, `CAM`, `SKIN`, `skinOn`, `skinFighter`, `randomLook`, `seed`, `startBout`, `P`, `E`, `useAvatar`, `simMeet`, `probeAI`, `poseProbe`, `poseStill`, `audioReady`, `audioState`, `audioTick`, `setAudio`, `notePad`, `setUnlock`, `hit`, `shakeMul`, `setLessMotion`, `pauseFight`, `resumeFight`, `restartBout`, `tutorInfo`.
+`window.__sublevel` exposes `G`, `CAM`, `SKIN`, `skinOn`, `skinFighter`, `randomLook`, `seed`, `startBout`, `P`, `E`, `useAvatar`, `simMeet`, `probeAI`, `poseProbe`, `poseStill`, `audioReady`, `audioState`, `audioTick`, `setAudio`, `notePad`, `setUnlock`, `hit`, `shakeMul`, `setLessMotion`, `pauseFight`, `resumeFight`, `restartBout`, `tutorInfo`, and since S27 `buf`, `strike`, `ATK`, `binds` and `crashProbe` (throws on purpose for the crash catcher test).
 
 Probes already in `tools/`: `balance-run.mjs`, `combat-probe.mjs`, `input-probe.mjs`, `portrait.mjs`, `ai-probe.mjs`, `pose-probe.mjs`, `look-probe.mjs`, `audio-probe.mjs`, `ui-probe.mjs`, `cam-probe.mjs`, `step-probe.mjs`, `skin-probe.mjs`, `skin-gallery.mjs`, `skin-random.mjs`, `look-contrast-probe.mjs`. `G.ticks` counts sim ticks and `G.trace(k)` is called after each one when set. Chrome user-data dirs match `.tmp-chrome-*` and are gitignored.
 
@@ -52,30 +52,13 @@ Do not redo these. Read `TUNING_LOG.md` before changing a number.
 - S24. Voice: `voiceSay` picks a clip from `assets/voice/voice.js`, else a male browser voice (`voicePick`, `VOICE_NOVELTY` skips macOS novelty voices; a Voice checkbox and list are in the title settings and the pause menu), else the formant robot. Autoplay: `autoOn` (`sublevel-auto`, `?auto=1`), `simTick` uses `botIntent(P,E,dt,diff)` until `G.autoTaken`; `tools/autoplay-probe.mjs`. Result cards show `punchLine()` from `G.log.thrown/landed/time`. Gamepad Back opens the card menu.
 - S25. CI: `.github/workflows/test.yml` (also called by `pages.yml`). `tutorLine(mode)`, `afterKO` loss counter and the Try Easy button (`c.assist` on `showCard`), WebGL guard (`showNoGL`), `gamepaddisconnected` pause, `blockToggle`/`G.blockLatch`, Italian pass in `paintLang` (all UI words are `STR` keys; the regression checks parity), playtest log (`logFight`, `sublevel-log`), practice mode (`practiceCard`, `G.practice`, `c.back` on `showCard`), `draw_budget_per_place` in the regression.
 - S26. `progressDefaults`/`migrateProgress`/`PROGRESS_VER` (the save is versioned: v2 added `pass2`), `continueAction` (the title card's `assist` slot: Continue, or the second pass once every bout is won), `PASS2_MODS` and `scaleCfg(cfg,pass2)` (the change per fighter; the first pass never passes an index), `pass2Card`/`pass2WinCard`/`G.pass2` (reset in `titleCard`, `hubCard`, `introCard`), `keyName` movement by `event.code` (`MOVE_CODES`, `moveCaps`, `loadMoveCaps`), `restartBout` sets `G.retry`, the Enter shortcut stands aside for other focused controls, head tags and `assets/social.jpg`, `balance-run.mjs --pass2`. `AGENTS.md` is the short rule list for agents; `.github/dependabot.yml` and `.github/workflows/audit.yml` (non-blocking) carry dependency care, and the actions in all three workflows are pinned to SHAs.
+- S27. Tests and hardening, no new content. `tools/cdp-session.mjs`: `CDP.eval` gives up after 90 s and names the expression, `window.__until(fn, label, ms)` is installed before every page load, and the CDP session collects page errors (`Runtime.exceptionThrown`, `console.error`, `Log` error entries such as a 404). `tools/regression.mjs`: each test is raced against 120 s, the run stops at the first timeout, one line per test goes to stderr, results land in `regression-result.json` (CI uploads it when the job fails), `--only <name>` runs the tests whose name contains it, and a test that sees a page error fails unless `EXPECTED_ERRORS` lists the message for that test with a reason. Game: Esc and Enter ignore key repeat, `clearInput` (buffer, sticks, touch block) runs on pause, resume and blur, `G.log.dodges` counts evaded punches and `G.log.dodgeTries` the presses (playtest log entries are `v:2` with `tries`), `saveProgressData(exact)` merges what another tab saved (`mergeStoredProgress`, a `storage` listener; resets pass `true`), `voiceCancel` silences a queued line on pause, mute, hide and Quit, `num()` and `sanitizeProgress` validate stored values (a save that cannot be parsed is copied to `sublevel-progress-bad`), and the crash catcher (`onCrash`, `crashReport`, `showNoGL('crash')`, Keep playing only while frames still come).
 
 S9 and S12 are logged in TUNING_LOG.md. Ideas not built are in `BACKLOG.md`. S11 was not done: the avatar path is now the skinned fighter, see S15.
 
-## Sprint 9, do this one
+## Next
 
-Story and structure.
-
-- Tighten the story cards. Rename the three bouts. Add bouts 4, 5, and 6. Between fights, a hub with a rule board. A stealth or sabotage mission on the loading dock.
-- Italian and English strings from one table. Every card under 55 words.
-- Progression: an outfit or an arena unlocks after each win. The save must survive `localStorage` throwing. Wrap every read and write in try/catch, the way the binds and the audio sliders already do.
-
-Numeric targets to set before you edit, then measure: word count of every card (max 55), both languages rendered from the same keys, a save key that round-trips an unlock, and the new bouts still reachable from the hub without breaking bout 1 to 3. Keep the combat table. New opponents need their own `BOUTS` row and should go through `scaleCfg`. Re-run `node tools/balance-run.mjs 200 normal 1` if you touch damage, health, react, or `rng()` on the hit path, and put the win rates in the log. The old targets were 85 / 65 / 45 for Reyes / Dag / Pike. Later sprints moved the played table to about 90.5 / 67.5 / 44. Do not silently retune that while writing story.
-
-## After sprint 9
-
-Sprint 11, avatar from a photo. Do not start it in the same turn.
-
-- Load three different free-service GLBs (an RPM-style export, a VRoid export, a Mixamo character). Fix scale, facing, materials, and bounds. Draco GLBs still need an external decoder. The current bundle does not include it.
-- Write down the best free path from a selfie to a GLB. Fallback: the procedural head, with the photo as a face texture.
-
-Sprint 12, release and QA. `LICENSE`, `NOTICE`, and `README.md` already exist. Do not rewrite the license.
-
-- Automated regression: title, three bouts, win, lose, restart, pad, touch, avatar. Device matrix. Lighthouse and an accessibility check.
-- An offline zip. A changelog.
+Pick from `BACKLOG.md`: its Ranking table is in order. Sprints 25, 26 and 27 built items 1 to 30, so item 31 is next (the foes that cannot answer a jab; it moves the bout table, so it is a balance sprint with `balance-run` before and after). Sprint 9 (story, hub, unlocks) and sprint 12 (release and QA) are done and logged in `TUNING_LOG.md`; sprint 11 (an avatar from a photo) was replaced by the skinned fighter in S15.
 
 ## Hand check the human still has to do
 

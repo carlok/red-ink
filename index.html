@@ -61,6 +61,8 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .noGL .box{max-width:440px;background:var(--paper);color:var(--ink);border:2px solid var(--tape);padding:20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
 .noGL h2{margin:0;font:800 clamp(22px,6vw,30px)/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
 .noGL p{margin:0;font:400 16px/1.4 var(--f-body)}
+.noGL .row{display:flex;flex-wrap:wrap;gap:8px}
+.noGL pre{margin:0;width:100%;box-sizing:border-box;max-height:30vh;overflow:auto;padding:8px;border:1px solid var(--mute);font:400 11px/1.4 var(--f-data);white-space:pre-wrap;word-break:break-all;user-select:text;-webkit-user-select:text}
 .bar.thin{height:8px;border-width:1px;width:68%;border-color:var(--mute)}
 .bar i,.bar b{position:absolute;top:0;bottom:0;left:0;width:100%;display:block}
 .right .bar i,.right .bar b{left:auto;right:0}
@@ -214,7 +216,12 @@ dl.rows dd a{color:inherit}
     <div class="box">
       <h2 id="noGLTitle">This game needs WebGL</h2>
       <p id="noGLBody">Your browser cannot start WebGL. Turn on hardware acceleration in its settings, or try Chrome, Firefox or Edge.</p>
-      <button class="btn2" id="noGLBtn" type="button">Reload</button>
+      <pre id="noGLDetail" hidden></pre>
+      <div class="row">
+        <button class="btn2" id="noGLBtn" type="button">Reload</button>
+        <button class="btn2" id="noGLCopy" type="button" hidden>Copy details</button>
+        <button class="btn2" id="noGLKeep" type="button" hidden>Keep playing</button>
+      </div>
     </div>
   </div>
   <div class="banner" id="banner" aria-live="polite"></div>
@@ -335,6 +342,7 @@ const $=id=>document.getElementById(id);
 if(!window.BABYLON){ $('fail').hidden=false; $('wrap').hidden=true; return; }
 const B=BABYLON, V3=B.Vector3, C3=B.Color3;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+const num=(x,lo,hi,def)=>{ x=Number(x); return Number.isFinite(x)?clamp(x,lo,hi):def; };   /* a number read from storage or a setting: NaN and Infinity give def */
 const lerp=(a,b,t)=>a+(b-a)*t;
 const damp=(k,dt)=>1-Math.exp(-k*dt);
 let rng=Math.random;
@@ -578,6 +586,11 @@ const STR={
   gl_lost_title:{en:'Graphics were reset',it:'Grafica reimpostata'},
   gl_lost_body:{en:'The game is paused. If the picture does not come back in a few seconds, reload the page.',it:"Il gioco è in pausa. Se l'immagine non torna entro pochi secondi, ricarica la pagina."},
   gl_reload:{en:'Reload',it:'Ricarica'},
+  crash_title:{en:'Something broke',it:'Qualcosa si è rotto'},
+  crash_body:{en:'The game hit an error. Your wins are saved. Reload to carry on. To report it, copy the details below; nothing is sent anywhere.',it:'Il gioco ha incontrato un errore. Le vittorie sono salvate. Ricarica per continuare. Per segnalarlo, copia i dettagli qui sotto; non viene inviato nulla.'},
+  crash_copy:{en:'Copy details',it:'Copia i dettagli'},
+  crash_copied:{en:'Copied',it:'Copiato'},
+  crash_keep:{en:'Keep playing',it:'Continua a giocare'},
   unlock_outfit_san:{en:'Sanitation cap (wear in fights)',it:'Cappello sanificazione (nei match)'},
   unlock_arena_dock:{en:'Dock sodium lights (arena)',it:'Luci sodio banchina (arena)'},
   unlock_outfit_stripe:{en:'Safety stripe shirt',it:'Maglia strisce sicurezza'},
@@ -688,6 +701,14 @@ function migrateProgress(p){
   if(typeof p.v!=='number') p.v=0;
   if(p.v<1) p.v=1;   /* 0 to 1: Sprint 25 and older saves had no version field; the fields are the same */
   if(p.v<2){ if(typeof p.pass2!=='number') p.pass2=0; p.v=2; }   /* 1 to 2: the second pass counts the bouts cleared in it */
+  return sanitizeProgress(p);
+}
+/* A hand-edited or damaged save must not reach the game as it is. Each known field keeps its value when it is the right kind and is put right when it is not
+   (a count outside its range is clamped, anything that is not a number becomes 0, an unknown outfit becomes the Auditor); fields this build does not know are left alone. */
+function sanitizeProgress(p){
+  const n=(x,hi)=>Number.isFinite(x)?Math.floor(clamp(x,0,hi)):0;
+  p.wins=n(p.wins,BOUTS.length); p.pass2=n(p.pass2,BOUTS.length); p.dock=n(p.dock,1); p.arena=n(p.arena,3);
+  if(typeof p.outfit!=='string'||!Object.prototype.hasOwnProperty.call(OUTFITS,p.outfit)) p.outfit='auditor';
   return p;
 }
 let progress=progressDefaults();
@@ -701,11 +722,26 @@ const CAM={fovV:.85,fovH:1,wide:1.25,frac:.40,fracPortrait:.2,pad:1.7,padPortrai
 /* ---------- engine, scene ---------- */
 const canvas=$('view');
 /* No WebGL, or a GPU reset: say so in words instead of leaving a blank page. */
-function showNoGL(kind){
+/* kind: 'none' (no WebGL), 'lost' (the context was reset) or 'crash' (an uncaught error; extra = {text, alive}) */
+function showNoGL(kind,extra){
   const el=$('noGL'); if(!el) return;
-  $('noGLTitle').textContent=L(kind==='lost'?'gl_lost_title':'gl_none_title');
-  $('noGLBody').textContent=L(kind==='lost'?'gl_lost_body':'gl_none_body');
+  const k=kind==='lost'?'gl_lost':kind==='crash'?'crash':'gl_none';
+  $('noGLTitle').textContent=L(k+'_title');
+  $('noGLBody').textContent=L(k+'_body');
   $('noGLBtn').textContent=L('gl_reload'); $('noGLBtn').onclick=()=>location.reload();
+  const crash=kind==='crash'&&extra;
+  $('noGLDetail').hidden=!crash; $('noGLCopy').hidden=!crash; $('noGLKeep').hidden=!(crash&&extra.alive);
+  if(crash){
+    $('noGLDetail').textContent=extra.text;
+    $('noGLCopy').textContent=L('crash_copy'); $('noGLKeep').textContent=L('crash_keep');
+    $('noGLCopy').onclick=async()=>{
+      let ok=false;
+      try{ await navigator.clipboard.writeText(extra.text); ok=true; }
+      catch(e){ try{ const r=document.createRange(); r.selectNodeContents($('noGLDetail')); const s=getSelection(); s.removeAllRanges(); s.addRange(r); ok=document.execCommand('copy'); }catch(e2){} }
+      $('noGLCopy').textContent=L(ok?'crash_copied':'crash_copy');
+    };
+    $('noGLKeep').onclick=()=>{ el.hidden=true; };
+  }
   el.hidden=false;
 }
 let engine;
@@ -714,6 +750,29 @@ try{
   engine=new B.Engine(canvas,true,{stencil:true,preserveDrawingBuffer:false},false);
 }catch(e){ showNoGL('none'); throw new Error('Sublevel Three needs WebGL ('+e.message+')'); }
 canvas.addEventListener('webglcontextlost',()=>{ if(G.state==='fight'||G.state==='ready') pauseFight(); showNoGL('lost'); });
+/* Crash catcher: an uncaught error or a rejected promise shows one card per page load with what a bug report needs. If the render loop has died the card
+   offers Reload only; if frames still come it also offers Keep playing. The report is built here and shown; it is never sent anywhere. */
+let crashed=false;
+function crashReport(err){
+  const out=['Sublevel Three crash report'];
+  try{ out.push('babylon '+(B.Engine.Version||'?')+' | '+navigator.userAgent); }catch(e){}
+  try{ out.push('state '+G.state+' | bout '+(G.bout+1)+' | lang '+lang+' | quality '+Q.lvl+' | '+innerWidth+'x'+innerHeight+' @'+(devicePixelRatio||1)); }catch(e){}
+  try{ out.push('last bouts '+JSON.stringify(logRead().slice(-5))); }catch(e){}
+  const msg=err&&err.stack?String(err.stack).split('\n').slice(0,7).join('\n'):String(err&&err.message||err);
+  out.push(msg.slice(0,900));
+  return out.join('\n');
+}
+function onCrash(err){
+  if(crashed) return; crashed=true;
+  const text=crashReport(err), f0=engine.frameId;
+  try{ if(G.state==='fight'||G.state==='ready') pauseFight(); }catch(e){}
+  setTimeout(()=>showNoGL('crash',{text,alive:engine.frameId>f0}),300);
+}
+window.addEventListener('error',ev=>{
+  if(/ResizeObserver loop/.test(ev.message||'')||/^(chrome|moz|safari-web)-extension:/.test(ev.filename||'')||(!ev.error&&ev.message==='Script error.')) return;
+  onCrash(ev.error||ev.message);
+});
+window.addEventListener('unhandledrejection',ev=>onCrash(ev.reason));
 canvas.addEventListener('webglcontextrestored',()=>{ if($('noGL')) $('noGL').hidden=true; });
 engine.setHardwareScalingLevel(1/Math.min(window.devicePixelRatio||1,1.25));
 const scene=new B.Scene(engine);
@@ -1017,15 +1076,35 @@ function buildProps(){
   it=[]; for(let i=0;i<8;i++){ const p=polar(i/8*Math.PI*2+.39,14.15); it.push([at(box(.1,8,.1),p[0],4,p[1]),i&1?'#ff4a3d':'#4de8ff',1]); } set('strips',it);
 }
 function loadProgress(){
+  let raw=null;
   try{
-    const raw=localStorage.getItem(SAVE_KEY);
-    if(raw){ const p=JSON.parse(raw); if(p&&typeof p==='object') progress=Object.assign(progressDefaults(),migrateProgress(p)); }
-  }catch(e){}
+    raw=localStorage.getItem(SAVE_KEY);
+    if(raw){ const p=JSON.parse(raw); if(p&&typeof p==='object'&&!Array.isArray(p)) progress=Object.assign(progressDefaults(),migrateProgress(p)); else throw new Error('not a save'); }
+  }catch(e){
+    /* a save that cannot be read is kept under another key before the next win overwrites it, so it can be recovered by hand */
+    if(raw){ try{ localStorage.setItem(SAVE_KEY+'-bad',raw); }catch(e2){} }
+  }
   applyArena(progress.arena);
 }
-function saveProgressData(){
+/* Another tab may have moved the save on since this one loaded it. Unless the caller means to overwrite (a reset, a probe), a save first takes
+   what the stored copy has beyond ours: the larger counts, and the outfit and arena of whichever side has won more. */
+function mergeStoredProgress(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY); if(!raw) return;
+    const s=migrateProgress(JSON.parse(raw)); if(!s||typeof s!=='object') return;
+    const ahead=Number.isFinite(s.wins)&&s.wins>progress.wins;
+    if(ahead){ progress.wins=s.wins; if(typeof s.outfit==='string') progress.outfit=s.outfit; if(Number.isFinite(s.arena)) progress.arena=s.arena; }
+    if(Number.isFinite(s.pass2)&&s.pass2>(progress.pass2||0)) progress.pass2=s.pass2;
+    if(Number.isFinite(s.dock)&&s.dock>(progress.dock||0)) progress.dock=s.dock;
+    if(ahead) applyArena(progress.arena);
+  }catch(e){}
+}
+function saveProgressData(exact){
+  if(!exact) mergeStoredProgress();
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); return true; }catch(e){ return false; }
 }
+/* A save made in another tab arrives as a storage event: take it, so this tab does not show (or overwrite) an older copy. */
+window.addEventListener('storage',e=>{ if(e.key===SAVE_KEY||e.key===null) loadProgress(); });
 function grantWin(boutIdx){
   if(boutIdx+1>progress.wins) progress.wins=boutIdx+1;
   const u=UNLOCK_CHAIN[boutIdx];
@@ -1153,11 +1232,11 @@ function loadAudioPrefs(){
     const m=localStorage.getItem('sublevel-mute');
     if(m==='1') muted=true;
     const s=localStorage.getItem('sublevel-sfx');
-    if(s!==null&&s!=='') volSfx=clamp(Number(s),0,1);
+    if(s!==null&&s!=='') volSfx=num(s,0,1,volSfx);
     const u=localStorage.getItem('sublevel-music');
-    if(u!==null&&u!=='') volMusic=clamp(Number(u),0,1);
+    if(u!==null&&u!=='') volMusic=num(u,0,1,volMusic);
     const a=localStorage.getItem('sublevel-amb');
-    if(a!==null&&a!=='') volAmb=clamp(Number(a),0,1);
+    if(a!==null&&a!=='') volAmb=num(a,0,1,volAmb);
   }catch(e){}
 }
 function saveAudioPrefs(){
@@ -1477,17 +1556,25 @@ function voiceClipsInit(){
   const pack=window.SUBLEVEL_VOICE||{};
   Object.keys(pack).forEach(w=>{ if(voiceClips[w]||!pack[w]) return; const a=new Audio(pack[w]); a.preload='auto'; a.addEventListener('error',()=>{ a.bad=true; }); voiceClips[w]=a; });
 }
+/* The clip and the browser voice do not go through the audio graph, so suspending or muting it does not stop them. voiceCancel drops a line that is
+   waiting on its delay, one being spoken and one being played: pause, mute, a hidden tab and Quit call it. */
+let voiceTimer=0;
+function voiceCancel(){
+  clearTimeout(voiceTimer); voiceTimer=0;
+  try{ const ss=window.speechSynthesis; if(ss&&ss.cancel) ss.cancel(); }catch(e){}
+  Object.keys(voiceClips).forEach(w=>{ const a=voiceClips[w]; try{ if(a&&!a.paused){ a.pause(); a.currentTime=0; } }catch(e){} });
+}
 function voiceClip(word,delay){
   const a=voiceClips[word]; if(!a||a.bad||a.readyState<3) return false;
   const go=()=>{ try{ a.volume=clamp(volSfx,0,1); a.currentTime=0; const p=a.play(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} };
-  if(delay) setTimeout(go,delay*1000); else go(); return true;
+  if(delay){ clearTimeout(voiceTimer); voiceTimer=setTimeout(go,delay*1000); } else go(); return true;
 }
 function voiceSpeak(word,delay){
   const ss=window.speechSynthesis; if(!ss||!window.SpeechSynthesisUtterance||!VOICE_TEXT[lang]) return false;
   const v=voicePick(ss.getVoices?ss.getVoices():[],lang,voiceName); if(!v) return false;
   const u=new SpeechSynthesisUtterance(VOICE_TEXT[lang][word]); u.voice=v; u.lang=v.lang; u.pitch=.7; u.rate=.95; u.volume=clamp(volSfx,0,1);
   const go=()=>{ try{ ss.cancel(); ss.speak(u); }catch(e){} };
-  if(delay) setTimeout(go,delay*1000); else go(); return true;
+  if(delay){ clearTimeout(voiceTimer); voiceTimer=setTimeout(go,delay*1000); } else go(); return true;
 }
 function voiceSay(word,delay){
   if(splashHold||audOut||muted||!voiceOn||document.hidden||!ac||ac.state!=='running') return;
@@ -1684,9 +1771,9 @@ function readAudioStore(){
 }
 function setAudio(o){
   if(!o) return;
-  if(o.sfx!=null) volSfx=clamp(Number(o.sfx),0,1);
-  if(o.music!=null) volMusic=clamp(Number(o.music),0,1);
-  if(o.mute!=null) muted=!!o.mute;
+  if(o.sfx!=null) volSfx=num(o.sfx,0,1,volSfx);
+  if(o.music!=null) volMusic=num(o.music,0,1,volMusic);
+  if(o.mute!=null){ muted=!!o.mute; if(muted) voiceCancel(); }
   saveAudioPrefs(); applyBus(); paintAudio();
 }
 const SFX={
@@ -2004,7 +2091,8 @@ function applyPose(f,dt){
 
 /* ---------- combat ---------- */
 const G={menuOpen:false,lastCard:null,showcase:null,state:'title',bout:0,t:0,ticks:0,trace:null,hitstop:0,shake:0,kick:new V3(0,0,0),kickV:new V3(0,0,0),roll:0,rollV:0,koSlow:0,koClock:0,cheer:0,koTimer:0,readyT:0,winner:null,camF:new V3(0,0,1),camR:new V3(1,0,0),log:{hits:0,blocks:0,dodges:0,corner:0}};
-function resetLog(){ G.log={hits:0,blocks:0,dodges:0,corner:0,thrown:0,landed:0,time:0}; }
+/* dodges counts punches the player evaded; dodgeTries counts dodge presses (it was the only count before Sprint 27) */
+function resetLog(){ G.log={hits:0,blocks:0,dodges:0,dodgeTries:0,corner:0,thrown:0,landed:0,time:0}; }
 function noteCorner(dt){
   if(G.state!=='fight'||!P) return;
   G.log.time+=dt;
@@ -2023,7 +2111,7 @@ function startDodge(f,I,dirO){
   let dx=I.mx,dz=I.mz; const l=Math.hypot(dx,dz);
   if(l>.1){dx/=l;dz/=l;} else {dx=-dirO.x;dz=-dirO.z;}
   f.state='dodge'; f.dodgeT=0; f.dodgeDir.set(dx,0,dz); f.stam-=16; f.stamDelay=.5; f.cd=.55; f.started='dodge';
-  if(f.isPlayer) G.log.dodges++;
+  if(f.isPlayer) G.log.dodgeTries++;
   f.dodgeSide=(dirO.x*dz-dirO.z*dx)>0?1:-1; SFX.whoosh();
 }
 /* A hit pushes the camera along the blow and rolls it a little. Impulses go into two springs (see updateCamera) that settle in about a
@@ -2035,7 +2123,7 @@ function camKick(dir,amt){
 function strike(a,d,D){
   if(d.state==='ko') return;
   const mid=a.pos.add(d.pos).scale(.5); mid.y=1.25;
-  if(d.inv>0){ SFX.whoosh(); return; }
+  if(d.inv>0){ if(d.isPlayer) G.log.dodges++; SFX.whoosh(); return; }
   const dir=d.pos.subtract(a.pos); dir.y=0; dir.normalize();
   if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
   else if(a.isPlayer&&d.state!=='block') G.log.landed++;
@@ -2235,6 +2323,8 @@ function loadBinds(){
     const b=raw?JSON.parse(raw):null;
     if(b&&typeof b==='object'){
       for(const act of Object.keys(DEFAULT_BINDS)) if(typeof b[act]==='string'&&b[act]&&!RESERVED.has(b[act])) binds[act]=b[act];
+      /* two actions on one key cannot both work: a save that has that is dropped for the defaults */
+      const used=Object.values(binds); if(new Set(used).size!==used.length) Object.assign(binds,DEFAULT_BINDS);
     }
   }catch(e){}
 }
@@ -2242,7 +2332,7 @@ function saveBinds(){ try{ localStorage.setItem('sublevel-binds', JSON.stringify
 function loadRumble(){
   try{
     const r=localStorage.getItem('sublevel-rumble');
-    if(r!==null&&r!=='') rumbleAmt=clamp(Number(r),0,1);
+    if(r!==null&&r!=='') rumbleAmt=num(r,0,1,rumbleAmt);
   }catch(e){}
 }
 function saveRumble(){ try{ localStorage.setItem('sublevel-rumble', String(rumbleAmt)); }catch(e){} }
@@ -2329,6 +2419,8 @@ window.addEventListener('keydown',e=>{
     }
     listenAct=null; paintBinds(); return;
   }
+  /* A held Esc would pause and resume on every repeat, and a held Enter would run through the cards: only the first press counts. */
+  if(e.repeat&&(k==='escape'||k==='enter')){ e.preventDefault(); return; }
   if(k==='escape'){
     e.preventDefault();
     if(G.menuOpen){ closeMenu(); return; }
@@ -2355,11 +2447,13 @@ window.addEventListener('keyup',e=>{
   const k=keyName(e); keys.delete(k); capLight(k,false);
   if(e.key==='Meta'){ keys.clear(); document.querySelectorAll('#keys kbd.on').forEach(x=>x.classList.remove('on')); } /* macOS sends no keyup for keys released under Cmd */
 });
-const dropKeys=()=>{ keys.clear(); touchBlock=false; document.querySelectorAll('#keys kbd.on').forEach(x=>x.classList.remove('on')); };
+/* Presses waiting in the buffer and a held stick belong to the moment they were made: a pause, a resume or losing focus starts clean. */
+const clearInput=()=>{ buf.jab=buf.heavy=buf.dodge=0; touchVec={x:0,y:0}; padVec={x:0,y:0}; touchBlock=false; const kn=$('knob'); if(kn) kn.style.transform=''; };
+const dropKeys=()=>{ keys.clear(); clearInput(); document.querySelectorAll('#keys kbd.on').forEach(x=>x.classList.remove('on')); };
 window.addEventListener('blur',()=>{ dropKeys(); if(G.state==='fight'||G.state==='ready') pauseFight(); });
 let audWasRunning=false;
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden){ dropKeys(); if(G.state==='fight'||G.state==='ready') pauseFight(); }
+  if(document.hidden){ dropKeys(); voiceCancel(); if(G.state==='fight'||G.state==='ready') pauseFight(); }
   /* a background tab is silent: the context stops while the page is hidden and starts again, if it was running, when it comes back */
   if(ac){ if(document.hidden){ audWasRunning=ac.state==='running'; ac.suspend(); } else if(audWasRunning){ audWasRunning=false; ac.resume(); } }
 });
@@ -2516,10 +2610,12 @@ function pauseFight(){
   if(G.state!=='fight'&&G.state!=='ready') return;
   G.pauseFrom=G.state;
   G.state='pause';
+  clearInput(); voiceCancel();
   if($('pause')) $('pause').hidden=false;
 }
 function resumeFight(){
   if(G.state!=='pause') return;
+  clearInput(); /* a press made while the pause card was up must not fire now */
   G.state=G.pauseFrom||'fight';
   if($('pause')) $('pause').hidden=true;
   if($('pauseHint')) $('pauseHint').hidden=true;
@@ -2552,7 +2648,7 @@ function restartBout(){
 function toSplash(withNote){
   try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen(); else if(document.webkitFullscreenElement&&document.webkitExitFullscreen) document.webkitExitFullscreen(); }catch(e){}
   if($('pause')) $('pause').hidden=true; G.menuOpen=false; $('pause').dataset.mode='fight'; $('resume').textContent=L('resume_btn'); $('pauseTitle').textContent=L('pause_title'); wrapEl.hidden=true; hudEl.hidden=true; $('touch').hidden=true;
-  G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0;
+  G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0; voiceCancel();
   G.state='splash'; splashHold=true; audOut=true; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
   if(ac&&ac.state!=='closed'){ try{ ac.suspend(); }catch(e){} }
   $('spNote').textContent=withNote?L('out_saved_v').replace('{n}',progress.wins).replace('{m}',BOUTS.length):'';
@@ -2592,7 +2688,7 @@ function logWrite(a){ try{ localStorage.setItem(LOG_KEY,JSON.stringify(a.slice(-
 function logFight(won){
   try{
     const g=G.log||{}, a=logRead();
-    a.push({v:1,t:new Date().toISOString(),bout:G.bout+1,foe:BOUTS[G.bout].foe,win:!!won,secs:Math.round((g.time||0)*10)/10,hits:g.hits|0,blocks:g.blocks|0,dodges:g.dodges|0,thrown:g.thrown|0,landed:g.landed|0,diff:diff,ctl:autoOn?(G.autoTaken?'mixed':'ai'):'human',toggle:blockToggle,practice:!!G.practice,pass2:!!G.pass2});
+    a.push({v:2,t:new Date().toISOString(),bout:G.bout+1,foe:BOUTS[G.bout].foe,win:!!won,secs:Math.round((g.time||0)*10)/10,hits:g.hits|0,blocks:g.blocks|0,dodges:g.dodges|0,tries:g.dodgeTries|0,thrown:g.thrown|0,landed:g.landed|0,diff:diff,ctl:autoOn?(G.autoTaken?'mixed':'ai'):'human',toggle:blockToggle,practice:!!G.practice,pass2:!!G.pass2});
     logWrite(a);
   }catch(e){}
   paintLog();
@@ -2615,7 +2711,7 @@ if($('logClear')) $('logClear').addEventListener('click',()=>{
 let resetArmed=false, resetTimer=0;
 function resetProgress(){
   progress=progressDefaults();
-  saveProgressData(); applyArena(0); syncPlayerOutfit(); skinEnsure(P);
+  saveProgressData(true); applyArena(0); syncPlayerOutfit(); skinEnsure(P);
 }
 function onResetClick(){
   const b=$('resetBtn'); if(!b) return;
@@ -3400,7 +3496,7 @@ async function skinOn(on,model){
 /* ---------- boot ---------- */
 wrapEl.addEventListener('pointerdown',()=>{ audCardT=0; });
 if(isTouch&&$('menuBtn')) $('menuBtn').hidden=false;
-$('snd').addEventListener('click',()=>{ muted=!muted; saveAudioPrefs(); paintAudio(); audioInit('click'); if(!muted) SFX.ui(); });
+$('snd').addEventListener('click',()=>{ muted=!muted; if(muted) voiceCancel(); saveAudioPrefs(); paintAudio(); audioInit('click'); if(!muted) SFX.ui(); });
 buildWorld(); buildCrowd(); buildParticles(); buildWords(); applyEnv(0);
 P=makeFighter(LOOKS.auditor,true); P.cfg={foe:'Auditor'}; P.speed0=4.4; P.reach=1; P.dmgMul=1; resetFighter(P,-2.3,Math.PI/2,100);
 E=makeFighter(LOOKS.reyes,false); E.cfg=BOUTS[0]; E.speed0=2.7; E.reach=1; E.dmgMul=.8; resetFighter(E,2.3,-Math.PI/2,70);
@@ -3463,7 +3559,7 @@ function scaleCfg(cfg,pass2){
   return o;
 }
 function loadDiff(){
-  try{ const v=localStorage.getItem('sublevel-diff'); if(v&&DIFF[v]) diff=v; }catch(e){}
+  try{ const v=localStorage.getItem('sublevel-diff'); if(v&&Object.prototype.hasOwnProperty.call(DIFF,v)) diff=v; }catch(e){}
 }
 function saveDiff(){ try{ localStorage.setItem('sublevel-diff', diff); }catch(e){} }
 function paintDiff(){
@@ -3502,7 +3598,7 @@ function saveProbe(opt){
       const p=raw?JSON.parse(raw):null;
       roundTrip=roundTrip&&!!(p&&p.outfit==='exec'&&p.wins===6&&p.dock===1);
     }catch(e){ roundTrip=false; }
-    progress=snap; saveProgressData();
+    progress=snap; saveProgressData(true);
   }
   return {key:SAVE_KEY,roundTrip,survivedThrow};
 }
@@ -3523,7 +3619,7 @@ function qaClickGo(){
 }
 function qaResetProgress(){
   progress=progressDefaults();
-  saveProgressData();
+  saveProgressData(true);
   applyArena(0);
   syncPlayerOutfit();
   return Object.assign({},progress);
@@ -3914,7 +4010,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

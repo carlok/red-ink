@@ -6,3 +6,4 @@ dist/
 .DS_Store
 lib/babylon.js.LEGAL.txt
 tuning/*.json
+regression-result.json

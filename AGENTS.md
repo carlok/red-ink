@@ -19,7 +19,7 @@ node tools/balance-run.mjs 200 normal 1 normal 0-5
 
 and expect 90.5 / 67.5 / 44.0 / 36.0 / 30.0 / 22.0. Render-only code (camera, particles, sound, DOM) must not touch the fixed 1/60 s sim or `rng()`. If a table value changes, the change is a balance change: say so, measure it and log it in `TUNING_LOG.md`.
 
-Budgets that still hold: under 400 draw calls, under 250 active meshes, keyboard to attack state under 80 ms.
+Budgets that still hold: under 400 draw calls and under 250 active meshes (the ceiling), keyboard to attack state under 80 ms. The regression also holds each of the six places to a tighter guard of 20 to 48 draws and at most 52 active meshes (`draw_budget_per_place`); that is the number a change is most likely to trip.
 
 Some probes overwrite committed screenshots in `tuning/` as a side effect (`env-probe.mjs` rewrites `s17-env-b1.jpg` to `s17-env-b6.jpg`, `ai-probe.mjs` rewrites `s5-tell.jpg`). Run `git checkout -- tuning/` after a probe unless you mean to replace those pictures, so they do not slip into a commit.
 
@@ -31,7 +31,7 @@ npm run build:engine
 npm run regression
 ```
 
-`npm run regression` drives headless Chrome (set `CHROME=/path/to/chrome` if it is not found) and exits non-zero on any failure. CI runs the same three commands (`.github/workflows/test.yml`) and the Pages deploy waits for them. Put new checks in `tools/regression.mjs`.
+`npm run regression` drives headless Chrome (set `CHROME=/path/to/chrome` if it is not found) and exits non-zero on any failure. CI runs the same three commands (`.github/workflows/test.yml`) and the Pages deploy waits for them. Put new checks in `tools/regression.mjs`. `node tools/regression.mjs --only <part of a name>` runs just those tests while you work. A test fails if the page logs an error (an uncaught exception, `console.error`, a failed request) while it runs; if a test provokes one on purpose, list the message for that test in `EXPECTED_ERRORS` with the reason. A test that never reaches its state fails after its bound (`__until`) or after 120 s instead of hanging, and the result is written to `regression-result.json`.
 
 ## Dependencies
 

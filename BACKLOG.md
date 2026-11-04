@@ -4,7 +4,7 @@ Ideas that were suggested or left out of a sprint and are not built. Nothing her
 
 ## Ranking
 
-Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items and a fourth look, from the play flow, added 13 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; next up is item 21.
+Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items, a fourth look, from the play flow, added 13, and a fifth look, from two reviews (combat and feel; web robustness and tooling), added 25 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; Sprint 27 built items 21 to 30; item 31 is next.
 
 ### Tier 1: Sprint 25 (all ten built; see `TUNING_LOG.md`)
 
@@ -36,55 +36,85 @@ Every item below, best first. Score is value (1 to 5, counting risk removed) div
 | 19 | Movement by physical key (`e.code`), for AZERTY, Dvorak and similar layouts | S+ | 2.7 |
 | 20 | A second pass with a modifier per bout after bout 6 | M | 2.0 |
 
-### Tier 3: next
+### Tier 3: Sprint 27 (all ten built; see `TUNING_LOG.md`)
 
 | # | Item | Size | Score |
 | --- | --- | --- | --- |
-| 21 | A crash catcher with a copyable report | S+ | 2.0 |
-| 22 | Training room with a dummy and live move costs | S+ | 2.0 |
-| 23 | Tells you can hear, and shapes not only colour | S+ | 2.0 |
-| 24 | Medals per bout from the stats already counted | S+ | 2.0 |
-| 25 | Per-system CPU time budget (sim tick, AI, render prep) | S+ | 2.0 |
-| 26 | Repo hygiene: `CHANGELOG.md` and a `probes` script | S | 2.0 |
-| 27 | Mobile haptics | S | 2.0 |
-| 28 | Controls reference card | S | 2.0 |
-| 29 | Progress export and import | S | 2.0 |
-| 30 | Voice variety (and which clip formats play everywhere) | S | 2.0 |
-| 31 | Page weight budget in CI | S | 2.0 |
-| 32 | Difficulty descriptions in the settings | S | 2.0 |
-| 33 | Credits note on the voice | S | 2.0 |
-| 34 | Pick the language on the first visit | S | 2.0 |
-| 35 | Compare an exported playtest log with the bot table | S | 2.0 |
-| 36 | Run the accessibility audit in CI | S | 2.0 |
-| 37 | A one-page design doc and a code map | S | 2.0 |
-| 38 | Pan the sound effects by fighter position | S | 2.0 |
-| 39 | A small FOV punch on heavy hits and the knockout | S | 2.0 |
-| 40 | Rebinding fails silently (reserved key, swapped clash) | S | 2.0 |
-| 41 | Pause menu: Space and the arrows are swallowed while a card is up (guess, test first) | S | 2.0 |
-| 42 | Stale state after Reset progress, Restart and Quit | S | 2.0 |
-| 43 | Language switch on the splash | S | 2.0 |
-| 44 | Stamina-denied feedback on touch and the pad (the keyboard has `denyCue`) | S | 2.0 |
-| 45 | Cards and the pause menu as modal dialogs | M | 1.5 |
-| 46 | The quality ladder recovers | M | 1.5 |
-| 47 | Photo mode | M | 1.5 |
-| 48 | Time attack, best times and a per-bout stats screen | M | 1.5 |
-| 49 | Regression gaps (`localStorage` throwing, rebinding, reduced motion, difficulty, blur, language) | M | 1.5 |
-| 50 | Screen-reader announcements for the fight | M | 1.5 |
-| 51 | Contrast and text-size options | M | 1.5 |
-| 52 | Gamepad remapping | M | 1.5 |
-| 53 | Gamepad dead ends: Back, Restart, Quit and a focus ring on cards and pause | M | 1.5 |
-| 54 | Attract mode | M | 1.5 |
-| 55 | One `localStorage` helper in place of a dozen pairs | S | 1.5 |
-| 56 | An in-game low-quality switch | S | 1.5 |
-| 57 | An opponent that adapts to wins and losses (dynamic difficulty) | M | 1.5 |
-| 58 | Firefox and WebKit smoke test in CI | M | 1.5 |
-| 59 | Replay of the last knockout | M-L | 1.3 |
-| 60 | Input recording and deterministic replay (bug reports, regression playback) | M-L | 1.0 |
-| 61 | Branch hygiene on GitHub (auto-delete merged branches, remove old ones) | S | 1.0 |
-| 62 | Avatar loader messages are English only | S | 1.0 |
-| 63 | Touch controls are decided once at load (guess) | S | 1.0 |
+| 21 | Regression hang bounds: an `until()` helper, a per-test timeout, a job timeout, an artifact on failure | S | 3.0 |
+| 22 | Held Esc and Enter ignore key repeat | S | 3.0 |
+| 23 | Input state is cleared on pause and resume | S | 3.0 |
+| 24 | The dodge stat counts evasions, not presses | S | 3.0 |
+| 25 | Two tabs cannot erase each other's progress | S | 3.0 |
+| 26 | A queued voice line is cancelled on pause, mute, hide and Quit | S | 3.0 |
+| 27 | Stored values are validated on load | S+ | 2.7 |
+| 28 | The regression fails on page errors | S+ | 2.7 |
+| 29 | Docs match the code (README, `CONTINUE.md`, `AGENTS.md` budgets) | S+ | 2.7 |
+| 30 | A crash catcher with a copyable report | S+ | 2.0 |
 
-### Tier 4: later
+### Tier 4: next
+
+| # | Item | Size | Score |
+| --- | --- | --- | --- |
+| 31 | Five of six foes cannot answer a jab (balance sprint: moves the bout table) | M | 2.0 |
+| 32 | Training room with a dummy and live move costs | S+ | 2.0 |
+| 33 | Tells you can hear, and shapes not only colour | S+ | 2.0 |
+| 34 | Medals per bout from the stats already counted | S+ | 2.0 |
+| 35 | Per-system CPU time budget (sim tick, AI, render prep) | S+ | 2.0 |
+| 36 | Missing cues: a dodge that works, low health, the foe's stamina | S+ | 2.0 |
+| 37 | Loading splash visible in the HTML, with a `noscript` line | S+ | 2.0 |
+| 38 | A limiter on `master` and a longer music lookahead (measure first) | S+ | 2.0 |
+| 39 | Tap targets of 44 px on touch | S+ | 2.0 |
+| 40 | CI hygiene: split QA tools from the regression install, check `lib/babylon.js` against a rebuild, pin Chrome | S+ | 2.0 |
+| 41 | Repo hygiene: `CHANGELOG.md` and a `probes` script | S | 2.0 |
+| 42 | Mobile haptics | S | 2.0 |
+| 43 | Controls reference card | S | 2.0 |
+| 44 | Progress export and import | S | 2.0 |
+| 45 | Voice variety (and which clip formats play everywhere) | S | 2.0 |
+| 46 | Page weight budget in CI | S | 2.0 |
+| 47 | Difficulty descriptions in the settings | S | 2.0 |
+| 48 | Credits note on the voice | S | 2.0 |
+| 49 | Pick the language on the first visit | S | 2.0 |
+| 50 | Compare an exported playtest log with the bot table | S | 2.0 |
+| 51 | Run the accessibility audit in CI | S | 2.0 |
+| 52 | A one-page design doc and a code map | S | 2.0 |
+| 53 | Pan the sound effects by fighter position | S | 2.0 |
+| 54 | A small FOV punch on heavy hits and the knockout | S | 2.0 |
+| 55 | Rebinding fails silently (reserved key, swapped clash) | S | 2.0 |
+| 56 | Pause menu: Space and the arrows are swallowed while a card is up (guess, test first) | S | 2.0 |
+| 57 | Stale state after Reset progress, Restart and Quit | S | 2.0 |
+| 58 | Language switch on the splash | S | 2.0 |
+| 59 | Stamina-denied feedback on touch and the pad (the keyboard has `denyCue`) | S | 2.0 |
+| 60 | Skip the knockout sequence (`koTimer` is a fixed 2.4 s) | S | 2.0 |
+| 61 | DevicePixelRatio after a zoom, a reduced-motion change listener, and the hit flash under reduced motion | S | 2.0 |
+| 62 | Cards and the pause menu as modal dialogs | M | 1.5 |
+| 63 | The quality ladder recovers | M | 1.5 |
+| 64 | Photo mode | M | 1.5 |
+| 65 | Time attack, best times and a per-bout stats screen | M | 1.5 |
+| 66 | Regression gaps (`localStorage` throwing, rebinding, reduced motion, difficulty, blur, language) | M | 1.5 |
+| 67 | Screen-reader announcements for the fight | M | 1.5 |
+| 68 | Contrast and text-size options | M | 1.5 |
+| 69 | Gamepad remapping | M | 1.5 |
+| 70 | Gamepad dead ends: Back, Restart, Quit and a focus ring on cards and pause | M | 1.5 |
+| 71 | Attract mode | M | 1.5 |
+| 72 | One `localStorage` helper in place of a dozen pairs | S | 1.5 |
+| 73 | An in-game low-quality switch | S | 1.5 |
+| 74 | An opponent that adapts to wins and losses (dynamic difficulty) | M | 1.5 |
+| 75 | Firefox and WebKit smoke test in CI | M | 1.5 |
+| 76 | No clock, no draw, and kiting is free (player speed 4.4 against 2.5 to 3.7) | M | 1.5 |
+| 77 | One tell timing and one marker for every foe | M | 1.5 |
+| 78 | Sim edge cases to measure (jab-chain gap, block at stamina 1, same-tick trade, the Dag and Chen lure loop) | M | 1.5 |
+| 79 | The fighter model ships twice (base64 script for `file://` and the `.glb`) | M | 1.5 |
+| 80 | The pad `mapping` is not checked; a focused checkbox may eat Space in Firefox (guess) | S | 1.5 |
+| 81 | Replay of the last knockout | M-L | 1.3 |
+| 82 | Input recording and deterministic replay (bug reports, regression playback) | M-L | 1.0 |
+| 83 | Branch hygiene on GitHub (auto-delete merged branches, remove old ones) | S | 1.0 |
+| 84 | Avatar loader messages are English only | S | 1.0 |
+| 85 | Touch controls are decided once at load (guess) | S | 1.0 |
+| 86 | The foes never bait or retreat (`prefer` is 1.5 to 1.7 for all six) | M | 1.0 |
+| 87 | The camera side may flip when the fighters line up on z (guess) | S | 1.0 |
+| 88 | Screen wake lock for pad-only and autoplay play (guess) | S | 1.0 |
+
+### Tier 5: later
 
 Settings card (M), daily challenge and share line (M, needs 20), installable offline app (M), visual diff of the six places (M), third language (M), long functions in `makeFighter` and `aiIntent` (M), more voice lines, footsteps, crowd roar and gasp, a referee, hair styles, beards and caps, a second punch and right-hand clips, head look-at and breathing, an optional CRT look, a luminance measurement of the rim light, shirts against the floor and the crowd, a thin move set with combos, counters and a parry (L, needs `balance-run` tuning), and a WebGPU engine (skip until the integrated-GPU check shows a frame-rate gap that WebGL cannot close).
 
@@ -95,9 +125,10 @@ Settings card (M), daily challenge and share line (M, needs 20), installable off
 - A real phone and an integrated-GPU check.
 - Italian voice lines recorded by a native speaker, and a native read of the Italian text.
 - Switch off the Cursor `daily-care` agent: you chose Dependabot for dependency bumps, and `AGENTS.md` says it owns them (PR #18 came from the agent).
-- Play on Safari and Firefox by hand once (item 58 automates only a smoke test).
+- Play on Safari and Firefox by hand once (item 75 automates only a smoke test).
+- Hold Enter and Esc on a real keyboard, and open the game in two real tabs, after Sprint 27.
 - Try the movement keys on a real AZERTY or Dvorak keyboard, and play the second pass through.
-- Turn on "Automatically delete head branches" in the GitHub repo settings (item 61).
+- Turn on "Automatically delete head branches" in the GitHub repo settings (item 83).
 
 ## From Sprint 24
 
@@ -221,7 +252,7 @@ Found by reading the code and by holding it against the game-development guidanc
 
 ### Robustness and tooling
 
-- **A crash catcher.** No `window.onerror` or `unhandledrejection` handler exists (checked by grep). A throw inside the frame loop would leave a frozen or half-drawn page with no message (guess, not reproduced). Stop the loop, show a card ("Something broke") with Reload and Copy details (build, browser, quality level, the last five log entries, the error text). It would be the one place a bug report comes from. Local only, nothing is sent. Small to medium.
+- **A crash catcher (built in Sprint 27, item 30).** No `window.onerror` or `unhandledrejection` handler exists (checked by grep). A throw inside the frame loop would leave a frozen or half-drawn page with no message (guess, not reproduced). Stop the loop, show a card ("Something broke") with Reload and Copy details (build, browser, quality level, the last five log entries, the error text). It would be the one place a bug report comes from. Local only, nothing is sent. Small to medium.
 - **Per-system CPU time budget.** The regression budgets draw calls and meshes, not time. Wrap `simTick`, `aiIntent` and the render prep in `performance.now()` in `env-probe` and fail the regression if the average sim tick passes about 2 ms of the 16.7 ms frame. CPU time is steadier than frame rate under software GL. Small to medium.
 - **Pick the language on the first visit.** `navigator.language` is not read anywhere, so an Italian browser opens in English until the switch is found. With no saved `sublevel-lang`, use `it` for `it*`. Do it after the native read of the Italian text (see Yours). Small.
 - **Compare an exported playtest log with the bot table.** `tools/log-compare.mjs` reads the exported JSON and prints, per bout, the human win rate and mean time next to the `balance-run` numbers. Without it the log has no reader. Needs someone to play and export. Small.
@@ -262,3 +293,46 @@ Found by reading `index.html` from the splash to the result card and the pause m
 - **Touch controls are decided once at load (guess).** `isTouch` (:2148) reads `(pointer: coarse)` at start, so a hybrid device with a mouse never gets them. Small.
 
 Loose files are settled: `CLAUDE.md` is excluded locally (`.git/info/exclude`) and `tuning/s5-tell.jpg` is restored to the committed copy. The `Yours` list also keeps: switch off the Cursor `daily-care` agent (Dependabot owns bumps, see `AGENTS.md`), try the AZERTY movement on a real keyboard, and play the second pass.
+
+## A fifth look, from two reviews
+
+Status after Sprint 27: the first nine bullets under "Confirmed defects" (items 21 to 29) are built, and so is the crash catcher (item 30, from the third look); the rest is open.
+
+Two read-only reviews went through the code: one on combat and feel, one on web robustness and tooling. The first ten were built in Sprint 27.
+
+### Confirmed defects
+
+- **Held Esc and Enter bypass the repeat guard.** The Esc and Enter branches (:2332-2342) run before `if(e.repeat) return` (:2344). A held Esc flickers pause and resume; a held Enter can chain through consecutive cards and skip the dossier. Small (item 22).
+- **Buffered presses and the touch or pad stick survive a pause.** The keydown handler buffers a press in any state (:2349-2351) and `buf` decays only in `simTick`, so a J pressed while paused fires on Resume. `dropKeys` (:2358) clears neither `buf`, `touchVec` nor the pad stick. Small (item 23).
+- **The dodge stat counts presses.** `G.log.dodges++` is in `startDodge` (:2026); a dodge that works (`d.inv>0` in `strike`, :2038) records nothing. The result card and the playtest log overstate dodging. Small (item 24).
+- **Two tabs overwrite each other's progress.** `grantWin` compares against the in-memory `progress.wins` and writes the whole object, with no `storage` listener. Tab A at 3 wins erases tab B at 5. Small (item 25).
+- **A queued voice line ignores pause, mute, hide and Quit.** `voiceClip` (`<audio>`) and `voiceSpeak` (`speechSynthesis`) bypass the Web Audio graph and check `muted` and `document.hidden` only when called (:1493). No `speechSynthesis.cancel()` exists outside the speak call. Small (item 26).
+- **Stored values are not validated.** `Number('abc')` is NaN and `clamp` passes it (:1155-1160); setting a gain to NaN throws `TypeError: ... non-finite` in `applyBus`, before the title card (confirmed by the Sprint 27 test with the validators reverted). `loadProgress` (:1019) takes `wins:"abc"`; `DIFF[v]` and `OUTFITS[id]` accept `"constructor"`; loaded binds can put two actions on one key; a corrupt save is overwritten on the next win with no backup. Small to medium (item 27).
+- **The regression can hang for 20 minutes.** About 12 tests use `while(G.state!=='fight') await raf()` with no bound, `test()` has no timeout, the JSON summary prints only at the end and `test.yml` uploads nothing on failure. Fixed sleeps such as `sleep(4300)` (:696) are the next flake. Small (item 21).
+- **The regression ignores page errors.** No `Runtime.exceptionThrown`, `consoleAPICalled`, `Log` or `Network.loadingFailed` subscription (grep gives 0), so a thrown handler or a 404 on a font passes CI. Small to medium (item 28).
+- **Docs disagree with the code.** `README.md:13` says "Three bouts" (there are six) and that Google Fonts load online (they are local). `CONTINUE.md` still says "Sprint 9, do this one" and "Sprint 12". `AGENTS.md` and `CONTINUE.md` give a 400 draw calls and 250 meshes budget while the regression enforces 48 and 52 (:318). Small to medium (item 29).
+- **Five of six foes cannot answer a jab.** A jab's `a1` is 0.20 s (:357). The AI answers only while `atk.t<a1` after waiting `react` (:2130-2133), and `react` at Normal is Reyes .08, Halvorsen .202, Pike .24, Voss .29, Dag .38, Chen .445. Only Reyes can block or dodge a jab, and nobody can on Easy, so the dossier's block and dodge percentages say little about jabs. It is a balance change: all six bout-table numbers move, so it needs a sprint of its own with `balance-run` before and after. Medium (item 31).
+- **Missing cues.** A dodge that works plays `SFX.whoosh`, the same as a whiffed swing; there is no low-health cue (the vignette at :737 is unused for it); the foe's stamina is not shown, so the guard-break window is invisible. Small to medium (item 36).
+- **The knockout cannot be skipped.** `koTimer=2.4` (:2064) is fixed, which adds up over retries. Small (item 60).
+- **A blank page until about 4 MB of scripts parse.** `#splash` is `hidden` in the HTML (:313) and four synchronous scripts run at :327-330, with no spinner and no `noscript`. Small to medium (item 37).
+- **Browser zoom and a monitor change leave the render blurry** (hardware scaling set once at :718), `prefers-reduced-motion` is read once (:2487) and the hit flash (:2059) ignores it. Small (item 61).
+- **Tap targets are 24 to 28 px** (`.bind`, `.btn2`, `.is-touch .snd`, :79, :81, :116, :120). Small to medium (item 39).
+- **CI installs everything on every run.** Lighthouse, axe, selenium and chromedriver come with the regression's install; CI never checks that the committed `lib/babylon.js` equals a rebuild; Chrome on `ubuntu-latest` is unpinned. Small to medium (item 40).
+- **No clock, no draw, and kiting is free.** Only a KO ends a bout (`afterKO`, :2875) and the player's speed is 4.4 against 2.5 to 3.7 (:1045), so running away is never punished. A long clock with a decision on health would leave the table alone, but the result card then needs wording for a draw. Medium (item 76).
+- **One tell timing for every foe.** The attack table is global (:357), the jab tell is a constant 0.28 s and only on the `teach` style (:2163), and the alert marker has one shape. Medium (item 77).
+- **The model ships twice.** `animated-human.js` (1.2 MB, base64) duplicates the 935 KB `.glb`, which is not fetched while the script loads; the script exists because `file://` cannot fetch. Medium (item 79).
+
+### Sim edge cases to measure first (reading, not run)
+
+All of these touch the sim, so each needs `balance-run` (item 78): a jab's stun (0.30 s) ends when the attacker's recovery (0.40 s) ends minus 0.1 s, so a chain is escapable only in a 0.1 s gap; stamina does not regenerate in block (:2075) and block re-enters while stamina is above 1 (:2081), which can pin a player near zero; `step(P)` runs before `step(E)` (:2934-2935), so a same-tick trade goes to the player; Dag and Chen answer a whiff with a heavy after `react` (:2123-2147), which makes whiff, dodge, punish a loop the bot never plays. The foes never bait or retreat either: `prefer` is 1.5 to 1.7 for all six, inside the player's 1.7 jab range (item 86).
+
+### Guesses
+
+- **No limiter on `master`** (:1195) and a 0.14 s music lookahead (:1422): a stall over 140 ms makes the rhythm jump. `audio-probe` checks single-sample peaks only. Measure the summed peak first (item 38).
+- **The pad `mapping` is never checked** (`pollPad`, :2420) although the README assumes a standard pad, and a focused checkbox may take Space as a click in Firefox because only keydown is cancelled (item 80).
+- **The camera side may flip** at :2663 when the fighters line up on z, which would swing the camera-relative thumb controls (item 87).
+- **No screen wake lock** for pad-only and autoplay play (item 88).
+
+### Checked and fine
+
+Frame loop (the 0.05 s clamp, the 5-tick accumulator cap, interpolation), hit stop on block, hit and KO, a 0.22 s input buffer, stuck keys on blur, tab hide and Cmd, double hits (`A.done`), acting during a KO, the ring and body resolution, and jab plus block on one frame (the jab wins). Do not check these again.
