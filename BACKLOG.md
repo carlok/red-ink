@@ -118,17 +118,17 @@ Every item below, best first. Score is value (1 to 5, counting risk removed) div
 
 | # | Item | Size | Score |
 | --- | --- | --- | --- |
-| 89 | The ambience without looping noise: a tonal room hum, tonal events, the crowd as a reaction (asked for by the player) | M | n/a |
-| 90 | Medals respect difficulty and autoplay (save v4) | S | 4.0 |
-| 91 | A whoosh that is not white noise | S | 4.0 |
-| 92 | Gamepad input resets the card-quiet timer | S | 3.0 |
-| 93 | A pad can start the game from the splash | S | 3.0 |
-| 94 | A loading watchdog: after 10 s, say it failed and offer Reload | S | 3.0 |
-| 95 | The crash catcher ignores harmless rejections and re-arms after Keep playing | S | 3.0 |
-| 96 | Offer Training after the first loss | S | 3.0 |
-| 97 | The lose card shows the foe's tip | S | 3.0 |
-| 98 | Leave training to the title card | S | 3.0 |
-| 99 | Training inputs: the tip by input mode, a pad button, blur after the strip click | S+ | 2.7 |
+| 89 | The ambience without looping noise: a tonal room hum, tonal events, the crowd as a reaction (asked for by the player) (built in Sprint 30) | M | n/a |
+| 90 | Medals respect difficulty and autoplay (save v4) (built in Sprint 30) | S | 4.0 |
+| 91 | A whoosh that is not white noise (built in Sprint 30) | S | 4.0 |
+| 92 | Gamepad input resets the card-quiet timer (built in Sprint 30) | S | 3.0 |
+| 93 | A pad can start the game from the splash (built in Sprint 30) | S | 3.0 |
+| 94 | A loading watchdog: after 10 s, say it failed and offer Reload (built in Sprint 30) | S | 3.0 |
+| 95 | The crash catcher ignores harmless rejections and re-arms after Keep playing (built in Sprint 30) | S | 3.0 |
+| 96 | Offer Training after the first loss (built in Sprint 30) | S | 3.0 |
+| 97 | The lose card shows the foe's tip (built in Sprint 30) | S | 3.0 |
+| 98 | Leave training to the title card (built in Sprint 30) | S | 3.0 |
+| 99 | Training inputs: the tip by input mode, a pad button, blur after the strip click (built in Sprint 30) | S+ | 2.7 |
 
 ### Tier 6: from the sixth look, not built
 
@@ -417,4 +417,12 @@ The bed was four looping noise sources (a 4 s random-noise buffer through a 380 
 - **The one lesson is missing:** the tutor is a 12 s key list; the red mark, its sound and the stamina bar are never explained, and "red mark" first appears in bout 2's text (item 100).
 - **Sprint 29 tests that would pass while wrong:** the heartbeat check (`length>=2 && %2==0`) passes on one double thump; the tell test sets `ai.tell` by hand; the limiter test runs an offline copy and `wired` would pass with a second route to the destination; medals are fed a hand-written `G.log`; the CPU test times step, AI and `scene.render` but not `updateSkin`, `crowdUpdate`, `updateFx`, `updateHud` or `audioTick` (item 101).
 - **Medals are write-only** (item 102). **Three mode flags** are reset by hand in four places (item 103). **A ledger card** would be the replay hook (item 112). **About 450 lines of QA probes ship to players** (:3721 to :4175; `probeAI` alone is 196 lines), with dead `boutRows`, `bumpTex` and `part` (item 113).
+
+### Found while building Sprint 30
+
+- **An unterminated `/*` comment in the main script swallowed the code after it and the script still parsed.** I caught it by reading, not by a check. A test that every function the UI wires to a button exists (or a lint for unclosed comments in `index.html`) would catch the next one. Small.
+- **Committed with two failing tests:** I read the regression result after committing. Fixed in the next commit; the habit to keep is reading the result before `git commit`. (Not a backlog item, a note to myself.)
+- **`tools/audio-probe.mjs` had been reading nothing since Sprint 22** (it never pressed Play, and read a `stems` field that did not exist). Fixed for the ambience; the other older probes (`input-probe`, `combat-probe`, `cam-probe`, `portrait`) may have the same age. Check which still run. Small.
+- **The crowd reaction levels and chances were set from numbers, not ears:** jab and block answer 15 and 10 percent of the time, a heavy 60, a dodge 30, the knockout always; `MIX.crowdReact = 0` turns it off. Yours.
+- **Headless Chrome here reports an Italian `navigator.language`,** so anything keyed on it (the loading message) shows Italian in the tests. The language is not picked on the first visit yet (item 49).
 
