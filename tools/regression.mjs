@@ -550,7 +550,7 @@ async function runHttpSuite(cdp) {
     await cdp.send("Page.reload", { ignoreCache: true });
     await bootSublevel(cdp);
     const v = await cdp.eval(`({ on: window.__sublevel.autoState().on, box: document.getElementById("autoOn").checked })`);
-    await cdp.eval(`localStorage.setItem('sublevel-auto','0')`);
+    await cdp.eval(`localStorage.setItem('sublevel-auto','0'); window.__sublevel.setAutoOn(false)`);   /* off in memory too: the page stays up for the tests after this one */
     if (!v.on || !v.box) throw new Error(JSON.stringify(v));
     return v;
   });
@@ -682,7 +682,7 @@ async function runHttpSuite(cdp) {
       const setDiff = (d) => $("wrap").querySelector('[data-diff="' + d + '"]').click();
       const fight = async (bout, log, setup) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); Object.assign(G.log, log); if (setup) setup(); S.qaEndBout(true); await sleep(60); return $("cRows").textContent; };
       const clean = { hits: 0, thrown: 10, landed: 10, time: 10 };
-      S.setLang("en"); S.qaResetProgress(); S.titleCard(); await sleep(100);
+      S.setLang("en"); S.setAutoOn(false); S.qaResetProgress(); S.titleCard(); await sleep(100);   /* a person at the keys: an earlier test may have left Autoplay on in memory */
       setDiff("easy"); let rows = await fight(0, clean); o.easyNone = stored().medals[0] === 0 && rows.includes("none on Easy");
       S.titleCard(); await sleep(100); setDiff("normal"); rows = await fight(0, clean, () => { G.assisted = true; }); o.autoplayNone = stored().medals[0] === 0 && rows.includes("none when the AI plays");
       /* the real flag: Autoplay on and untouched keys, the bot plays ticks, the flag is set by the sim loop */
@@ -854,7 +854,7 @@ async function runHttpSuite(cdp) {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
       const stored = () => JSON.parse(localStorage.getItem("sublevel-progress"));
       const fight = async (bout, log, flags = {}) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); Object.assign(G, flags); Object.assign(G.log, log); const w = S.qaEndBout(true); await sleep(60); return { rows: $("cRows").textContent, title: $("cTitle").textContent, w }; };
-      S.setLang("en"); S.qaResetProgress();
+      S.setLang("en"); S.setAutoOn(false); S.qaResetProgress();
       o.freshHasMedals = Array.isArray(S.progress.medals) && S.progress.medals.length === 6 && S.progress.medals.every((m) => m === 0) && S.progress.v === 4;
       /* an untouched, accurate, quick win: all three */
       let f = await fight(0, { hits: 0, thrown: 10, landed: 9, time: 20 });
