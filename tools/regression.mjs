@@ -673,6 +673,41 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("training_room_dummy_never_attacks_and_costs_are_shown", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+      $("wrap").hidden = true; S.qaResetProgress(); S.setLang("en"); localStorage.removeItem("sublevel-log"); S.titleCard(); await sleep(150);
+      o.linkAtZeroWins = !$("linkTrain").hidden;                       /* no win needed, unlike Practice */
+      $("linkTrain").click(); await sleep(150);
+      o.cardUp = G.state === "card" && /dummy/i.test($("cTitle").textContent) && /10/.test($("cRows").textContent) && /24/.test($("cRows").textContent) && /16/.test($("cRows").textContent);
+      $("go").click(); await __until(() => G.state === "fight", "fight");
+      o.mode = G.train === true && G.practice === true && $("eName").textContent === "Dummy" && $("roundLbl").textContent === "TRAINING";
+      /* he stays put, never attacks, cannot be knocked out */
+      const E = S.E, P = S.P; let attacked = false, moved = 0; const x0 = E.pos.x;
+      let hits = 0;   /* a heavy every 0.4 s for 4 s: 10 blows, 160 damage against 70 hp, one at a time as in a fight */
+      for (let i = 0; i < 240; i++) { await raf(); if (i % 24 === 0) { E.state = "idle"; S.strike(P, E, S.ATK.heavy); hits++; } if (E.state === "attack") attacked = true; moved = Math.max(moved, Math.abs(E.pos.x - x0)); }
+      o.neverAttacks = !attacked; o.neverDies = E.hp === E.maxHp && E.state !== "ko" && G.state === "fight";
+      /* the strip shows the costs and strikes out what you cannot afford */
+      const chips = [...document.querySelectorAll("#trainStrip .chip")];
+      o.stripShown = !$("trainStrip").hidden && chips.map((c) => c.textContent).join("|") === "jab 10|heavy 24|dodge 16";
+      P.stam = 20; await raf(); await raf(); o.greyedHeavy = chips[1].classList.contains("no") && !chips[0].classList.contains("no") && !chips[2].classList.contains("no");
+      P.stam = 100; await raf(); await raf(); o.noneGreyedWhenRested = !chips.some((c) => c.classList.contains("no"));
+      /* his guard: off, a jab lands; on (button and T key), a jab is blocked */
+      const before = { ...G.log };
+      S.E.state = "idle"; S.strike(P, E, S.ATK.jab); o.standsTakesIt = G.log.jabHit === before.jabHit + 1;
+      $("trainBlock").click(); await sleep(120); o.buttonSwitches = G.trainBlock === true && $("trainBlock").getAttribute("aria-pressed") === "true";
+      await __until(() => E.state === "block", "the dummy raises his guard", 3000); const b1 = G.log.jabBlock; S.strike(P, E, S.ATK.jab); o.guardBlocks = G.log.jabBlock === b1 + 1;
+      kd("t"); o.keySwitchesBack = G.trainBlock === false;
+      /* nothing saved, nothing logged */
+      o.logUntouched = localStorage.getItem("sublevel-log") === null && S.progress.wins === 0;
+      /* leaving the room: the title card clears the mode and the strip */
+      $("wrap").hidden = true; S.titleCard(); await sleep(100); o.modeCleared = !G.train; S.pauseFight && 0;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("held_esc_and_enter_do_not_repeat", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
