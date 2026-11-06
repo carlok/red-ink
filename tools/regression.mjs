@@ -704,6 +704,24 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  /* The whoosh was unfiltered white noise under a half-sine. A swish has a band, and a peak at the level the mix expects. Measured on the decoded sample itself. */
+  await test("whoosh_is_a_band_not_white_noise", async () => {
+    const r = await cdp.eval(`(async () => {
+      const S = window.__sublevel, ac = S.audioGraph().ac, A = window.SUBLEVEL_AUDIO;
+      const bin = atob(A.clips.whoosh), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const buf = await ac.decodeAudioData(bytes.buffer), d = buf.getChannelData(0), N = d.length, rate = buf.sampleRate;
+      let peak = 0; for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(d[i]));
+      /* Hann-windowed periodogram by direct DFT (N is about 2,500 samples) */
+      const bins = Math.floor(N / 2), P = new Float64Array(bins);
+      for (let k = 1; k < bins; k++) { let re = 0, im = 0; const w0 = 2 * Math.PI * k / N; for (let i = 0; i < N; i++) { const w = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1)), x = d[i] * w; re += x * Math.cos(w0 * i); im -= x * Math.sin(w0 * i); } P[k] = re * re + im * im; }
+      const hz = (k) => k * rate / N; let lo = 1, hi = bins; for (let k = 1; k < bins; k++) { if (hz(k) < 200) lo = k + 1; if (hz(k) > 7000) { hi = k; break; } }
+      let logS = 0, sum = 0, n = 0, band = 0; for (let k = lo; k < hi; k++) { const p = P[k] + 1e-20; logS += Math.log(p); sum += p; n++; if (hz(k) >= 600 && hz(k) <= 3500) band += p; }
+      return { peakDbfs: +(20 * Math.log10(peak)).toFixed(2), flatness: +(Math.exp(logS / n) / (sum / n)).toFixed(3), shareIn600to3500: +(band / sum).toFixed(3), ms: Math.round(N / rate * 1000) }; })()`, true);
+    /* white noise: flatness about 0.56 for one periodogram and 40 percent of the energy in 600 to 3500 Hz; a swept band-pass: low flatness and most of the energy in the band */
+    if (!(r.flatness < 0.2 && r.shareIn600to3500 > 0.7 && r.peakDbfs > -20 && r.ms >= 150 && r.ms <= 220)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("training_room_dummy_never_attacks_and_costs_are_shown", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
