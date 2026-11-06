@@ -1,15 +1,15 @@
 /**
  * Lighthouse (local Chrome) + axe-core injected via CDP (no ChromeDriver).
- * Usage: node tools/lighthouse-a11y.mjs
+ * Usage: npm run qa:a11y   (installs tools/qa first), or node tools/qa/lighthouse-a11y.mjs after npm ci --prefix tools/qa
  */
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
-import { findChrome } from "./chrome.mjs";
-import { bootSublevel, createStaticServer, ROOT, withPage } from "./cdp-session.mjs";
+import { findChrome } from "../chrome.mjs";
+import { bootSublevel, createStaticServer, ROOT, withPage } from "../cdp-session.mjs";
 
-const TOOL_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const TOOL_ROOT = dirname(fileURLToPath(import.meta.url));   /* tools/qa: Lighthouse and axe live in its own package, so the regression's install stays small */
 const LH = join(TOOL_ROOT, "node_modules", ".bin", "lighthouse");
 
 const server = await createStaticServer();

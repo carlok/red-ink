@@ -22,11 +22,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Chrome, pinned to one release line
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
+        with:
+          chrome-version: 156
       - run: npm ci
       - run: npm run build:engine
+      - name: The committed engine is what a rebuild gives
+        run: git diff --exit-code -- lib/babylon.js
       - name: Regression (headless Chrome)
         env:
-          CHROME: /usr/bin/google-chrome
+          CHROME: ${{ steps.chrome.outputs.chrome-path }}
         run: npm run regression
       - name: Keep the result file of a failed run
         if: failure()
