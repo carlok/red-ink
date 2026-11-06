@@ -629,6 +629,31 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("dodge_low_health_and_foe_stamina_cues", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, g = S.audioGraph(), $ = (i) => document.getElementById(i), o = {};
+      S.setAudio({ mute: false }); if (g.ac.state !== "running") { await g.ac.resume(); for (let i = 0; i < 20 && g.ac.state !== "running"; i++) await sleep(50); }
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.setLessMotion(false);
+      const cues = async (fn, ms = 0) => { g.MUS.log = []; fn(); if (ms) await sleep(ms); const l = g.MUS.log.filter((x) => String(x).startsWith("cue:")); g.MUS.log = null; return l; };
+      /* a dodge that works: one cue per evaded punch, none for a punch that lands, none when muted */
+      S.P.inv = 0.2; let l = await cues(() => S.strike(S.E, S.P, S.ATK.jab)); o.dodgeCue = l.join() === "cue:dodge";
+      S.P.inv = 0; S.P.state = "idle"; l = await cues(() => S.strike(S.E, S.P, S.ATK.jab)); o.noCueOnAHit = l.length === 0;
+      S.setAudio({ mute: true }); S.P.inv = 0.2; l = await cues(() => S.strike(S.E, S.P, S.ATK.jab)); o.mutedSilent = l.length === 0; S.setAudio({ mute: false }); S.P.inv = 0;
+      /* the foe's stamina bar follows E.stam */
+      S.E.stam = 40; await raf(); await raf(); o.foeStaminaBar = Math.abs(parseFloat($("eSt").style.width) - 40) < 1;
+      S.E.stam = 100;
+      /* low health: red edge and a double thump while under 25 percent; still (no animation) under less motion; none when healthy */
+      S.P.hp = 80; await raf(); await raf(); o.healthyNoEdge = $("lowHp").hidden;
+      g.MUS.log = []; S.P.hp = 20; await raf(); await raf(); o.edgeShown = !$("lowHp").hidden && getComputedStyle($("lowHp")).animationName !== "none";
+      await sleep(1100); l = g.MUS.log.filter((x) => String(x).startsWith("cue:heart")); g.MUS.log = null; o.heartbeat = l.length >= 2 && l.length % 2 === 0;
+      S.setLessMotion(true); await raf(); o.stillUnderLessMotion = getComputedStyle($("lowHp")).animationName === "none"; S.setLessMotion(false);
+      S.setAudio({ mute: true }); g.MUS.log = []; await sleep(1100); o.heartMuted = g.MUS.log.filter((x) => String(x).startsWith("cue:")).length === 0; g.MUS.log = null; S.setAudio({ mute: false });
+      S.P.hp = 100; await raf(); await raf(); o.edgeGoes = $("lowHp").hidden;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("held_esc_and_enter_do_not_repeat", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};

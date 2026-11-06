@@ -70,6 +70,7 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .bar i{background:var(--tape);transition:width .1s}
 .right .bar i{background:var(--stain)}
 .bar i.st{background:#8fb9a8}
+.right .bar i.st{background:#8fb9a8}   /* the foe's stamina reads like yours, not like his red health */
 .round{font:600 11px/1 var(--f-data);letter-spacing:.18em;padding:3px;background:repeating-linear-gradient(-45deg,var(--tape) 0 8px,#111 8px 16px)}
 .round span{display:block;padding:5px 10px;background:#111;color:var(--tape);white-space:nowrap}
 .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
@@ -78,6 +79,10 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .keys kbd.on{background:var(--tape);color:#111;border-color:var(--tape)}
 .bar i.st.deny{background:var(--stain);animation:deny .25s}
 @keyframes deny{0%,60%{opacity:.35}30%,100%{opacity:1}}
+.lowHp{position:absolute;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 42%,rgba(176,24,16,.6) 100%);animation:lowpulse 1.1s ease-in-out infinite}   /* under 25 percent health */
+.lowHp[hidden]{display:none}
+.reduce-motion .lowHp{animation:none;opacity:.55}
+@keyframes lowpulse{0%,100%{opacity:.25}50%{opacity:.85}}
 .snd{pointer-events:auto;font:600 11px var(--f-data);letter-spacing:.12em;text-transform:uppercase;background:rgba(10,10,11,.55);color:var(--paper);border:1px solid var(--mute);padding:7px 10px;cursor:pointer}
 .is-touch .keys{display:none}
 /* touch: a control a thumb has to hit is at least 44 px high (WCAG 2.5.5, Apple's guideline); a row that is a label is the whole target */
@@ -202,6 +207,7 @@ dl.rows dd a{color:inherit}
 <div id="app" role="main">
   <canvas id="view" tabindex="0" aria-label="Fight arena, 3D view"></canvas>
 
+  <div class="lowHp" id="lowHp" hidden></div>
   <div class="hud" id="hud" hidden>
     <div class="bars">
       <div class="fighter left">
@@ -214,6 +220,7 @@ dl.rows dd a{color:inherit}
       <div class="fighter right">
         <div class="name" id="eName">Reyes</div>
         <div class="bar" role="img" aria-label="Opponent health"><b id="eGhost"></b><i id="eHp"></i></div>
+        <div class="bar thin" role="img" aria-label="Opponent stamina"><i class="st" id="eSt"></i></div>
       </div>
     </div>
     <div class="foot">
@@ -582,6 +589,8 @@ const STR={
   aria_hp:{en:'Your health',it:'La tua salute'},
   aria_st:{en:'Your stamina',it:'La tua resistenza'},
   aria_ehp:{en:'Opponent health',it:"Salute dell'avversario"},
+  aria_est:{en:'Opponent stamina',it:"Resistenza dell'avversario"},
+  word_dodge:{en:'DODGE',it:'SCHIVATA!'},
   aria_view:{en:'Fight arena, 3D view',it:'Arena di combattimento, vista 3D'},
   word_blok:{en:'BLOK',it:'PARA!'},
   kw_move:{en:'move',it:'muovi'},
@@ -677,13 +686,13 @@ function paintLang(){
   document.querySelectorAll('[data-diff]').forEach(b=>{ b.textContent=L('diff_'+b.dataset.diff); });
   document.querySelectorAll('.tb[data-act]').forEach(b=>{ b.textContent=L('act_'+b.dataset.act); });
   document.querySelectorAll('[data-bind]').forEach(b=>{ if(b.firstChild&&b.firstChild.nodeType===3) b.firstChild.textContent=L('act_'+b.dataset.bind)+' '; });
-  { const A={pHp:'aria_hp',pSt:'aria_st',eHp:'aria_ehp'}; Object.keys(A).forEach(id=>{ const el=$(id); if(el&&el.parentNode) el.parentNode.setAttribute('aria-label',L(A[id])); }); }
+  { const A={pHp:'aria_hp',pSt:'aria_st',eHp:'aria_ehp',eSt:'aria_est'}; Object.keys(A).forEach(id=>{ const el=$(id); if(el&&el.parentNode) el.parentNode.setAttribute('aria-label',L(A[id])); }); }
   $('view').setAttribute('aria-label',L('aria_view')); if($('voiceSel')) $('voiceSel').setAttribute('aria-label',L('voice_lbl'));
   if(typeof paintAudio==='function') paintAudio();
   if(typeof paintBinds==='function') paintBinds();
   if(padOn) $('keys').innerHTML=padHtml();
   if(P&&G.bout!==undefined&&$('roundLbl')) $('roundLbl').textContent=roundText(G.bout);
-  if(WORDS.BLOK){ WORDS.BLOK.text=L('word_blok'); drawWords(); }
+  if(WORDS.BLOK){ WORDS.BLOK.text=L('word_blok'); if(WORDS.DODGE) WORDS.DODGE.text=L('word_dodge'); drawWords(); }
 }
 function boutPlace(c){ return L(c.placeKey); }
 function boutRole(c){ return L(c.roleKey); }
@@ -1191,12 +1200,12 @@ function buildParticles(){
 /* comic words */
 const WORDS={}, fxList=[];
 function buildWords(){
-  [['POW','#f0c400'],['WHAM','#f0c400'],['BLOK','#8fb9d9'],['KO','#d0432b']].forEach(w=>{
+  [['POW','#f0c400'],['WHAM','#f0c400'],['BLOK','#8fb9d9'],['DODGE','#8fb9a8'],['KO','#d0432b']].forEach(w=>{
     const tex=new B.DynamicTexture('w'+w[0],{width:512,height:320},scene,true); tex.hasAlpha=true;
     const p=B.MeshBuilder.CreatePlane('word'+w[0],{width:2.24,height:1.4},scene);
     p.billboardMode=B.Mesh.BILLBOARDMODE_ALL; p.isPickable=false; p.setEnabled(false);
     const m=new B.StandardMaterial('wm'+w[0],scene); m.emissiveTexture=tex; m.opacityTexture=tex; m.disableLighting=true; m.backFaceCulling=false; m.fogEnabled=false; m.specularColor=new C3(0,0,0);
-    p.material=m; WORDS[w[0]]={tex,plane:p,color:w[1],text:w[0]==='KO'?'K.O.!':w[0]==='BLOK'?L('word_blok'):w[0]+'!'};
+    p.material=m; WORDS[w[0]]={tex,plane:p,color:w[1],text:w[0]==='KO'?'K.O.!':w[0]==='BLOK'?L('word_blok'):w[0]==='DODGE'?L('word_dodge'):w[0]+'!'};
   });
 }
 function drawWords(){
@@ -2136,7 +2145,7 @@ function strike(a,d,D){
   if(d.state==='ko') return;
   const mid=a.pos.add(d.pos).scale(.5); mid.y=1.25;
   if(a.isPlayer&&D.dmg<=10) G.log[d.inv>0?'jabDodge':d.state==='block'?'jabBlock':'jabHit']++;
-  if(d.inv>0){ if(d.isPlayer) G.log.dodges++; SFX.whoosh(); return; }
+  if(d.inv>0){ if(d.isPlayer) G.log.dodges++; SFX.whoosh(); cueTone('dodge',520,1040,.14,.16,'triangle'); fxWord('DODGE',mid); return; }
   const dir=d.pos.subtract(a.pos); dir.y=0; dir.normalize();
   if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
   else if(a.isPlayer&&d.state!=='block') G.log.landed++;
@@ -2426,6 +2435,25 @@ function capLight(k,on){
   if(act==='move'){ const down=[...keys].some(q=>MOVE_KEYS.has(q)); kb.classList.toggle('on',down); } else kb.classList.toggle('on',on);
 }
 /* A press that cannot start (not enough stamina) says so: the stamina bar blinks and a low tick plays. */
+/* Short synthesised cues for things the samples do not cover. Render only: constants, no rng(), nothing the sim reads. name goes to MUS.log for the tests. */
+function cueTone(name,f0,f1,dur,gain,type,at){
+  if(splashHold||!ac||muted||!sfxGain) return;
+  if(MUS.log) MUS.log.push('cue:'+name);
+  const t=ac.currentTime+(at||0), o=ac.createOscillator(), g=ac.createGain();
+  o.type=type||'sine'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(gain,t+.01); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+dur+.03);
+}
+/* Under 25 percent health in a fight: a red edge to the picture (still, under less motion) and a slow double thump. */
+let heartT=0;
+function lowHealthCue(real){
+  const el=$('lowHp'); if(!el) return;
+  const low=!!P&&G.state==='fight'&&P.hp>0&&P.hp/P.maxHp<.25;
+  if(low===el.hidden) el.hidden=!low;
+  if(!low){ heartT=0; return; }
+  heartT-=real; if(heartT>0) return; heartT=.95;
+  cueTone('heart',72,44,.13,.2,'sine'); cueTone('heart',66,42,.11,.14,'sine',.17);
+}
 let denyT=0;
 function denyCue(){
   const now=performance.now(); if(now-denyT<250) return; denyT=now;
@@ -2825,7 +2853,7 @@ function setW(id,pct){ pct=clamp(pct,0,100); if(cache[id]===undefined||Math.abs(
 function updateHud(){
   if(!P||!E) return;
   setW('pHp',P.hp/P.maxHp*100); setW('pGhost',P.hp/P.maxHp*100); setW('pSt',P.stam);
-  setW('eHp',E.hp/E.maxHp*100); setW('eGhost',E.hp/E.maxHp*100);
+  setW('eHp',E.hp/E.maxHp*100); setW('eGhost',E.hp/E.maxHp*100); setW('eSt',E.stam);
   const cfg=E.cfg; let nm=cfg.foe;
   if(cfg.echo&&E.hp/E.maxHp<.35&&(G.t%1.4)<.14) nm='Auditor';
   if($('eName').textContent!==nm) $('eName').textContent=nm;
@@ -3082,7 +3110,7 @@ function frame(){
   const a=Math.max(0,acc/SIM);
   simShow(P,a); simShow(E,a);
   if(SKIN.on){ updateSkin(P,real); updateSkin(E,real); }
-  updateFx(real); updateAmbient(dt); updateCamera(dt,real); updateHud();
+  updateFx(real); updateAmbient(dt); updateCamera(dt,real); updateHud(); lowHealthCue(real);
 }
 
 /* ---------- custom avatar (GLB) ---------- */
