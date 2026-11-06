@@ -4,7 +4,7 @@ Ideas that were suggested or left out of a sprint and are not built. Nothing her
 
 ## Ranking
 
-Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items, a fourth look, from the play flow, added 13, and a fifth look, from two reviews (combat and feel; web robustness and tooling), added 25 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; Sprints 27 and 28 built items 21 to 31; item 32 is next.
+Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items, a fourth look, from the play flow, added 13, and a fifth look, from two reviews (combat and feel; web robustness and tooling), added 25 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; Sprints 27 and 28 built items 21 to 31; Sprint 29 built items 32 to 40 and 57; item 41 is next.
 
 ### Tier 1: Sprint 25 (all ten built; see `TUNING_LOG.md`)
 
@@ -56,15 +56,15 @@ Every item below, best first. Score is value (1 to 5, counting risk removed) div
 | # | Item | Size | Score |
 | --- | --- | --- | --- |
 | 31 | Five of six foes cannot answer a jab (built in Sprint 28: `JAB_READ`, health retuned) | M | 2.0 |
-| 32 | Training room with a dummy and live move costs | S+ | 2.0 |
-| 33 | Tells you can hear, and shapes not only colour | S+ | 2.0 |
-| 34 | Medals per bout from the stats already counted | S+ | 2.0 |
-| 35 | Per-system CPU time budget (sim tick, AI, render prep) | S+ | 2.0 |
-| 36 | Missing cues: a dodge that works, low health, the foe's stamina | S+ | 2.0 |
-| 37 | Loading splash visible in the HTML, with a `noscript` line | S+ | 2.0 |
-| 38 | A limiter on `master` and a longer music lookahead (measure first) | S+ | 2.0 |
-| 39 | Tap targets of 44 px on touch | S+ | 2.0 |
-| 40 | CI hygiene: split QA tools from the regression install, check `lib/babylon.js` against a rebuild, pin Chrome | S+ | 2.0 |
+| 32 | Training room with a dummy and live move costs (built in Sprint 29) | S+ | 2.0 |
+| 33 | Tells you can hear, and shapes not only colour (built in Sprint 29) | S+ | 2.0 |
+| 34 | Medals per bout from the stats already counted (built in Sprint 29) | S+ | 2.0 |
+| 35 | Per-system CPU time budget (sim tick, AI, render prep) (built in Sprint 29) | S+ | 2.0 |
+| 36 | Missing cues: a dodge that works, low health, the foe's stamina (built in Sprint 29) | S+ | 2.0 |
+| 37 | Loading splash visible in the HTML, with a `noscript` line (built in Sprint 29) | S+ | 2.0 |
+| 38 | A limiter on `master` and a longer music lookahead (measure first) (built in Sprint 29) | S+ | 2.0 |
+| 39 | Tap targets of 44 px on touch (built in Sprint 29) | S+ | 2.0 |
+| 40 | CI hygiene: split QA tools from the regression install, check `lib/babylon.js` against a rebuild, pin Chrome (built in Sprint 29) | S+ | 2.0 |
 | 41 | Repo hygiene: `CHANGELOG.md` and a `probes` script | S | 2.0 |
 | 42 | Mobile haptics | S | 2.0 |
 | 43 | Controls reference card | S | 2.0 |
@@ -81,7 +81,7 @@ Every item below, best first. Score is value (1 to 5, counting risk removed) div
 | 54 | A small FOV punch on heavy hits and the knockout | S | 2.0 |
 | 55 | Rebinding fails silently (reserved key, swapped clash) | S | 2.0 |
 | 56 | Pause menu: Space and the arrows are swallowed while a card is up (guess, test first) | S | 2.0 |
-| 57 | Stale state after Reset progress, Restart and Quit | S | 2.0 |
+| 57 | Stale state after Reset progress, Restart and Quit (built in Sprint 29) | S | 2.0 |
 | 58 | Language switch on the splash | S | 2.0 |
 | 59 | Stamina-denied feedback on touch and the pad (the keyboard has `denyCue`) | S | 2.0 |
 | 60 | Skip the knockout sequence (`koTimer` is a fixed 2.4 s) | S | 2.0 |
@@ -127,6 +127,9 @@ Settings card (M), daily challenge and share line (M, needs 20), installable off
 - Switch off the Cursor `daily-care` agent: you chose Dependabot for dependency bumps, and `AGENTS.md` says it owns them (PR #18 came from the agent).
 - Play on Safari and Firefox by hand once (item 75 automates only a smoke test).
 - Hold Enter and Esc on a real keyboard, and open the game in two real tabs, after Sprint 27.
+- Play bouts 2 to 6 under the jab read (Sprint 28) and say whether it feels too strong or too weak (`JAB_READ.f`).
+- Listen to the new tones (the opponent's tell, a dodge that works, the heartbeat under a quarter health) and to a hard hit with the limiter on (Sprint 29).
+- Try the training room, the medals and the 44 px controls on a real phone, and say whether the medal limits (Sharp 85 percent; Quick 26 / 31 / 40 / 46 / 38 / 39 s) suit a person: they come from the bot, not from play.
 - Try the movement keys on a real AZERTY or Dvorak keyboard, and play the second pass through.
 - Turn on "Automatically delete head branches" in the GitHub repo settings (item 83).
 
@@ -336,3 +339,12 @@ All of these touch the sim, so each needs `balance-run` (item 78): a jab's stun 
 ### Checked and fine
 
 Frame loop (the 0.05 s clamp, the 5-tick accumulator cap, interpolation), hit stop on block, hit and KO, a 0.22 s input buffer, stuck keys on blur, tab hide and Cmd, double hits (`A.done`), acting during a KO, the ring and body resolution, and jab plus block on one frame (the jab wins). Do not check these again.
+
+## Found while building Sprint 29
+
+- **The Lighthouse half of `npm run qa:a11y` times out after 180 s on this machine, on master too** (`spawnSync /bin/sh ETIMEDOUT`); axe runs (0 violations, 1 incomplete). Find out whether Lighthouse needs different Chrome flags or never worked here. Small.
+- **Medal limits come from the bot.** Quick is its quickest quarter of wins and Sharp sits above what it lands in the later bouts; it never wins without a hit. With an exported playtest log (item 50) the limits should be set from people. Small.
+- **On a phone the settings rows on the title card look uneven:** a long label ("Block as a toggle (tap to start and stop)") wraps under its checkbox. Cosmetic, there before the 44 px rows. Small.
+- **The foe's alert mark against the floor in bout 6** measured 2.4 to 1 against its own rim, probably the measurement's ring catching the head; check by eye or with a better sampler before calling it a fault. Small.
+- **The limiter is a safety net, not a mix.** It was added because a dense, synthetic scene (a hit every 110 ms, the crowd at full, the voice) read up to -0.4 dBFS; a real fight is rarely that dense, and nobody has listened for pumping on a hard hit. Yours.
+
