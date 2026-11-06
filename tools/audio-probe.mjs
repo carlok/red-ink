@@ -1,5 +1,5 @@
 /**
- * Mix check: sample peaks, duck, stems, crowd swell, saved volume.
+ * Mix check: sample peaks, duck, music layers, the crowd's reactions, saved volume.
  * Usage: node tools/audio-probe.mjs
  */
 import { spawn } from "node:child_process";
@@ -56,6 +56,7 @@ const EXPR = `(async () => {
     await new Promise((r) => requestAnimationFrame(r));
   }
   const S = window.__sublevel;
+  if (S.G.state === "splash") S.play();   /* the page opens on a silent splash since Sprint 22 */
   await S.audioReady();
   S.notePad();
   const pad = S.audioState().unlock;
@@ -70,16 +71,15 @@ const EXPR = `(async () => {
   S.G.state = "fight";
   S.P.hp = 20; S.P.maxHp = 100; S.E.hp = 100; S.E.maxHp = 100; S.G.cheer = 0;
   for (let i = 0; i < 15; i++) S.audioTick(0.1);
-  const tense = S.audioState().stems;
+  const tense = S.audioState().music.layers;
   S.G.state = "ko";
   for (let i = 0; i < 15; i++) S.audioTick(0.1);
-  const finish = S.audioState().stems;
+  const finish = S.audioState().music.layers;
   S.G.state = "card"; S.G.cheer = 0;
   for (let i = 0; i < 15; i++) S.audioTick(0.1);
-  const calm = S.audioState().stems;
-  S.G.cheer = 0; S.audioTick(0);
-  const crowd0 = S.audioState().crowd;
-  S.G.cheer = 1; S.audioTick(0);
+  const calm = S.audioState().music.layers;
+  const crowd0 = S.audioState().crowd;   /* reactions so far: the crowd answers a blow, and a knockout always */
+  S.crowdReact("ko");
   const crowd1 = S.audioState().crowd;
   S.setAudio({ sfx: 0.25, music: 0.5, mute: true });
   const store = S.audioState().store;
@@ -95,7 +95,7 @@ const userData = mkdtempSync(join(ROOT, ".tmp-chrome-"));
 const chrome = spawn(CHROME, [
   "--headless=new", `--remote-debugging-port=${debugPort}`, `--user-data-dir=${userData}`,
   "--remote-allow-origins=*", "--no-first-run", "--disable-background-networking",
-  "--hide-scrollbars", "about:blank",
+  "--hide-scrollbars", "--autoplay-policy=no-user-gesture-required", "about:blank",
 ], { stdio: "ignore" });
 try {
   let page = null;

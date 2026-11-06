@@ -23,7 +23,7 @@ await withPage(async (cdp) => {
     $("wrap").hidden = true; S.startBout(4); await __until(() => G.state === "fight", "fight"); await sleep(500);
     out.push(await measure("fight, music and room only", 2500, null));
     G.cheer = 1;
-    out.push(await measure("crowd swell (cheer 1)", 2000, () => { G.cheer = 1; }));
+    out.push(await measure("cheer 1 held (music and room, the crowd answers blows)", 2000, () => { G.cheer = 1; }));
     let k = 0; const SFXS = ["jab", "heavy", "block", "whoosh"];
     out.push(await measure("hits every 110 ms with swell", 3000, () => { G.cheer = 1; S.hit(); }));
     out.push(await measure("hits + robot voice KO + FIGHT", 3000, () => { G.cheer = 1; S.hit(); if ((k++ % 5) === 0) S.voiceSay(k % 2 ? "ko" : "fight"); }));

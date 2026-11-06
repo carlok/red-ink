@@ -810,6 +810,45 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("ambience_is_a_hum_and_a_crowd_that_answers_blows", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), g = S.audioGraph(), ac = g.ac, o = {};
+      S.setAudio({ mute: false }); if (ac.state !== "running") { await ac.resume(); for (let i = 0; i < 20 && ac.state !== "running"; i++) await sleep(50); }
+      /* the bed rebuilt under a counter: no buffer source at all (it used to build four looping noise sources) */
+      const made = [], orig = ac.createBufferSource.bind(ac); ac.createBufferSource = () => { const s = orig(); made.push(s); return s; };
+      g.BED.ready = false; S.bedInit(); ac.createBufferSource = orig;
+      o.noNoiseSources = made.length === 0; o.humIsSixOscillators = g.BED.hum.length === 6 && g.BED.hum.every((h) => h.o instanceof OscillatorNode);
+      $("wrap").hidden = true; S.startBout(1); await __until(() => G.state === "fight", "fight");
+      const count = (kind) => { g.MUS.log = []; S.crowdReact(kind); const n = g.MUS.log.filter((x) => x === "cue:crowd").length; g.MUS.log = null; return n; };
+      const rnd = Math.random;
+      Math.random = () => 0.01;                       /* every chance succeeds */
+      await sleep(1000); o.heavyAnswers = count("heavy") === 1;
+      o.notTwiceWithinAGap = count("heavy") === 0 && count("jab") === 0;
+      o.knockoutAlways = count("ko") === 1;
+      Math.random = () => 0.99;                       /* every chance fails */
+      await sleep(1000); o.chanceCanFail = count("heavy") === 0 && count("block") === 0; o.knockoutIgnoresChance = count("ko") === 1;
+      Math.random = () => 0.01; await sleep(1000);
+      S.setAudio({ mute: true }); o.mutedSilent = count("ko") === 0; S.setAudio({ mute: false });
+      S.MIX.crowdReact = 0; o.switchedOff = count("ko") === 0; S.MIX.crowdReact = 1;
+      const amb = $("ambVol"); amb.value = "0"; amb.dispatchEvent(new Event("input")); o.zeroVolumeSilent = count("ko") === 0; amb.value = "100"; amb.dispatchEvent(new Event("input"));
+      o.backOn = count("ko") === 1;
+      Math.random = rnd;
+      /* events: scheduled in a fight, not when muted or at zero */
+      const events = async () => { g.MUS.log = []; g.BED.next = 0; S.audioTick(0.016); const n = g.MUS.log.filter((x) => x === "bed:event").length; g.MUS.log = null; return n; };
+      o.eventsInAFight = (await events()) === 1;
+      S.setAudio({ mute: true }); o.noEventsMuted = (await events()) === 0; S.setAudio({ mute: false });
+      /* the bed fades with the music on a card nobody touches, and comes back */
+      S.MIX.cardQuiet = 0.05; $("wrap").hidden = false; G.state = "card";
+      for (let i = 0; i < 60; i++) S.audioTick(0.25);
+      o.roomFadesOnAnIdleCard = g.roomGain.gain.value < 0.02 && g.crowdGain.gain.value < 0.02;
+      S.MIX.cardQuiet = 40; G.state = "fight"; $("wrap").hidden = true; for (let i = 0; i < 80; i++) S.audioTick(0.1);
+      o.roomComesBack = g.roomGain.gain.value > 0.5;
+      S.titleCard();
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("held_esc_and_enter_do_not_repeat", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};

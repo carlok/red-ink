@@ -1279,7 +1279,7 @@ const LIMIT={threshold:-3,knee:0,ratio:20,attack:.001,release:.12,trim:Math.pow(
 let limiter=null, limitOut=null;
 let master=null, sfxGain=null, musicGain=null, duckGain=null, roomGain=null, crowdGain=null, ambGain=null;
 let duck=1, duckT=0, bufs={}, gains={}, audioP=null;
-const PEAK={jab:.5012,jab2:.5012,jab3:.5012,heavy:.5012,heavy2:.5012,block:.5012,block2:.5012,ko:.5012,whoosh:.1995,ui:.2512,room:.02512,crowd:.0631,calm:.1259,calm2:.1259,tense:.1259,tense2:.1259,finish:.1259,hub:.1259,dock:.1259};
+const PEAK={jab:.5012,jab2:.5012,jab3:.5012,heavy:.5012,heavy2:.5012,block:.5012,block2:.5012,ko:.5012,whoosh:.1995,ui:.2512};   /* the sample pack's own peaks (-6 dBFS hits, -14 whoosh, -12 ui); the old room and music-loop keys went with the loops */
 const HIT_POOL={jab:['jab','jab2','jab3'],heavy:['heavy','heavy2'],block:['block','block2']};
 const HIT_RATE=[1,.97,1.04,.92,1.08];
 let hitPick=0;
@@ -1557,7 +1557,7 @@ function musicMoodSet(m,arg){
   }
 }
 function musicTick(){
-  if(!ac||!MUS.bus||ac.state!=='running'||splashHold||document.hidden||G.state==='pause'){ MUS.nextT=0; return; }
+  if(!ac||!MUS.bus||ac.state!=='running'||splashHold||document.hidden||G.state==='pause'||muted||volMusic<=0){ MUS.nextT=0; return; }   /* muted or at zero: schedule nothing */
   const now=ac.currentTime, P=MUSIC_PLACES[MUS.place], onCard=G.state==='card'&&!$('wrap').hidden, mood=onCard?MUS.mood:'card',
     sd=60/(mood==='win'?P.bpm*1.08:mood==='lose'?64:P.bpm)/4;
   if(MUS.nextT<now) MUS.nextT=now+.06;
@@ -1712,7 +1712,7 @@ function musicUpdate(dt,live){
 }
 /* one-off phrases at the moments that matter: the bout starts, a knockout, a win, a loss */
 function musicSting(kind){
-  if(!ac||!MUS.bus||ac.state!=='running'||splashHold||audOut) return;
+  if(!ac||!MUS.bus||ac.state!=='running'||splashHold||audOut||muted||volMusic<=0) return;
   const t=ac.currentTime+.03, P=MUSIC_PLACES[MUS.place], sc=SCALES[P.scale], root=P.root, deg=d=>sc[((d%sc.length)+sc.length)%sc.length]+12*Math.floor(d/sc.length);
   MUS.layer.drums.gain.setTargetAtTime(Math.max(MUS.layer.drums.gain.value,.9),t,.02); MUS.layer.pluck.gain.setTargetAtTime(Math.max(MUS.layer.pluck.gain.value,.9),t,.02);
   if(kind==='ready'){
@@ -1727,50 +1727,66 @@ function musicSting(kind){
     [0,3,7].forEach((n,j)=>{ const q=ac.createOscillator(), f=ac.createBiquadFilter(); q.type='sawtooth'; q.frequency.setValueAtTime(mhz(root+24+deg(n)),t); q.frequency.exponentialRampToValueAtTime(mhz(root+12+deg(n)),t+1.4); f.type='lowpass'; f.frequency.value=1100; q.connect(f); f.connect(mEnv(MUS.layer.pad,t+.02*j,1.6,.12,.02)); q.start(t); q.stop(t+1.65); });
   }
 }
-/* The bed is quiet and the music is for moments. room and crowd are low and drift slowly (two incommensurate sines), so their 1.5 s loops do
-   not read as loops; the crowd rises with G.cheer. The calm stem plays on cards and fades out after cardQuiet seconds of nobody pressing
-   anything; the tense stem only when a fighter is under 40% hp; the finish stem on the knockout. Pause hushes everything. */
-const MIX={room:1.2,crowdBase:.45,crowdSwell:1.1,cardQuiet:40};
-/* The bed is live noise, not a looped file: a 4 s noise buffer with a cross-faded seam, filtered into a room tone and a crowd murmur, each
-   with its own slow level wobble, so nothing repeats on a short period. A few low events per place (BED_EVENTS) are scheduled on the clock. */
-const BED={ready:false,murmur:null,wind:null,next:0,t:0};
-function loopNoise(sec){
-  const n=Math.floor(ac.sampleRate*sec), xf=Math.floor(ac.sampleRate*.3), b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0); let a=11;
-  for(let i=0;i<n;i++){ a=(Math.imul(a,1664525)+1013904223)>>>0; d[i]=a/2147483648-1; }
-  for(let i=0;i<xf;i++){ const w=i/xf; d[n-xf+i]=d[n-xf+i]*(1-w)+d[i]*w; }
-  return b;
-}
+/* The bed is quiet and the music is for moments. The room is a low hum with a slow wander and the crowd is a reaction, so nothing between blows is noise.
+   The calm stem plays on cards and fades out after cardQuiet seconds of nobody pressing anything; the tense stem only when a fighter is under 40% hp; the finish
+   stem on the knockout. The bed fades with the music and goes silent in pause, muted, or at zero volume. */
+const MIX={room:1.2,crowdReact:1,cardQuiet:40};
+/* The ambience used to be four looping noise sources (a low-passed room and two band-passed crowd murmurs, plus wind) with the crowd swelling on every hit: filtered noise has
+   no pitch or syllables, so it read as hiss (tools/ambience-probe.mjs: flatness 0.11 quiet and 0.40 after a hit, 4 looping buffer sources). Now:
+   - the room is a mains hum: a fundamental and two partials, each as two oscillators a few tenths of a hertz apart so they beat slowly; the base frequency changes with the place;
+   - BED_EVENTS are tonal (beeps, pings, a knock), one kind per place, a few seconds apart;
+   - the crowd is crowdReact(): a handful of voices (sawtooth through two vowel formants and a low-pass) that answer a blow, and nothing between blows. */
+const BED={ready:false,hum:null,next:0,t:0};
+const HUM_F=[50,50,50,41,50,56], HUM_LEVEL=.0055;
 function bedInit(){
   if(BED.ready||!ac||!roomGain) return; BED.ready=true;
-  const nb=loopNoise(4);
-  const mk=(type,f,q,gain,dest,lfoHz,depth)=>{
-    const s=ac.createBufferSource(), fl=ac.createBiquadFilter(), g=ac.createGain(); s.buffer=nb; s.loop=true; fl.type=type; fl.frequency.value=f; fl.Q.value=q; g.gain.value=gain;
-    s.connect(fl); fl.connect(g); g.connect(dest);
-    if(lfoHz){ const o=ac.createOscillator(), dp=ac.createGain(); o.frequency.value=lfoHz; dp.gain.value=depth*gain; o.connect(dp); dp.connect(g.gain); o.start(); }
-    s.start(0,Math.random()*3); return {g,fl};
-  };
-  mk('lowpass',380,.5,.1,roomGain,.05,.25);
-  BED.murmur=mk('bandpass',420,.6,.09,crowdGain,.21,.55).fl;
-  mk('bandpass',1500,.8,.045,crowdGain,.37,.7);
-  BED.wind=mk('bandpass',650,2.5,0,roomGain,.07,.9).g;
+  BED.hum=[];
+  [[1,1],[2,.25],[3,.1]].forEach(([k,a])=>[[0,1],[.3,.25]].forEach(([d,w])=>{
+    const o=ac.createOscillator(), g=ac.createGain(); o.type='sine'; o.frequency.value=HUM_F[0]*k+d*k; g.gain.value=HUM_LEVEL*a*w; o.connect(g); g.connect(roomGain); o.start(); BED.hum.push({o,k,d});
+  }));
   bedPlace(envIdx<0?0:envIdx);
 }
-function bedPlace(i){ if(BED.wind) BED.wind.gain.value=(i%6)===3?.07:0; BED.next=ac?ac.currentTime+3:0; }
+function bedPlace(i){
+  if(BED.hum&&ac) BED.hum.forEach(h=>h.o.frequency.setTargetAtTime(HUM_F[i%6]*h.k+h.d*h.k,ac.currentTime,.6));
+  BED.next=ac?ac.currentTime+3:0;
+}
 const BED_EVENTS=[
   {every:[2.5,7],f:t=>{ const o=ac.createOscillator(); o.frequency.setValueAtTime(1900,t); o.frequency.exponentialRampToValueAtTime(1000,t+.07); o.connect(mEnvOn(roomGain,t,.1,.05,.003)); o.start(t); o.stop(t+.12); }},
   {every:[14,30],f:t=>{ [0,.26].forEach(d=>{ const o=ac.createOscillator(); o.type='square'; o.frequency.value=2300; const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=3000; o.connect(f); f.connect(mEnvOn(roomGain,t+d,.15,.014,.004)); o.start(t+d); o.stop(t+d+.17); }); }},
   {every:[9,18],f:t=>{ const o=ac.createOscillator(); o.frequency.value=1250; o.connect(mEnvOn(roomGain,t,.7,.03,.004)); o.start(t); o.stop(t+.72); }},
-  {every:[8,20],f:t=>{ if(!MUS.noise) return; const s=ac.createBufferSource(), fl=ac.createBiquadFilter(); s.buffer=MUS.noise; fl.type='highpass'; fl.frequency.value=5200; s.connect(fl); fl.connect(mEnvOn(roomGain,t,.07,.05,.002)); s.start(t,Math.random()); s.stop(t+.09); }},
-  {every:[12,25],f:t=>{ if(!MUS.noise) return; const s=ac.createBufferSource(), fl=ac.createBiquadFilter(); s.buffer=MUS.noise; fl.type='bandpass'; fl.frequency.value=1800; fl.Q.value=2; s.connect(fl); fl.connect(mEnvOn(roomGain,t,.22,.035,.01)); s.start(t,Math.random()); s.stop(t+.25); const o=ac.createOscillator(); o.frequency.value=1000; o.connect(mEnvOn(roomGain,t+.3,.07,.025,.004)); o.start(t+.3); o.stop(t+.4); }},
+  {every:[8,20],f:t=>{ const o=ac.createOscillator(); o.frequency.value=3100; o.connect(mEnvOn(roomGain,t,.06,.04,.002)); o.start(t); o.stop(t+.08); }},   /* a ping, where a noise tick was */
+  {every:[12,25],f:t=>{ [0,.22].forEach(d=>{ const o=ac.createOscillator(); o.frequency.setValueAtTime(190,t+d); o.frequency.exponentialRampToValueAtTime(110,t+d+.09); o.connect(mEnvOn(roomGain,t+d,.12,.05,.004)); o.start(t+d); o.stop(t+d+.14); }); const o=ac.createOscillator(); o.frequency.value=1000; o.connect(mEnvOn(roomGain,t+.5,.07,.025,.004)); o.start(t+.5); o.stop(t+.6); }},   /* two knocks and a beep, where a scrape was */
   {every:[3,6],f:t=>{ const o=ac.createOscillator(); o.frequency.setValueAtTime(52,t); o.frequency.exponentialRampToValueAtTime(40,t+.6); o.connect(mEnvOn(roomGain,t,.7,.07,.02)); o.start(t); o.stop(t+.72); }}
 ];
 function mEnvOn(dest,t,dur,peak,atk){ const g=ac.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(Math.max(.0002,peak),t+atk); g.gain.exponentialRampToValueAtTime(.0001,t+dur); g.connect(dest); return g; }
 function bedEvents(){
-  if(!BED.ready||!ac||ac.state!=='running'||splashHold||audOut||document.hidden) return;
+  if(!BED.ready||!ac||ac.state!=='running'||splashHold||audOut||document.hidden||muted||volAmb<=0) return;
   if(G.state!=='fight'&&G.state!=='ready') return;
   const now=ac.currentTime; if(now<BED.next) return;
   const ev=BED_EVENTS[(envIdx<0?0:envIdx)%BED_EVENTS.length]; ev.f(now+.05);
+  if(MUS.log) MUS.log.push('bed:event');
   BED.next=now+ev.every[0]+Math.random()*(ev.every[1]-ev.every[0]);
+}
+/* The crowd answers a blow: p is the chance, n the voices, dur the tail in seconds, lvl the peak of each voice. Nothing plays between blows, a reaction at most every
+   0.9 s (the knockout always), and MIX.crowdReact scales the chance (0 switches the crowd off). Render only: Math.random, never rng(). */
+const CROWD_REACT={heavy:{p:.6,n:6,dur:.9,lvl:.02},jab:{p:.15,n:4,dur:.6,lvl:.012},block:{p:.1,n:4,dur:.6,lvl:.012},dodge:{p:.3,n:5,dur:.7,lvl:.014},ko:{p:1,n:9,dur:1.8,lvl:.04}};
+const VOWELS=[[500,900],[700,1200],[320,800]];   /* oh, ah, oo: the first two formants */
+let crowdT=-9, crowdCount=0;
+function crowdReact(kind){
+  const R=CROWD_REACT[kind];
+  if(!R||!MIX.crowdReact||splashHold||!ac||muted||volAmb<=0||!crowdGain||ac.state!=='running'||document.hidden) return;
+  const now=ac.currentTime;
+  if(kind!=='ko'&&(now-crowdT<.9||Math.random()>=R.p*MIX.crowdReact)) return;
+  crowdT=now; crowdCount++; if(MUS.log) MUS.log.push('cue:crowd');
+  const vow=kind==='dodge'?VOWELS[2]:VOWELS[Math.random()<.6?0:1];
+  for(let i=0;i<R.n;i++){
+    const t=now+.02+Math.random()*.14, f0=95+Math.random()*95, o=ac.createOscillator(), lp=ac.createBiquadFilter(), env=ac.createGain();
+    o.type='sawtooth'; o.frequency.setValueAtTime(f0,t); o.frequency.linearRampToValueAtTime(f0*1.12,t+R.dur*.7);
+    lp.type='lowpass'; lp.frequency.value=2800;
+    vow.forEach((fc,k)=>{ const bp=ac.createBiquadFilter(), g=ac.createGain(); bp.type='bandpass'; bp.frequency.value=fc*(.94+Math.random()*.12); bp.Q.value=k?7:5; g.gain.value=k?.45:.7; o.connect(bp); bp.connect(g); g.connect(lp); });
+    const atk=.08+Math.random()*.07; env.gain.setValueAtTime(.0001,t); env.gain.exponentialRampToValueAtTime(R.lvl,t+atk); env.gain.exponentialRampToValueAtTime(.0001,t+R.dur);
+    lp.connect(env); env.connect(crowdGain); o.start(t); o.stop(t+R.dur+.05);
+  }
 }
 let audPause=0, audCardT=0, audClock=0, audFade=1;
 function audioTick(dt){
@@ -1789,11 +1805,8 @@ function audioTick(dt){
   musicUpdate(dt,live);
   bedEvents();
   const drift=(a,b)=>.5+.5*Math.sin(audClock*a)*Math.sin(audClock*b+1.7), hush=1-.85*audPause, cheer=clamp(G.cheer||0,0,1.4);
-  if(roomGain) roomGain.gain.value=MIX.room*(.75+.25*drift(.37,.11))*hush;
-  if(crowdGain){
-    crowdGain.gain.value=(MIX.crowdBase+MIX.crowdSwell*cheer/1.4)*(.8+.2*drift(.29,.13))*hush;
-    if(BED.murmur) BED.murmur.frequency.value=420*(1+.5*cheer/1.4);
-  }
+  if(roomGain) roomGain.gain.value=MIX.room*(.75+.25*drift(.37,.11))*hush*audFade;   /* the room fades with the music on a card nobody touches */
+  if(crowdGain) crowdGain.gain.value=hush*audFade;
 }
 function audioMetrics(){
   const pack=window.SUBLEVEL_AUDIO;
@@ -1818,7 +1831,7 @@ function audioState(){
   return {
     unlock, muted, volSfx, volMusic, duck,
     music:{place:MUS.place,bar:MUS.bar,layers:{pad:Math.round(MUS.cur.pad*100)/100,pluck:Math.round(MUS.cur.pluck*100)/100,bass:Math.round(MUS.cur.bass*100)/100,drums:Math.round(MUS.cur.drums*100)/100}},
-    crowd:crowdGain?Math.round(crowdGain.gain.value*100)/100:null,
+    crowd:crowdCount,   /* reactions so far (it used to be the crowd bed's gain) */
     peaks:{jab:peakDb('jab'),heavy:peakDb('heavy'),block:peakDb('block'),ko:peakDb('ko')},
     store:readAudioStore()
   };
@@ -1835,11 +1848,11 @@ function setAudio(o){
   saveAudioPrefs(); applyBus(); paintAudio();
 }
 const SFX={
-  jab:()=>{ playHit('jab'); duckHit(); },
-  heavy:()=>{ playHit('heavy'); duckHit(); },
-  block:()=>{ playHit('block'); duckHit(); },
+  jab:()=>{ playHit('jab'); duckHit(); crowdReact('jab'); },
+  heavy:()=>{ playHit('heavy'); duckHit(); crowdReact('heavy'); },
+  block:()=>{ playHit('block'); duckHit(); crowdReact('block'); },
   whoosh:()=>playSample('whoosh', .9+(hitPick%4)*.05),
-  ko:()=>{ playSample('ko'); duckHit(); },
+  ko:()=>{ playSample('ko'); duckHit(); crowdReact('ko'); },
   ui:()=>playSample('ui')
 };
 loadAudioPrefs();
@@ -2191,7 +2204,7 @@ function strike(a,d,D){
   if(d.state==='ko') return;
   const mid=a.pos.add(d.pos).scale(.5); mid.y=1.25;
   if(a.isPlayer&&D.dmg<=10) G.log[d.inv>0?'jabDodge':d.state==='block'?'jabBlock':'jabHit']++;
-  if(d.inv>0){ if(d.isPlayer) G.log.dodges++; SFX.whoosh(); cueTone('dodge',520,1040,.14,.16,'triangle'); fxWord('DODGE',mid); return; }
+  if(d.inv>0){ if(d.isPlayer) G.log.dodges++; SFX.whoosh(); cueTone('dodge',520,1040,.14,.16,'triangle'); crowdReact('dodge'); fxWord('DODGE',mid); return; }
   const dir=d.pos.subtract(a.pos); dir.y=0; dir.normalize();
   if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
   else if(a.isPlayer&&d.state!=='block') G.log.landed++;
@@ -4152,7 +4165,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={bedInit,JAB_READ,step,aiIntent,resolveBodies,crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,limiter,limitOut,LIMIT,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={bedInit,crowdReact,JAB_READ,step,aiIntent,resolveBodies,crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,limiter,limitOut,LIMIT,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

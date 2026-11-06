@@ -55,7 +55,7 @@ A hit turns the head toward that side. Knockdowns fall back, crumple, or drop si
 
 The overhead light is cold. The hanging bulbs are sodium orange. The crowd around the ring is built from shoulders, arms, and legs, and they sway while they stand.
 
-Hits, blocks, and the K.O. are samples. A room tone and three music loops sit under them, and the music ducks when a hit lands.
+Hits, blocks, and the K.O. are samples. A low room hum, a few quiet beeps and knocks, and the music sit under them, and the music ducks when a hit lands. The crowd is a reaction, not a bed: a few voices answer a blow (always the knockout) and nothing plays between blows. The Ambience slider and the pause switch set the hum, the events and the crowd together.
 
 Esc pauses a bout. The first fight shows a 12-second control strip.
 
