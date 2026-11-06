@@ -1176,6 +1176,23 @@ async function runHttpSuite(cdp) {
     return out;
   });
 
+  /* Scripts off: what a visitor sees before the game has parsed, or with JavaScript disabled. Reloads the page. */
+  await test("page_is_not_blank_before_the_scripts_run", async () => {
+    await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await new Promise((r) => setTimeout(r, 800));
+    const r = await cdp.send("Runtime.evaluate", { returnByValue: true, expression: `(() => { const $ = (i) => document.getElementById(i), vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden" && getComputedStyle(el).display !== "none"; };
+      return { splashShown: !$("splash").hidden && vis($("splash")), title: $("spTitle").textContent, loadingNote: vis($("spNote")), playHidden: !vis($("spPlay")), noscript: [...document.querySelectorAll("noscript p")].some((p) => /JavaScript/.test(p.textContent) && vis(p)) }; })()` });
+    await cdp.send("Emulation.setScriptExecutionDisabled", { value: false });
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await bootSublevel(cdp);
+    const after = await cdp.eval(`(() => ({ loadingGone: !document.getElementById("splash").classList.contains("loading"), note: document.getElementById("spNote").textContent }))()`);
+    const v = r.result.value;
+    /* with scripts off the loading note is replaced by the noscript line (display:none from the noscript style); the Play button stays out of sight */
+    if (!(v.splashShown && v.title === "Sublevel Three" && !v.loadingNote && v.playHidden && v.noscript && after.loadingGone && after.note === "")) throw new Error(JSON.stringify({ v, after }));
+    return { v, after };
+  });
+
   /* Last in the suite: it reloads the page twice. */
   await test("stored_values_are_validated_on_load", async () => {
     const reload = async () => { await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp); };

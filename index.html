@@ -158,6 +158,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 @media (max-aspect-ratio:1/1){.wrap.dossier{place-items:end center;padding:0;overflow:hidden;background:linear-gradient(to top,rgba(8,8,9,.7) 50%,rgba(8,8,9,0) 62%)}.wrap.dossier .card{margin:0;width:100%;max-height:56vh;overflow:auto}}
 .splash{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at center,rgba(8,8,9,.55),rgba(8,8,9,.92) 78%);text-align:center}
 .splash[hidden]{display:none}
+.splash.loading .spPlay,.splash.loading .spCredits{visibility:hidden}   /* until the script has run there is nothing to press */
 .splash::before{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;pointer-events:none;opacity:.55;
   background:linear-gradient(to top,rgba(255,45,149,.22),rgba(255,45,149,0) 70%),
   repeating-linear-gradient(90deg,rgba(255,45,149,.55) 0 1px,transparent 1px 70px),repeating-linear-gradient(0deg,rgba(255,45,149,.45) 0 1px,transparent 1px 34px);
@@ -327,11 +328,12 @@ dl.rows dd a{color:inherit}
     </article>
   </div>
 
-  <div class="splash" id="splash" hidden>
+  <div class="splash loading" id="splash">   <!-- shown from the first paint: the scripts below take a while to parse, and the page used to be blank until they had -->
     <div class="splashIn">
       <div class="kick" id="spKick">Halvorsen Freight &middot; Form 7-B</div>
       <h1 id="spTitle">Sublevel Three</h1>
-      <p class="note" id="spNote" aria-live="polite"></p>
+      <p class="note" id="spNote" aria-live="polite">Loading&hellip;</p>
+      <noscript><style>#spNote{display:none}</style><p class="note">Sublevel Three needs JavaScript. Turn it on and reload the page.</p></noscript>
       <button class="spPlay" id="spPlay" type="button"><span id="spPlayTxt">Play</span><span aria-hidden="true">&rarr;</span></button>
       <button class="spCredits" id="spCredits" type="button">Credits</button>
     </div>
@@ -349,7 +351,7 @@ dl.rows dd a{color:inherit}
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-if(!window.BABYLON){ $('fail').hidden=false; $('wrap').hidden=true; return; }
+if(!window.BABYLON){ $('fail').hidden=false; $('wrap').hidden=true; $('splash').hidden=true; return; }
 const B=BABYLON, V3=B.Vector3, C3=B.Color3;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 const num=(x,lo,hi,def)=>{ x=Number(x); return Number.isFinite(x)?clamp(x,lo,hi):def; };   /* a number read from storage or a setting: NaN and Infinity give def */
@@ -3555,7 +3557,7 @@ fontsDone();
 if(document.fonts&&document.fonts.load){
   Promise.all([document.fonts.load('800 40px "Big Shoulders Stencil Display"'),document.fonts.load('600 20px "IBM Plex Mono"')]).then(fontsDone).catch(()=>{});
 }
-wrapEl.hidden=true; hudEl.hidden=true; G.state='splash'; $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus({preventScroll:true}); }catch(e){} },60);
+wrapEl.hidden=true; hudEl.hidden=true; G.state='splash'; $('splash').classList.remove('loading'); $('spNote').textContent=''; $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus({preventScroll:true}); }catch(e){} },60);
 const SKILL={easy:1.45,normal:1,hard:.72};
 const DIFF={
   easy:{hp:.85,speed:.92,react:1.18,dmg:.88,guard:.75,cd:1.12},
