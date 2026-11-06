@@ -2655,6 +2655,7 @@ function closeMenu(){
 function restartBout(){
   if($('pause')) $('pause').hidden=true;
   G.retry=true;   /* a restart begins at full health, like Retry on the lose card; without it the bout started at the damaged health plus 35 */
+  if($('pauseHint')) $('pauseHint').hidden=true;   /* the pad-unplugged hint belongs to the pause it was shown in */
   startBout(G.bout||0);
 }
 /* Quit: leave the fight, the fullscreen and the sound, and show the splash. Wins are saved when they happen (grantWin), so nothing is lost.
@@ -2662,7 +2663,7 @@ function restartBout(){
 function toSplash(withNote){
   try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen(); else if(document.webkitFullscreenElement&&document.webkitExitFullscreen) document.webkitExitFullscreen(); }catch(e){}
   if($('pause')) $('pause').hidden=true; G.menuOpen=false; $('pause').dataset.mode='fight'; $('resume').textContent=L('resume_btn'); $('pauseTitle').textContent=L('pause_title'); wrapEl.hidden=true; hudEl.hidden=true; $('touch').hidden=true;
-  G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0; voiceCancel();
+  G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0; voiceCancel(); if($('pauseHint')) $('pauseHint').hidden=true;
   G.state='splash'; splashHold=true; audOut=true; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
   if(ac&&ac.state!=='closed'){ try{ ac.suspend(); }catch(e){} }
   $('spNote').textContent=withNote?L('out_saved_v').replace('{n}',progress.wins).replace('{m}',BOUTS.length):'';
@@ -2726,6 +2727,9 @@ let resetArmed=false, resetTimer=0;
 function resetProgress(){
   progress=progressDefaults();
   saveProgressData(true); applyArena(0); syncPlayerOutfit(); skinEnsure(P);
+  /* the title card is still up and was drawn from the old save: take down what it offered (Practice, Continue) and the loss count */
+  G.loss=null; if($('linkPractice')) $('linkPractice').hidden=true;
+  if(G.state==='card'&&G.lastCard&&G.lastCard.assist){ G.lastCard.assist=null; if($('cardAssist')) $('cardAssist').hidden=true; }
 }
 function onResetClick(){
   const b=$('resetBtn'); if(!b) return;

@@ -607,6 +607,28 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("reset_restart_and_quit_leave_no_stale_state", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      $("wrap").hidden = true; S.qaResetProgress(); S.progress.wins = 3; S.titleCard(); await sleep(150);
+      o.offeredBefore = !$("linkPractice").hidden && !$("cardAssist").hidden;
+      G.loss = { bout: 1, n: 3 };
+      $("resetBtn").click(); $("resetBtn").click(); await sleep(100);
+      o.winsCleared = S.progress.wins === 0;
+      o.practiceGone = $("linkPractice").hidden;
+      o.continueGone = $("cardAssist").hidden;
+      o.lossCleared = !G.loss;
+      /* the pad hint is cleared by Restart and by Quit, not only by Resume */
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight");
+      S.pauseFight(); $("pauseHint").textContent = "hint"; $("pauseHint").hidden = false;
+      S.restartBout(); o.restartClearsHint = $("pauseHint").hidden;
+      await __until(() => G.state === "fight" || G.state === "ready", "bout"); S.pauseFight(); $("pauseHint").hidden = false;
+      S.toSplash(true); o.quitClearsHint = $("pauseHint").hidden; S.play();
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("held_esc_and_enter_do_not_repeat", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
