@@ -778,6 +778,42 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("training_is_offered_after_a_loss_and_can_be_left_for_the_title", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const buttons = () => Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
+      const lose = async (bout) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); S.qaEndBout(false); await sleep(80); return { rows: $("cRows").textContent, back: !$("cardBack").hidden ? $("cardBack").textContent : "" }; };
+      S.setLang("en"); S.qaResetProgress(); localStorage.removeItem("sublevel-train");
+      let l = await lose(0); o.tipOnTheLoseCard = l.rows.includes(S.STR[S.BOUTS[0].tipKey].en.slice(0, 20));
+      o.trainingOffered = l.back === "Try the training room";
+      l = await lose(2); o.notOfferedLate = l.back === "";
+      l = await lose(0); $("cardBack").click(); await sleep(150); o.offerOpensTraining = /dummy/i.test($("cTitle").textContent);
+      $("go").click(); await __until(() => G.state === "fight", "fight"); o.seenIsSaved = localStorage.getItem("sublevel-train") === "1";
+      /* leaving: from the pause menu back to the title card, mode and HUD gone */
+      S.pauseFight(); await sleep(100); o.leaveShownInTraining = !$("leaveTrain").hidden;
+      $("leaveTrain").click(); await sleep(150);
+      o.backOnTheTitle = G.state === "card" && !G.train && !G.practice && $("hud").hidden && $("pause").hidden && $("trainStrip").hidden && /sublevel|reconcil|audit/i.test($("cTitle").textContent + $("cStamp").textContent + $("cKick").textContent);
+      /* in an ordinary fight the leave button is not there, and the offer is gone once training has been seen */
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.pauseFight(); await sleep(80); o.noLeaveInAFight = $("leaveTrain").hidden; S.resumeFight();
+      l = await lose(0); o.notOfferedOnceSeen = l.back === "";
+      /* the input the player uses decides the tip */
+      o.tipKey = S.trainTip("key") === "T toggles his guard"; o.tipTouch = /Tap Dummy/.test(S.trainTip("touch")); o.tipPad = /Select/.test(S.trainTip("pad"));
+      const jab = S.binds.jab; S.binds.jab = "t"; o.tipRebound = /Dummy button/.test(S.trainTip()); S.binds.jab = jab;
+      S.setLang("it"); o.tipItalian = /Select attiva/.test(S.trainTip("pad")) && S.STR.train_leave.it === "Esci dalla palestra"; S.setLang("en");
+      /* a pad: Select switches the guard in a training fight; the strip button does not keep focus */
+      let padButtons = buttons(); const fake = { connected: true, id: "regression", mapping: "standard", axes: [0, 0, 0, 0], get buttons() { return padButtons; } };
+      Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [fake] });
+      $("wrap").hidden = true; S.titleCard(); await sleep(80); $("linkTrain").click(); await sleep(100); o.tipFollowsAPad = /Select/.test($("cRows").textContent);
+      $("go").click(); await __until(() => G.state === "fight", "fight"); const before = G.trainBlock;
+      padButtons = buttons(); S.pollPad(); padButtons[8] = { pressed: true, value: 1 }; S.pollPad(); padButtons = buttons(); S.pollPad();
+      o.selectToggles = G.trainBlock === !before;
+      $("trainBlock").focus(); $("trainBlock").click(); o.blurred = document.activeElement !== $("trainBlock");
+      delete navigator.getGamepads; S.pollPad(); $("wrap").hidden = true; S.titleCard(); localStorage.removeItem("sublevel-train");
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("training_room_dummy_never_attacks_and_costs_are_shown", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
