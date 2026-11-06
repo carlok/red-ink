@@ -756,6 +756,37 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  /* CPU time, not frame rate: a software-GL runner's frame rate says little, CPU cost is steadier. Measured on a Mac in headless Chrome: the sim tick
+     (two steps, the AI and the body resolution) costs about 0.003 ms against a 16.7 ms frame, and the JS side of scene.render about 1.1 to 2.0 ms.
+     The ceilings are 0.1 ms and 8 ms: far enough above for a slow CI runner, near enough to catch an accidental 30-fold (sim) or 4-fold (render) cost. */
+  await test("cpu_time_per_sim_tick_and_render", async () => {
+    const r = await cdp.eval(`(async () => {
+      const S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), dt = 1 / 60, out = { sim: {}, render: {} };
+      const idle = { mx: 0, mz: 0, jab: false, heavy: false, block: false, dodge: false }, scene = BABYLON.Engine.LastCreatedScene;
+      for (const bout of [1, 2, 5]) {
+        $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); S.seed(3);
+        const E = S.E, P = S.P, N = 3000;
+        const run = () => { const t0 = performance.now();
+          for (let t = 0; t < N; t++) {
+            const ip = t % 45 === 0 ? { ...idle, jab: true } : (t % 150 === 100 ? { ...idle, heavy: true } : idle);
+            S.step(P, E, ip, dt); S.step(E, P, S.aiIntent(E, P, dt), dt); S.resolveBodies();
+            P.hp = 1e6; E.hp = 1e6; G.state = "fight";
+          }
+          return (performance.now() - t0) / N; };
+        run(); out.sim["bout" + (bout + 1)] = +Math.min(run(), run(), run()).toFixed(4);   /* the first run warms the JIT up; the best of three drops a hiccup */
+      }
+      for (const bout of [0, 3, 5]) {
+        $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight");
+        for (let i = 0; i < 30; i++) await new Promise((r) => requestAnimationFrame(r));
+        const one = () => { const t0 = performance.now(); for (let i = 0; i < 60; i++) scene.render(); return (performance.now() - t0) / 60; };
+        out.render["bout" + (bout + 1)] = +Math.min(one(), one(), one()).toFixed(2);
+      }
+      return out; })()`, true, 300000);
+    const slowSim = Object.entries(r.sim).filter(([, v]) => v > 0.1), slowRender = Object.entries(r.render).filter(([, v]) => v > 8);
+    if (slowSim.length || slowRender.length) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("held_esc_and_enter_do_not_repeat", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
