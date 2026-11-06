@@ -352,6 +352,7 @@ dl.rows dd a{color:inherit}
       <noscript><style>#spNote{display:none}</style><p class="note">Sublevel Three needs JavaScript. Turn it on and reload the page.</p></noscript>
       <button class="spPlay" id="spPlay" type="button"><span id="spPlayTxt">Play</span><span aria-hidden="true">&rarr;</span></button>
       <button class="spCredits" id="spCredits" type="button">Credits</button>
+      <button class="btn2" id="spReload" type="button" hidden onclick="location.reload()">Reload</button>
     </div>
   </div>
 
@@ -359,6 +360,19 @@ dl.rows dd a{color:inherit}
   <p class="fail" id="fail" hidden>The 3D engine could not be loaded. Check your connection and reload the page.</p>
 </div>
 
+<script>
+/* If the game has not started after 10 s (a script that never arrived, or threw before the page could say so) the splash says so and offers Reload, instead of "Loading..." for ever. ?bootwatch=ms shortens it for the tests. */
+(function(){
+  var ms=+(/[?&]bootwatch=(\d+)/.exec(location.search)||[])[1]||10000;
+  window.__bootFail=function(){
+    if(window.__bootDone) return;
+    var it=/^it/i.test(navigator.language||''), n=document.getElementById('spNote'), b=document.getElementById('spReload');
+    if(n) n.textContent=it?'Il gioco non si \u00e8 avviato. Controlla la connessione e ricarica la pagina.':'The game did not start. Check your connection, then reload the page.';
+    if(b){ b.textContent=it?'Ricarica':'Reload'; b.hidden=false; }
+  };
+  window.__bootTimer=setTimeout(window.__bootFail,ms);
+})();
+</script>
 <script src="lib/babylon.js"></script>
 <script src="audio/samples.js"></script>
 <script src="assets/voice/voice.js"></script>
@@ -793,7 +807,7 @@ function showNoGL(kind,extra){
       catch(e){ try{ const r=document.createRange(); r.selectNodeContents($('noGLDetail')); const s=getSelection(); s.removeAllRanges(); s.addRange(r); ok=document.execCommand('copy'); }catch(e2){} }
       $('noGLCopy').textContent=L(ok?'crash_copied':'crash_copy');
     };
-    $('noGLKeep').onclick=()=>{ el.hidden=true; };
+    $('noGLKeep').onclick=()=>{ el.hidden=true; setTimeout(()=>{ crashed=false; },CRASH_REARM_MS); };   /* later errors are not lost for good */
   }
   el.hidden=false;
 }
@@ -805,7 +819,7 @@ try{
 canvas.addEventListener('webglcontextlost',()=>{ if(G.state==='fight'||G.state==='ready') pauseFight(); showNoGL('lost'); });
 /* Crash catcher: an uncaught error or a rejected promise shows one card per page load with what a bug report needs. If the render loop has died the card
    offers Reload only; if frames still come it also offers Keep playing. The report is built here and shown; it is never sent anywhere. */
-let crashed=false;
+let crashed=false, CRASH_REARM_MS=10000;   /* after Keep playing, a new error is reported again once this long has passed */
 function crashReport(err){
   const out=['Sublevel Three crash report'];
   try{ out.push('babylon '+(B.Engine.Version||'?')+' | '+navigator.userAgent); }catch(e){}
@@ -825,7 +839,9 @@ window.addEventListener('error',ev=>{
   if(/ResizeObserver loop/.test(ev.message||'')||/^(chrome|moz|safari-web)-extension:/.test(ev.filename||'')||(!ev.error&&ev.message==='Script error.')) return;
   onCrash(ev.error||ev.message);
 });
-window.addEventListener('unhandledrejection',ev=>onCrash(ev.reason));
+/* A rejected promise from the browser's own audio or media calls (resume, suspend, play) is not a crash: autoplay policy, a tab being hidden, an interrupted load. */
+const HARMLESS=/^(AbortError|NotAllowedError|NotSupportedError|InvalidStateError)$/;
+window.addEventListener('unhandledrejection',ev=>{ const r=ev.reason; if(r&&HARMLESS.test(r.name||'')) return; onCrash(r); });
 canvas.addEventListener('webglcontextrestored',()=>{ if($('noGL')) $('noGL').hidden=true; });
 engine.setHardwareScalingLevel(1/Math.min(window.devicePixelRatio||1,1.25));
 const scene=new B.Scene(engine);
@@ -2640,7 +2656,7 @@ function pollPad(){
   for(let i=0;i<list.length;i++){ if(list[i]&&list[i].connected){ gp=list[i]; padIdx=i; break; } }
   if(!gp){ padVec={x:0,y:0}; padBlock=false; padPrev=[]; padIdx=-1; if(padOn){ padOn=false; $('keys').innerHTML=keysHtml; } return; }
   if(!padOn){ padOn=true; $('keys').innerHTML=padHtml(); }
-  for(let i=0;i<gp.buttons.length;i++) if(gp.buttons[i]&&gp.buttons[i].pressed){ audioInit('pad'); break; }
+  for(let i=0;i<gp.buttons.length;i++) if(gp.buttons[i]&&gp.buttons[i].pressed){ audioInit('pad'); audCardT=0; break; }   /* a pad press counts as someone being there: the card's music does not fade on a pad-only player */
   const pr=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed), dn=i=>pr(i)&&!padPrev[i];
   let x=gp.axes[0]||0, y=-(gp.axes[1]||0); const m=Math.hypot(x,y);
   if(m<.2){ x=y=0; } else { const s=(Math.min(m,1)-.2)/.8/m; x*=s; y*=s; }
@@ -2650,7 +2666,8 @@ function pollPad(){
   const rawBlock=analog(6)||analog(7)||pr(4)||pr(5)||pr(1);
   if(blockToggle){ if(rawBlock&&!padBlockRaw&&G.state==='fight') G.blockLatch=!G.blockLatch; padBlock=false; } else padBlock=rawBlock;
   padBlockRaw=rawBlock;
-  if(G.state==='pause'){ if(dn(9)||dn(0)) resumeFight(); }
+  if(G.state==='splash'){ if(dn(0)||dn(9)) playGame(); }   /* A or Start begins, as Enter and Space do */
+  else if(G.state==='pause'){ if(dn(9)||dn(0)) resumeFight(); }
   else if(!$('wrap').hidden){ if(dn(8)){ if(G.menuOpen) closeMenu(); else if(!cardEsc) openMenu(); } else if(dn(0)||dn(9)) $('go').click(); }
   else {
     if(dn(9)) pauseFight();
@@ -3685,7 +3702,7 @@ fontsDone();
 if(document.fonts&&document.fonts.load){
   Promise.all([document.fonts.load('800 40px "Big Shoulders Stencil Display"'),document.fonts.load('600 20px "IBM Plex Mono"')]).then(fontsDone).catch(()=>{});
 }
-wrapEl.hidden=true; hudEl.hidden=true; G.state='splash'; $('splash').classList.remove('loading'); $('spNote').textContent=''; $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus({preventScroll:true}); }catch(e){} },60);
+wrapEl.hidden=true; hudEl.hidden=true; G.state='splash'; clearTimeout(window.__bootTimer); window.__bootDone=true; $('splash').classList.remove('loading'); $('spNote').textContent=''; $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus({preventScroll:true}); }catch(e){} },60);
 const SKILL={easy:1.45,normal:1,hard:.72};
 const DIFF={
   easy:{hp:.85,speed:.92,react:1.18,dmg:.88,guard:.75,cd:1.12},
@@ -4173,7 +4190,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={bedInit,crowdReact,JAB_READ,step,aiIntent,resolveBodies,crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,limiter,limitOut,LIMIT,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={pollPad,cardIdle:()=>audCardT,crashProbe2:{rearm:ms=>{ CRASH_REARM_MS=ms; },crashed:()=>crashed},bedInit,crowdReact,JAB_READ,step,aiIntent,resolveBodies,crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,limiter,limitOut,LIMIT,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

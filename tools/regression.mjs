@@ -59,6 +59,8 @@ const EXPECTED_ERRORS = {
   webgl_missing_shows_message: [/needs WebGL/],
   /* the crash catcher test throws on purpose, in a timer, a promise and the render loop */
   crash_catcher_shows_a_card_with_details: [/test crash in/],
+  crash_catcher_ignores_harmless_rejections_and_reports_again_later: [/a real one|too soon|later|AbortError|NotAllowedError|NotSupportedError|InvalidStateError/],
+  a_hung_script_does_not_leave_loading_for_ever: [/babylon|ERR_|Failed to load|BABYLON/i],
 };
 let activeCdp = null;
 function takeErrors(name) {
@@ -719,6 +721,60 @@ async function runHttpSuite(cdp) {
       return { peakDbfs: +(20 * Math.log10(peak)).toFixed(2), flatness: +(Math.exp(logS / n) / (sum / n)).toFixed(3), shareIn600to3500: +(band / sum).toFixed(3), ms: Math.round(N / rate * 1000) }; })()`, true);
     /* white noise: flatness about 0.56 for one periodogram and 40 percent of the energy in 600 to 3500 Hz; a swept band-pass: low flatness and most of the energy in the band */
     if (!(r.flatness < 0.2 && r.shareIn600to3500 > 0.7 && r.peakDbfs > -20 && r.ms >= 150 && r.ms <= 220)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("a_pad_starts_the_game_and_keeps_the_card_music_alive", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const buttons = () => Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
+      let padButtons = buttons();
+      const fake = { connected: true, id: "regression", mapping: "standard", axes: [0, 0, 0, 0], get buttons() { return padButtons; } };
+      Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [fake] });
+      const press = (i) => { padButtons = buttons(); S.pollPad(); padButtons[i] = { pressed: true, value: 1 }; S.pollPad(); padButtons = buttons(); S.pollPad(); };
+      S.toSplash(false); await sleep(100); o.onTheSplash = G.state === "splash";
+      press(0); await sleep(200); o.aStarts = G.state === "card" && $("splash").hidden;
+      S.toSplash(false); await sleep(100); press(9); await sleep(200); o.startStarts = G.state === "card";
+      /* on a card the pad counts as someone being there: the music's idle timer restarts */
+      $("wrap").hidden = false; G.state = "card"; S.audioTick(5); S.audioTick(5); o.idleBuilds = S.cardIdle() >= 10;
+      press(1); o.padPressResetsIdle = S.cardIdle() === 0;
+      delete navigator.getGamepads; S.pollPad(); S.titleCard();
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  /* A script that never arrives: the request for the engine is held, and the splash must say so instead of "Loading..." for ever. Reloads the page. */
+  await test("a_hung_script_does_not_leave_loading_for_ever", async () => {
+    const base = await cdp.eval(`location.origin`);
+    await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*lib/babylon.js" }] });
+    await cdp.send("Page.navigate", { url: base + "/index.html?bootwatch=400" });
+    await new Promise((r) => setTimeout(r, 1500));
+    const held = await cdp.eval(`(() => { const $ = (i) => document.getElementById(i), vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && getComputedStyle(el).visibility !== "hidden"; };
+      return { note: $("spNote").textContent, reloadShown: !$("spReload").hidden && vis($("spReload")), playOutOfSight: !vis($("spPlay")), done: !!window.__bootDone }; })()`);
+    await cdp.send("Fetch.disable");
+    await cdp.send("Page.navigate", { url: base + "/index.html" });
+    await bootSublevel(cdp);
+    const ok = await cdp.eval(`(() => ({ done: window.__bootDone === true, reloadHidden: document.getElementById("spReload").hidden, note: document.getElementById("spNote").textContent }))()`);
+    if (!(/did not start|non si \u00e8 avviato/.test(held.note) && held.reloadShown && held.playOutOfSight && !held.done && ok.done && ok.reloadHidden && ok.note === "")) throw new Error(JSON.stringify({ held, ok }));
+    return { held, ok };
+  });
+
+  await test("crash_catcher_ignores_harmless_rejections_and_reports_again_later", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, $ = (i) => document.getElementById(i), o = {};
+      S.crashProbe.reset(); S.crashProbe2.rearm(250);
+      const shown = () => !$("noGL").hidden && $("noGLTitle").textContent === "Something broke";
+      for (const name of ["AbortError", "NotAllowedError", "NotSupportedError", "InvalidStateError"]) Promise.reject(new DOMException("x", name));
+      await sleep(700); o.harmlessIgnored = !shown() && !S.crashProbe2.crashed();
+      Promise.reject(new Error("a real one")); await sleep(700); o.realOneShown = shown();
+      $("noGLKeep").click(); o.keepHides = $("noGL").hidden;
+      Promise.reject(new Error("too soon")); await sleep(100); o.notWhileLatched = $("noGL").hidden;
+      await sleep(400); o.rearmed = S.crashProbe2.crashed() === false;
+      Promise.reject(new Error("later")); await sleep(700); o.reportedAgain = shown() && /later/.test($("noGLDetail").textContent);
+      S.crashProbe.reset(); S.crashProbe2.rearm(10000);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
   });
 
