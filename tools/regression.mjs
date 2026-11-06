@@ -654,6 +654,25 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("the_opponents_tell_has_a_sound", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, g = S.audioGraph(), $ = (i) => document.getElementById(i), o = {};
+      S.setAudio({ mute: false }); if (g.ac.state !== "running") { await g.ac.resume(); for (let i = 0; i < 20 && g.ac.state !== "running"; i++) await sleep(50); }
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight");
+      S.E.ai.cd = 99;   /* the foe makes no tell of his own while the test holds the mark */
+      const tells = async (fn, frames = 6) => { g.MUS.log = []; fn(); for (let i = 0; i < frames; i++) await raf(); const l = g.MUS.log.filter((x) => x === "cue:tell"); g.MUS.log = null; return l.length; };
+      o.onceWhenItAppears = (await tells(() => { S.E.ai.tell = 5; }, 10)) === 1;       /* held on for 10 frames: still one sound */
+      S.E.ai.tell = 0; await raf(); await raf();
+      o.againForTheNext = (await tells(() => { S.E.ai.tell = 5; })) === 1;
+      S.E.ai.tell = 0; await raf(); await raf();
+      S.setAudio({ mute: true }); o.mutedSilent = (await tells(() => { S.E.ai.tell = 5; })) === 0; S.E.ai.tell = 0; S.setAudio({ mute: false }); await raf(); await raf();
+      /* the player's own heavy shows no mark and makes no sound */
+      o.playerNone = (await tells(() => { S.P.state = "attack"; S.P.atk = { type: "heavy", def: S.ATK.heavy, t: 0.05, done: true }; })) === 0; S.P.state = "idle"; S.P.atk = null;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("held_esc_and_enter_do_not_repeat", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};

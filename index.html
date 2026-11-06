@@ -1987,6 +1987,10 @@ function makeFighter(L,isPlayer){
   mergeJoints(f.root);
   if(!isPlayer){
     f.alert=new B.TransformNode('alert',scene); f.alert.parent=head; f.alert.position.y=.62;
+    /* a dark rim around the mark: a bigger copy with its faces flipped, so only its far side draws (an inverted hull). The red alone measured 1.6 to 1 against the pale floor of bout 4. */
+    const rim=toon('#08080a',{e:0}); rim.disableLighting=true; rim.emissiveColor=new C3(.02,.02,.025);   // unlit: a lit dark grey read 0.1 on the pale floor
+    pp(box(.1,.34,.1),rim,f.alert,0,.1,0,{cast:false,keep:true,sx:2.1,sy:1.4,sz:2.1}).flipFaces(false);
+    pp(sph(.13),rim,f.alert,0,-.18,0,{cast:false,keep:true,sx:1.9,sy:1.9,sz:1.9}).flipFaces(false);
     pp(box(.1,.34,.1),toon('#ff2a1a',{e:1}),f.alert,0,.1,0,{cast:false,keep:true});
     pp(sph(.13),toon('#ff2a1a',{e:1}),f.alert,0,-.18,0,{cast:false,keep:true});
     f.alert.setEnabled(false);
@@ -2107,7 +2111,12 @@ function applyPose(f,dt){
     f.face.sweat.scaling.setAll(.35+mk*1.1);
   }
   if(f.avatar) f.avatar.anchor.rotation.y=P.twist*.5;
-  if(f.alert) f.alert.setEnabled((f.ai&&f.ai.tell>0)||(f.state==='attack'&&f.atk&&f.atk.type==='heavy'&&f.atk.t<f.atk.def.a0));
+  if(f.alert){
+    const on=!!((f.ai&&f.ai.tell>0)||(f.state==='attack'&&f.atk&&f.atk.type==='heavy'&&f.atk.t<f.atk.def.a0));
+    f.alert.setEnabled(on);
+    if(on&&!f._alertOn&&!f.isPlayer) cueTone('tell',240,520,.17,.1,'sawtooth');   /* the mark has a sound too: once, when it appears (render only) */
+    f._alertOn=on;
+  }
 }
 
 /* ---------- combat ---------- */
