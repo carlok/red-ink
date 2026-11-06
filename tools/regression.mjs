@@ -636,7 +636,7 @@ async function runHttpSuite(cdp) {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, g = S.audioGraph(), $ = (i) => document.getElementById(i), o = {};
       S.setAudio({ mute: false }); if (g.ac.state !== "running") { await g.ac.resume(); for (let i = 0; i < 20 && g.ac.state !== "running"; i++) await sleep(50); }
       $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.setLessMotion(false);
-      const cues = async (fn, ms = 0) => { g.MUS.log = []; fn(); if (ms) await sleep(ms); const l = g.MUS.log.filter((x) => String(x).startsWith("cue:")); g.MUS.log = null; return l; };
+      const cues = async (fn, ms = 0) => { g.MUS.log = []; fn(); if (ms) await sleep(ms); const l = g.MUS.log.filter((x) => String(x).startsWith("cue:") && x !== "cue:crowd"); g.MUS.log = null; return l; };   /* the crowd may answer a blow too (a chance) and has its own test */
       /* a dodge that works: one cue per evaded punch, none for a punch that lands, none when muted */
       S.P.inv = 0.2; let l = await cues(() => S.strike(S.E, S.P, S.ATK.jab)); o.dodgeCue = l.join() === "cue:dodge";
       S.P.inv = 0; S.P.state = "idle"; l = await cues(() => S.strike(S.E, S.P, S.ATK.jab)); o.noCueOnAHit = l.length === 0;

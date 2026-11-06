@@ -719,7 +719,7 @@ function paintLang(){
   const first=(id,k)=>{ const el=$(id)&&$(id).parentNode; if(el&&el.firstChild&&el.firstChild.nodeType===3) el.firstChild.textContent=L(k)+' '; };
   if($('cardAssist')&&$('cardAssist').hidden) set('cardAssist','assist_btn'); set('noGLTitle','gl_none_title'); set('noGLBody','gl_none_body'); set('noGLBtn','gl_reload');
   paintLog(); if(!logArmed) set('logClear','log_clear');
-  set('linkPractice','practice_btn'); set('linkTrain','train_link'); paintTrain();
+  set('linkPractice','practice_btn'); set('linkTrain','train_link'); set('spReload','gl_reload'); paintTrain();
   set('tutorGo','got_it'); set('avLbl','fighter_lbl'); set('glbLbl','glb_load'); set('avReset','av_reset'); set('dropHint','drop_hint'); set('fail','fail_msg');
   if($('avReset')&&$('avReset').hidden) set('avName','av_placeholder');
   { const h=$('avHint'); if(h&&(h.textContent===STR.av_hint.en||h.textContent===STR.av_hint.it)) h.textContent=L('av_hint'); }
