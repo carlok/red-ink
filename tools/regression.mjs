@@ -1145,6 +1145,37 @@ async function runHttpSuite(cdp) {
     return v;
   });
 
+  await test("touch_targets_are_44px_and_the_cards_fit", async () => {
+    const out = {};
+    for (const [w, h] of [[390, 844], [844, 390]]) {
+      await cdp.send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 2, mobile: true });
+      for (const lang of ["en", "it"]) {
+        const r = await cdp.eval(`(async () => {
+          const S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), o = { small: {}, fit: {} };
+          $("app").classList.add("is-touch"); S.setLang("${lang}"); S.qaResetProgress(); S.progress.wins = 3;
+          const scan = (where) => document.querySelectorAll("button, input, select, a[href], [role=button], label").forEach((el) => {
+            const r = el.getBoundingClientRect();
+            if (!r.width || !r.height || getComputedStyle(el).visibility === "hidden" || el.closest("[hidden]")) return;
+            if (el.tagName === "LABEL" && !el.querySelector("input")) return;
+            if (el.type === "checkbox" && el.closest("label") && el.closest("label").getBoundingClientRect().height >= 44) return;   /* the label is the target */
+            if (r.height < 43.5 || r.width < 43.5) o.small[where + " " + (el.id || el.className || el.tagName)] = Math.round(r.width) + "x" + Math.round(r.height);
+          });
+          $("wrap").hidden = true; S.titleCard(); await sleep(150); scan("title"); o.fit.goOnScreen = $("go").getBoundingClientRect().bottom <= innerHeight + 1;
+          S.titleCard(); S.introCard(0); await sleep(150); scan("dossier");
+          $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.pauseFight(); await sleep(120); scan("pause");
+          const pc = document.querySelector(".pauseCard").getBoundingClientRect(); o.fit.pauseCardFits = pc.top >= 0 && pc.bottom <= innerHeight + 1;
+          S.resumeFight(); S.qaEndBout(true); await sleep(150); scan("win");
+          $("app").classList.remove("is-touch"); S.setLang("en"); S.qaResetProgress();
+          return o; })()`, true);
+        out[`${w}x${h} ${lang}`] = r;
+      }
+    }
+    await cdp.send("Emulation.clearDeviceMetricsOverride");
+    const bad = Object.entries(out).filter(([, r]) => Object.keys(r.small).length || !Object.values(r.fit).every(Boolean));
+    if (bad.length) throw new Error(JSON.stringify(bad));
+    return out;
+  });
+
   /* Last in the suite: it reloads the page twice. */
   await test("stored_values_are_validated_on_load", async () => {
     const reload = async () => { await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp); };

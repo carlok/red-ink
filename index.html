@@ -80,6 +80,12 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 @keyframes deny{0%,60%{opacity:.35}30%,100%{opacity:1}}
 .snd{pointer-events:auto;font:600 11px var(--f-data);letter-spacing:.12em;text-transform:uppercase;background:rgba(10,10,11,.55);color:var(--paper);border:1px solid var(--mute);padding:7px 10px;cursor:pointer}
 .is-touch .keys{display:none}
+/* touch: a control a thumb has to hit is at least 44 px high (WCAG 2.5.5, Apple's guideline); a row that is a label is the whole target */
+.is-touch .bind,.is-touch .btn2,.is-touch .snd,.is-touch .tutor button,.is-touch .pauseCard button,.is-touch .pauseCard label,.is-touch .tuneRow,.is-touch select,.is-touch input[type=range]{min-height:44px;box-sizing:border-box}
+.is-touch .bind,.is-touch .btn2,.is-touch .snd{display:inline-flex;align-items:center;justify-content:center}
+.is-touch .pauseCard button,.is-touch .pauseCard label{display:flex;align-items:center;gap:8px}
+.is-touch .tuneRow input[type=checkbox],.is-touch .pauseCard input[type=checkbox]{width:22px;height:22px;flex:none}
+.is-touch .go{position:sticky;bottom:10px;z-index:3}   /* the settings rows grew to 44 px: Start stays on screen while they scroll */
 .is-touch .snd{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:calc(76px + env(safe-area-inset-top,0px));padding:5px 8px;font-size:10px}
 .snd:focus-visible,.go:focus-visible,.btn2:focus-visible,.tb:focus-visible,.bind:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
 
@@ -132,8 +138,8 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .tutor{position:absolute;left:50%;bottom:max(24px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(460px,calc(100% - 32px));background:#0a0a0b;color:var(--paper);border:2px solid var(--tape);padding:10px 12px;display:flex;gap:12px;align-items:center;justify-content:space-between;pointer-events:auto;z-index:4}
 .tutor p{margin:0;font:600 14px/1.35 var(--f-data)}
 .tutor button{font:800 14px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:var(--tape);color:#111;border:0;padding:10px 12px;cursor:pointer}
-.pause{position:absolute;inset:0;display:grid;place-items:center;background:rgba(8,8,9,.55);z-index:5}
-.pauseCard{width:min(360px,calc(100% - 32px));background:var(--paper);color:var(--ink);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:8px 8px 0 var(--tape)}
+.pause{position:absolute;inset:0;display:flex;background:rgba(8,8,9,.55);z-index:5;overflow-y:auto}   /* flex and a card with margin:auto: centred when it fits, scrollable from the top when it does not */
+.pauseCard{margin:auto;width:min(360px,calc(100% - 32px));background:var(--paper);color:var(--ink);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:8px 8px 0 var(--tape)}
 .pauseHint{margin:0;font:600 13px/1.35 var(--f-body);background:var(--tape);color:var(--ink);padding:6px 8px}
 .pauseCard h2{margin:0;font:800 36px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
 .pauseCard button,.pauseCard label{font:600 13px/1 var(--f-data);letter-spacing:.06em;text-transform:uppercase}
@@ -141,6 +147,10 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .pause[data-mode=menu] #restart{display:none}
 .cardMenu{align-self:flex-start;margin:10px 20px 0}
 .pauseCard button.quiet{background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:10px 12px}
+@media (max-height:520px){   /* a phone on its side: the pause card goes two columns so 44 px rows still fit */
+  .pauseCard{width:min(640px,calc(100% - 32px));display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+  .pauseCard h2,.pauseCard .pauseHint{grid-column:1/-1}
+}
 .wrap.dossier{place-items:center end;padding-right:clamp(16px,6vw,96px);background:linear-gradient(to left,rgba(8,8,9,.74),rgba(8,8,9,.12) 64%)}
 .wrap.dossier .card{margin:auto 0 auto auto;max-height:calc(100% - 24px);overflow:auto}
 .wrap.dossier .go{position:sticky;bottom:8px;z-index:1}
