@@ -55,7 +55,7 @@ A hit turns the head toward that side. Knockdowns fall back, crumple, or drop si
 
 The overhead light is cold. The hanging bulbs are sodium orange. The crowd around the ring is built from shoulders, arms, and legs, and they sway while they stand.
 
-Hits, blocks, and the K.O. are samples. A room tone and three music loops sit under them, and the music ducks when a hit lands.
+Hits, blocks, and the K.O. are samples. A low room hum, a few quiet beeps and knocks, and the music sit under them, and the music ducks when a hit lands. The crowd is a reaction, not a bed: a few voices answer a blow (always the knockout) and nothing plays between blows. The Ambience slider and the pause switch set the hum, the events and the crowd together.
 
 Esc pauses a bout. The first fight shows a 12-second control strip.
 
@@ -90,9 +90,11 @@ Quality steps down resolution, then shadow filtering, then shadows, when the fra
 - **Saves:** the progress save carries a version and is upgraded when the game loads it; a save from a newer build is left as it is. If the browser blocks storage, the win card says that the win will not be kept.
 - **Pad unplugged** in a fight: the fight pauses and says why.
 - **Crash card:** an uncaught error shows one card with Reload, Copy details (the browser, the state, the last five logged bouts and the error) and, while the game is still drawing, Keep playing. Nothing is sent anywhere.
-- **Training** (title card, always there): a dummy that never hits back and cannot be knocked out. A strip shows what each move costs in stamina (jab 10, heavy 24, dodge 16) and strikes out one you cannot afford; the Dummy switch (a button, or T) holds his guard so you can see a block. Nothing is saved.
-- **Medals** (first-pass wins only): Untouched (no hit taken), Sharp (85 percent of punches landed) and Quick (a win inside a time per bout). The win card lists them, the rule board counts them and says what to aim for. Practice, Training and the second pass give none.
+- **Training** (title card, always there; offered on the lose card after a first loss in bouts 1 and 2): a dummy that never hits back and cannot be knocked out. A strip shows what each move costs in stamina (jab 10, heavy 24, dodge 16) and strikes out one you cannot afford; the Dummy switch (a button, T on a keyboard, Select on a pad) holds his guard so you can see a block. Leave training in the pause menu goes back to the title card. Nothing is saved.
+- **Medals** (first-pass wins only): Untouched (no hit taken), Sharp (85 percent of punches landed) and Quick (a win inside a time per bout). The win card lists them, the rule board counts them and says what to aim for. None on Easy, none if Autoplay played any of the bout, none from Practice, Training or the second pass; ones earned on Hard are marked (Hard).
 - **Cues:** a dodge that works says DODGE and rings; under a quarter of your health the edge of the picture goes red (still under Less motion) and a double thump sounds; the foe has a stamina bar under his health; his alert mark has a dark rim and a short rising sound when it appears.
+- **Pad:** A or Start starts the game from the splash, and a pad press keeps the card's music from fading.
+- **Loading:** if the game has not started after 10 seconds the splash says so and offers Reload.
 - **Held keys:** holding Esc or Enter does not repeat; a press made while paused does not fire on Resume; a voice line already queued is dropped on pause, mute, a hidden tab and Quit; a second tab cannot overwrite a save that has more wins.
 - **Playtest log:** each finished bout adds one line (result, time, hits taken, blocks, dodges, punches thrown and landed, difficulty, who controlled it) to a list of the newest 200 in this browser's local storage. Nothing is sent anywhere. *Export playtest log* in the title settings saves it as JSON; *Clear log* empties it. It exists so real players' numbers can be set against the bot table.
 - **No WebGL:** the page says what is needed instead of staying blank. Tests run on every pull request (`.github/workflows/test.yml`) and before each deploy.

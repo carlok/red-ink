@@ -1687,3 +1687,43 @@ The ten best-ranked items after Sprint 28: 57, 39, 37, 36, 33, 32, 34, 35, 38 an
 - `-1` in a medal bitmask is `7` under `& 7`; the sanitiser now accepts 0 to 7 as integers and nothing else.
 - The Lighthouse half of `qa:a11y` times out after 180 s on this machine, on master as well; axe runs (0 violations, 1 incomplete). Not fixed.
 - Not checked: how the tell tone, the DODGE tone, the heartbeat and the limiter sound (a listening test); how the training room, the strip and the medals read on a real phone; whether the medal limits suit a person (there is no human data: the playtest log is the way to tune them); the five new Italian strings and `Palestra`, `Intatto`, `Preciso`, `Rapido` for a native read; the new CI steps on a runner (the PR's run).
+
+## Sprint 30: the ambience without looping noise, and the ten best of a sixth look
+
+You said the ambience was terrible, "like white noise". It was: four looping noise sources through filters. I redesigned it (hum, tonal events, a crowd that answers blows), then ran a sixth look at the backlog (26 items, `BACKLOG.md`) and built the ten best-ranked. No foe behaviour changed; the bout table (90.5 / 69.0 / 40.5 / 37.0 / 30.5 / 21.0) and the second pass (71.5 / 54.5 / 14.5 / 17.0 / 12.0 / 11.0) were checked after every item. Regression 70 tests at the start, 77 at the end.
+
+| # | Item | What it does | Test |
+| --- | --- | --- | --- |
+| 89 | Ambience | no looping noise: a mains hum (six sines, base frequency per place), tonal events, `crowdReact` (vowel-formant voices answering a blow, the knockout always); the bed fades with the music and is silent muted or at zero; music schedules nothing then either | no buffer source in the bed; reaction chances, gap, mute, zero volume, `MIX.crowdReact = 0`; events muted; fade and return |
+| 90 | Medals | none on Easy, none if the AI played any of the bout, Hard ones marked, save v4 | Easy, the real bot flag, Normal, Hard, a v3 save, an over-wide Hard mask |
+| 91 | Whoosh | a swept band-pass instead of white noise under an envelope | the decoded sample: flatness, energy in band, length |
+| 92 to 95 | Pad, watchdog, crash catcher | a pad press resets the card idle timer; A or Start starts from the splash; after 10 s the splash says it did not start and offers Reload; harmless rejections are not crashes and the catcher re-arms after Keep playing | each fails with only its behaviour reverted |
+| 96 to 99 | Training | offered after a first loss, a Tip row on the lose card, Leave training, the tip by input, Select on a pad, blur after the strip click | one test, eight checks that fail when reverted |
+
+### Numbers
+
+Ambience, measured at the output with the music, hits and voice at zero (`tools/ambience-probe.mjs`, bout 3, over 100 Hz to 8 kHz):
+
+| Measure | Before (three runs) | After |
+| --- | --- | --- |
+| Looping noise sources in the bed | 4 | 0 (no buffer source at all) |
+| Spectral flatness, bed alone (1 = white noise, 0 = a tone) | 0.113 to 0.116 | 0.0005 |
+| Spectral flatness just after a blow | 0.398 to 0.424 | 0.0004 to 0.0013 (a crowd reaction) |
+| Energy above 1 kHz, bed alone / after a blow | 14 to 17 percent / 45 to 48 percent | 0.5 percent / 3 to 11 percent (during a reaction) |
+| Level, bed alone | -34 to -37 dBFS rms | -40.6 dBFS rms, peak -32.8 |
+| Crowd reaction peak | the swell, about -30 dBFS rms | jab -36 to -28, heavy -28 to -27, knockout -19 dBFS |
+| Summed output, four scenes (`audio-sum-probe`) | -4.4 ... -0.4 dBFS before the Sprint 29 limiter | -5.7 / -5.3 / -3.8 / -5.5, and with the new whoosh -5.1 / -6.4 / -5.0 / -2.8 |
+
+Whoosh, on the decoded sample (Hann-windowed periodogram, 200 to 7000 Hz): flatness 0.575 to 0.116, energy in 600 to 3500 Hz 47 to 96 percent, 160 ms as before, the other nine clips byte-identical.
+
+### What it took
+
+- **I cannot hear any of it.** The numbers say "a hum, a few vowels, a band", not "good". The hum is 50 Hz with partials; on a phone speaker only the partials will be audible. The crowd is a guess built from textbook vowel formants; `MIX.crowdReact = 0` is the off switch.
+- **The first hum throbbed:** two oscillators detuned by 0.3 Hz at equal level cancel completely every 3.3 s (a 9.3 dB swing in one-second windows). The second copy is now a quarter of the first (3.8 dB).
+- **The first crowd reactions were far too loud** (knockout -14.9 dBFS peak); I lowered every voice by 5 to 8 dB.
+- **The probe's own first scene was misleading:** "share of energy above 1 kHz" read 56 percent for the new bed because an event beep fell in the window. The probe now holds events off for the hum-only scene.
+- **Two tests committed red:** I committed items 92 to 95 after reading the result line of the wrong command. `italian_has_no_english_leftovers` caught the new Reload button staying English, and the dodge test flaked because the crowd may now answer a dodge (a 30 percent chance). Fixed in the next commit; the failing state was never pushed.
+- **An unterminated comment** I typed swallowed the code after it, and the script still parsed. I found it by reading the diff; see the backlog.
+- The whoosh test first asserted the sample's own peak was -14 dBFS; the decoded peak is -10.5 because the game rescales every clip to its `PEAK` entry, so the check is now "not silent".
+- Not done on purpose: the first-time hints (item 100) lost the tie at 2.7 and lead the next sprint.
+- Not checked: how the hum, the crowd and the whoosh sound; the Italian strings (`medal_none_*`, the goal line, the watchdog message, the training tips and offer, `Esci dalla palestra`); the training pause card on a real phone.

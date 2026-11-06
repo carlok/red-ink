@@ -30,6 +30,21 @@ function noise(n, seed) {
   return out;
 }
 
+/* White noise through a resonant band-pass whose centre sweeps from f0 to f1 (a Chamberlin state-variable filter): a swish with a band and a direction,
+   where flat noise under an envelope sounds like static. q is the resonance. */
+function swish(n, seed, f0, f1, q) {
+  const r = noise(n, seed), out = new Float32Array(n);
+  let low = 0, band = 0;
+  for (let i = 0; i < n; i++) {
+    const fc = f0 * Math.pow(f1 / f0, i / n), f = 2 * Math.sin(Math.PI * fc / RATE);
+    low += f * band;
+    const high = r[i] - low - band / q;
+    band += f * high;
+    out[i] = band;
+  }
+  return out;
+}
+
 function env(n, dur) {
   const out = new Float32Array(n);
   for (let i = 0; i < n; i++) {
@@ -126,9 +141,9 @@ const clips = {
     tone(N.block, 580, 260, 0.07),
     noise(N.block, 23).map((x, i) => x * Math.exp(-i / RATE / 0.014)),
   ]), HIT),
-  whoosh: normalize(noise(N.whoosh, 13).map((x, i) => {
-    const t = i / RATE;
-    return x * Math.sin(Math.PI * Math.min(1, t / 0.16)) * 0.8;
+  whoosh: normalize(swish(N.whoosh, 13, 600, 2600, 4).map((x, i) => {
+    const t = i / RATE;   /* a quick rise and a fall, so it swishes past rather than hisses */
+    return x * (t < 0.03 ? t / 0.03 : Math.exp(-(t - 0.03) / 0.06));
   }), 10 ** (-14 / 20)),
   ko: normalize(mix([
     tone(N.ko, 70, 28, 0.62),

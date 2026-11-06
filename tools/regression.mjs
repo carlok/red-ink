@@ -59,6 +59,8 @@ const EXPECTED_ERRORS = {
   webgl_missing_shows_message: [/needs WebGL/],
   /* the crash catcher test throws on purpose, in a timer, a promise and the render loop */
   crash_catcher_shows_a_card_with_details: [/test crash in/],
+  crash_catcher_ignores_harmless_rejections_and_reports_again_later: [/a real one|too soon|later|AbortError|NotAllowedError|NotSupportedError|InvalidStateError/],
+  a_hung_script_does_not_leave_loading_for_ever: [/babylon|ERR_|Failed to load|BABYLON/i],
 };
 let activeCdp = null;
 function takeErrors(name) {
@@ -548,7 +550,7 @@ async function runHttpSuite(cdp) {
     await cdp.send("Page.reload", { ignoreCache: true });
     await bootSublevel(cdp);
     const v = await cdp.eval(`({ on: window.__sublevel.autoState().on, box: document.getElementById("autoOn").checked })`);
-    await cdp.eval(`localStorage.setItem('sublevel-auto','0')`);
+    await cdp.eval(`localStorage.setItem('sublevel-auto','0'); window.__sublevel.setAutoOn(false)`);   /* off in memory too: the page stays up for the tests after this one */
     if (!v.on || !v.box) throw new Error(JSON.stringify(v));
     return v;
   });
@@ -634,7 +636,7 @@ async function runHttpSuite(cdp) {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, g = S.audioGraph(), $ = (i) => document.getElementById(i), o = {};
       S.setAudio({ mute: false }); if (g.ac.state !== "running") { await g.ac.resume(); for (let i = 0; i < 20 && g.ac.state !== "running"; i++) await sleep(50); }
       $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.setLessMotion(false);
-      const cues = async (fn, ms = 0) => { g.MUS.log = []; fn(); if (ms) await sleep(ms); const l = g.MUS.log.filter((x) => String(x).startsWith("cue:")); g.MUS.log = null; return l; };
+      const cues = async (fn, ms = 0) => { g.MUS.log = []; fn(); if (ms) await sleep(ms); const l = g.MUS.log.filter((x) => String(x).startsWith("cue:") && x !== "cue:crowd"); g.MUS.log = null; return l; };   /* the crowd may answer a blow too (a chance) and has its own test */
       /* a dodge that works: one cue per evaded punch, none for a punch that lands, none when muted */
       S.P.inv = 0.2; let l = await cues(() => S.strike(S.E, S.P, S.ATK.jab)); o.dodgeCue = l.join() === "cue:dodge";
       S.P.inv = 0; S.P.state = "idle"; l = await cues(() => S.strike(S.E, S.P, S.ATK.jab)); o.noCueOnAHit = l.length === 0;
@@ -668,6 +670,145 @@ async function runHttpSuite(cdp) {
       S.setAudio({ mute: true }); o.mutedSilent = (await tells(() => { S.E.ai.tell = 5; })) === 0; S.E.ai.tell = 0; S.setAudio({ mute: false }); await raf(); await raf();
       /* the player's own heavy shows no mark and makes no sound */
       o.playerNone = (await tells(() => { S.P.state = "attack"; S.P.atk = { type: "heavy", def: S.ATK.heavy, t: 0.05, done: true }; })) === 0; S.P.state = "idle"; S.P.atk = null;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("medals_respect_difficulty_and_autoplay", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const stored = () => JSON.parse(localStorage.getItem("sublevel-progress"));
+      const setDiff = (d) => $("wrap").querySelector('[data-diff="' + d + '"]').click();
+      const fight = async (bout, log, setup) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); Object.assign(G.log, log); if (setup) setup(); S.qaEndBout(true); await sleep(60); return $("cRows").textContent; };
+      const clean = { hits: 0, thrown: 10, landed: 10, time: 10 };
+      S.setLang("en"); S.setAutoOn(false); S.qaResetProgress(); S.titleCard(); await sleep(100);   /* a person at the keys: an earlier test may have left Autoplay on in memory */
+      setDiff("easy"); let rows = await fight(0, clean); o.easyNone = stored().medals[0] === 0 && rows.includes("none on Easy");
+      S.titleCard(); await sleep(100); setDiff("normal"); rows = await fight(0, clean, () => { G.assisted = true; }); o.autoplayNone = stored().medals[0] === 0 && rows.includes("none when the AI plays");
+      /* the real flag: Autoplay on and untouched keys, the bot plays ticks, the flag is set by the sim loop */
+      $("wrap").hidden = true; S.setAutoOn(true); S.startBout(0); await __until(() => G.state === "fight", "fight"); await sleep(400); o.botTicksSetTheFlag = G.assisted === true; S.setAutoOn(false);
+      rows = await fight(0, clean); o.humanNormal = stored().medals[0] === 7 && stored().medalsHard[0] === 0 && !rows.includes("(Hard)");
+      S.titleCard(); await sleep(100); setDiff("hard"); rows = await fight(1, clean); o.hardRecorded = stored().medals[1] === 7 && stored().medalsHard[1] === 7 && rows.includes("Untouched (Hard)");
+      S.titleCard(); await sleep(100); setDiff("normal");
+      /* a medal earned on Hard stays marked when a later Normal win earns the same one */
+      await fight(1, clean); o.hardMarkStays = stored().medalsHard[1] === 7;
+      o.goalSaysSo = true; S.hubCard(0); await sleep(100); o.goalSaysSo = $("cRows").textContent.includes("played by you");
+      /* a v3 save (medals, no medalsHard) upgrades; the Hard mask is a subset of the medals */
+      localStorage.setItem("sublevel-progress", JSON.stringify({ v: 3, wins: 2, medals: [7, 1, 0, 0, 0, 0] }));
+      return o; })()`, true);
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    r.v3Upgrades = await cdp.eval(`(() => { const p = window.__sublevel.progress; return p.v === 4 && JSON.stringify(p.medals) === "[7,1,0,0,0,0]" && JSON.stringify(p.medalsHard) === "[0,0,0,0,0,0]"; })()`);
+    await cdp.eval(`localStorage.setItem("sublevel-progress", JSON.stringify({ v: 4, wins: 1, medals: [1, 0, 0, 0, 0, 0], medalsHard: [7, 5, "x", 0, 0, 0] }))`);
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    r.hardIsASubset = await cdp.eval(`JSON.stringify(window.__sublevel.progress.medalsHard) === "[1,0,0,0,0,0]"`);
+    await cdp.eval(`window.__sublevel.qaResetProgress(); document.querySelector('[data-diff="normal"]').click()`);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  /* The whoosh was unfiltered white noise under a half-sine. A swish has a band, and a peak at the level the mix expects. Measured on the decoded sample itself. */
+  await test("whoosh_is_a_band_not_white_noise", async () => {
+    const r = await cdp.eval(`(async () => {
+      const S = window.__sublevel, ac = S.audioGraph().ac, A = window.SUBLEVEL_AUDIO;
+      const bin = atob(A.clips.whoosh), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const buf = await ac.decodeAudioData(bytes.buffer), d = buf.getChannelData(0), N = d.length, rate = buf.sampleRate;
+      let peak = 0; for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(d[i]));
+      /* Hann-windowed periodogram by direct DFT (N is about 2,500 samples) */
+      const bins = Math.floor(N / 2), P = new Float64Array(bins);
+      for (let k = 1; k < bins; k++) { let re = 0, im = 0; const w0 = 2 * Math.PI * k / N; for (let i = 0; i < N; i++) { const w = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1)), x = d[i] * w; re += x * Math.cos(w0 * i); im -= x * Math.sin(w0 * i); } P[k] = re * re + im * im; }
+      const hz = (k) => k * rate / N; let lo = 1, hi = bins; for (let k = 1; k < bins; k++) { if (hz(k) < 200) lo = k + 1; if (hz(k) > 7000) { hi = k; break; } }
+      let logS = 0, sum = 0, n = 0, band = 0; for (let k = lo; k < hi; k++) { const p = P[k] + 1e-20; logS += Math.log(p); sum += p; n++; if (hz(k) >= 600 && hz(k) <= 3500) band += p; }
+      return { peakDbfs: +(20 * Math.log10(peak)).toFixed(2), flatness: +(Math.exp(logS / n) / (sum / n)).toFixed(3), shareIn600to3500: +(band / sum).toFixed(3), ms: Math.round(N / rate * 1000) }; })()`, true);
+    /* white noise: flatness about 0.56 for one periodogram and 40 percent of the energy in 600 to 3500 Hz; a swept band-pass: low flatness and most of the energy in the band */
+    if (!(r.flatness < 0.2 && r.shareIn600to3500 > 0.7 && r.peakDbfs > -20 && r.ms >= 150 && r.ms <= 220)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("a_pad_starts_the_game_and_keeps_the_card_music_alive", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const buttons = () => Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
+      let padButtons = buttons();
+      const fake = { connected: true, id: "regression", mapping: "standard", axes: [0, 0, 0, 0], get buttons() { return padButtons; } };
+      Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [fake] });
+      const press = (i) => { padButtons = buttons(); S.pollPad(); padButtons[i] = { pressed: true, value: 1 }; S.pollPad(); padButtons = buttons(); S.pollPad(); };
+      S.toSplash(false); await sleep(100); o.onTheSplash = G.state === "splash";
+      press(0); await sleep(200); o.aStarts = G.state === "card" && $("splash").hidden;
+      S.toSplash(false); await sleep(100); press(9); await sleep(200); o.startStarts = G.state === "card";
+      /* on a card the pad counts as someone being there: the music's idle timer restarts */
+      $("wrap").hidden = false; G.state = "card"; S.audioTick(5); S.audioTick(5); o.idleBuilds = S.cardIdle() >= 10;
+      press(1); o.padPressResetsIdle = S.cardIdle() === 0;
+      delete navigator.getGamepads; S.pollPad(); S.titleCard();
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  /* A script that never arrives: the request for the engine is held, and the splash must say so instead of "Loading..." for ever. Reloads the page. */
+  await test("a_hung_script_does_not_leave_loading_for_ever", async () => {
+    const base = await cdp.eval(`location.origin`);
+    await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*lib/babylon.js" }] });
+    await cdp.send("Page.navigate", { url: base + "/index.html?bootwatch=400" });
+    await new Promise((r) => setTimeout(r, 1500));
+    const held = await cdp.eval(`(() => { const $ = (i) => document.getElementById(i), vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && getComputedStyle(el).visibility !== "hidden"; };
+      return { note: $("spNote").textContent, reloadShown: !$("spReload").hidden && vis($("spReload")), playOutOfSight: !vis($("spPlay")), done: !!window.__bootDone }; })()`);
+    await cdp.send("Fetch.disable");
+    await cdp.send("Page.navigate", { url: base + "/index.html" });
+    await bootSublevel(cdp);
+    const ok = await cdp.eval(`(() => ({ done: window.__bootDone === true, reloadHidden: document.getElementById("spReload").hidden, note: document.getElementById("spNote").textContent }))()`);
+    if (!(/did not start|non si \u00e8 avviato/.test(held.note) && held.reloadShown && held.playOutOfSight && !held.done && ok.done && ok.reloadHidden && ok.note === "")) throw new Error(JSON.stringify({ held, ok }));
+    return { held, ok };
+  });
+
+  await test("crash_catcher_ignores_harmless_rejections_and_reports_again_later", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, $ = (i) => document.getElementById(i), o = {};
+      S.crashProbe.reset(); S.crashProbe2.rearm(250);
+      const shown = () => !$("noGL").hidden && $("noGLTitle").textContent === "Something broke";
+      for (const name of ["AbortError", "NotAllowedError", "NotSupportedError", "InvalidStateError"]) Promise.reject(new DOMException("x", name));
+      await sleep(700); o.harmlessIgnored = !shown() && !S.crashProbe2.crashed();
+      Promise.reject(new Error("a real one")); await sleep(700); o.realOneShown = shown();
+      $("noGLKeep").click(); o.keepHides = $("noGL").hidden;
+      Promise.reject(new Error("too soon")); await sleep(100); o.notWhileLatched = $("noGL").hidden;
+      await sleep(400); o.rearmed = S.crashProbe2.crashed() === false;
+      Promise.reject(new Error("later")); await sleep(700); o.reportedAgain = shown() && /later/.test($("noGLDetail").textContent);
+      S.crashProbe.reset(); S.crashProbe2.rearm(10000);
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("training_is_offered_after_a_loss_and_can_be_left_for_the_title", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const buttons = () => Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
+      const lose = async (bout) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); S.qaEndBout(false); await sleep(80); return { rows: $("cRows").textContent, back: !$("cardBack").hidden ? $("cardBack").textContent : "" }; };
+      S.setLang("en"); S.qaResetProgress(); localStorage.removeItem("sublevel-train");
+      let l = await lose(0); o.tipOnTheLoseCard = l.rows.includes(S.STR[S.BOUTS[0].tipKey].en.slice(0, 20));
+      o.trainingOffered = l.back === "Try the training room";
+      l = await lose(2); o.notOfferedLate = l.back === "";
+      l = await lose(0); $("cardBack").click(); await sleep(150); o.offerOpensTraining = /dummy/i.test($("cTitle").textContent);
+      $("go").click(); await __until(() => G.state === "fight", "fight"); o.seenIsSaved = localStorage.getItem("sublevel-train") === "1";
+      /* leaving: from the pause menu back to the title card, mode and HUD gone */
+      S.pauseFight(); await sleep(100); o.leaveShownInTraining = !$("leaveTrain").hidden;
+      $("leaveTrain").click(); await sleep(150);
+      o.backOnTheTitle = G.state === "card" && !G.train && !G.practice && $("hud").hidden && $("pause").hidden && $("trainStrip").hidden && /sublevel|reconcil|audit/i.test($("cTitle").textContent + $("cStamp").textContent + $("cKick").textContent);
+      /* in an ordinary fight the leave button is not there, and the offer is gone once training has been seen */
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.pauseFight(); await sleep(80); o.noLeaveInAFight = $("leaveTrain").hidden; S.resumeFight();
+      l = await lose(0); o.notOfferedOnceSeen = l.back === "";
+      /* the input the player uses decides the tip */
+      o.tipKey = S.trainTip("key") === "T toggles his guard"; o.tipTouch = /Tap Dummy/.test(S.trainTip("touch")); o.tipPad = /Select/.test(S.trainTip("pad"));
+      const jab = S.binds.jab; S.binds.jab = "t"; o.tipRebound = /Dummy button/.test(S.trainTip()); S.binds.jab = jab;
+      S.setLang("it"); o.tipItalian = /Select attiva/.test(S.trainTip("pad")) && S.STR.train_leave.it === "Esci dalla palestra"; S.setLang("en");
+      /* a pad: Select switches the guard in a training fight; the strip button does not keep focus */
+      let padButtons = buttons(); const fake = { connected: true, id: "regression", mapping: "standard", axes: [0, 0, 0, 0], get buttons() { return padButtons; } };
+      Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [fake] });
+      $("wrap").hidden = true; S.titleCard(); await sleep(80); $("linkTrain").click(); await sleep(100); o.tipFollowsAPad = /Select/.test($("cRows").textContent);
+      $("go").click(); await __until(() => G.state === "fight", "fight"); const before = G.trainBlock;
+      padButtons = buttons(); S.pollPad(); padButtons[8] = { pressed: true, value: 1 }; S.pollPad(); padButtons = buttons(); S.pollPad();
+      o.selectToggles = G.trainBlock === !before;
+      $("trainBlock").focus(); $("trainBlock").click(); o.blurred = document.activeElement !== $("trainBlock");
+      delete navigator.getGamepads; S.pollPad(); $("wrap").hidden = true; S.titleCard(); localStorage.removeItem("sublevel-train");
       return o; })()`, true);
     if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
@@ -713,8 +854,8 @@ async function runHttpSuite(cdp) {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
       const stored = () => JSON.parse(localStorage.getItem("sublevel-progress"));
       const fight = async (bout, log, flags = {}) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); Object.assign(G, flags); Object.assign(G.log, log); const w = S.qaEndBout(true); await sleep(60); return { rows: $("cRows").textContent, title: $("cTitle").textContent, w }; };
-      S.setLang("en"); S.qaResetProgress();
-      o.freshHasMedals = Array.isArray(S.progress.medals) && S.progress.medals.length === 6 && S.progress.medals.every((m) => m === 0) && S.progress.v === 3;
+      S.setLang("en"); S.setAutoOn(false); S.qaResetProgress();
+      o.freshHasMedals = Array.isArray(S.progress.medals) && S.progress.medals.length === 6 && S.progress.medals.every((m) => m === 0) && S.progress.v === 4;
       /* an untouched, accurate, quick win: all three */
       let f = await fight(0, { hits: 0, thrown: 10, landed: 9, time: 20 });
       o.allThree = stored().medals[0] === 7 && /Untouched · Sharp · Quick/.test(f.rows) && f.rows.includes("3 / 18");
@@ -744,7 +885,7 @@ async function runHttpSuite(cdp) {
       return o; })()`, true);
     await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
     const v2 = await cdp.eval(`(() => { const p = window.__sublevel.progress; return { v: p.v, wins: p.wins, medals: p.medals }; })()`);
-    r.v2Loads = v2.v === 3 && v2.wins === 2 && JSON.stringify(v2.medals) === "[0,0,0,0,0,0]";
+    r.v2Loads = v2.v === 4 && v2.wins === 2 && JSON.stringify(v2.medals) === "[0,0,0,0,0,0]";
     await cdp.eval(`localStorage.setItem("sublevel-progress", JSON.stringify({ v: 3, wins: 1, medals: "abc" }))`);
     await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
     r.badMedalsFixed = JSON.stringify(await cdp.eval(`window.__sublevel.progress.medals`)) === "[0,0,0,0,0,0]";
@@ -807,6 +948,45 @@ async function runHttpSuite(cdp) {
       return o; })()`, true);
     const { numbers, ...checks } = r;
     if (!Object.values(checks).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("ambience_is_a_hum_and_a_crowd_that_answers_blows", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), g = S.audioGraph(), ac = g.ac, o = {};
+      S.setAudio({ mute: false }); if (ac.state !== "running") { await ac.resume(); for (let i = 0; i < 20 && ac.state !== "running"; i++) await sleep(50); }
+      /* the bed rebuilt under a counter: no buffer source at all (it used to build four looping noise sources) */
+      const made = [], orig = ac.createBufferSource.bind(ac); ac.createBufferSource = () => { const s = orig(); made.push(s); return s; };
+      g.BED.ready = false; S.bedInit(); ac.createBufferSource = orig;
+      o.noNoiseSources = made.length === 0; o.humIsSixOscillators = g.BED.hum.length === 6 && g.BED.hum.every((h) => h.o instanceof OscillatorNode);
+      $("wrap").hidden = true; S.startBout(1); await __until(() => G.state === "fight", "fight");
+      const count = (kind) => { g.MUS.log = []; S.crowdReact(kind); const n = g.MUS.log.filter((x) => x === "cue:crowd").length; g.MUS.log = null; return n; };
+      const rnd = Math.random;
+      Math.random = () => 0.01;                       /* every chance succeeds */
+      await sleep(1000); o.heavyAnswers = count("heavy") === 1;
+      o.notTwiceWithinAGap = count("heavy") === 0 && count("jab") === 0;
+      o.knockoutAlways = count("ko") === 1;
+      Math.random = () => 0.99;                       /* every chance fails */
+      await sleep(1000); o.chanceCanFail = count("heavy") === 0 && count("block") === 0; o.knockoutIgnoresChance = count("ko") === 1;
+      Math.random = () => 0.01; await sleep(1000);
+      S.setAudio({ mute: true }); o.mutedSilent = count("ko") === 0; S.setAudio({ mute: false });
+      S.MIX.crowdReact = 0; o.switchedOff = count("ko") === 0; S.MIX.crowdReact = 1;
+      const amb = $("ambVol"); amb.value = "0"; amb.dispatchEvent(new Event("input")); o.zeroVolumeSilent = count("ko") === 0; amb.value = "100"; amb.dispatchEvent(new Event("input"));
+      o.backOn = count("ko") === 1;
+      Math.random = rnd;
+      /* events: scheduled in a fight, not when muted or at zero */
+      const events = async () => { g.MUS.log = []; g.BED.next = 0; S.audioTick(0.016); const n = g.MUS.log.filter((x) => x === "bed:event").length; g.MUS.log = null; return n; };
+      o.eventsInAFight = (await events()) === 1;
+      S.setAudio({ mute: true }); o.noEventsMuted = (await events()) === 0; S.setAudio({ mute: false });
+      /* the bed fades with the music on a card nobody touches, and comes back */
+      S.MIX.cardQuiet = 0.05; $("wrap").hidden = false; G.state = "card";
+      for (let i = 0; i < 60; i++) S.audioTick(0.25);
+      o.roomFadesOnAnIdleCard = g.roomGain.gain.value < 0.02 && g.crowdGain.gain.value < 0.02;
+      S.MIX.cardQuiet = 40; G.state = "fight"; $("wrap").hidden = true; for (let i = 0; i < 80; i++) S.audioTick(0.1);
+      o.roomComesBack = g.roomGain.gain.value > 0.5;
+      S.titleCard();
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
     return r;
   });
 
@@ -1108,8 +1288,8 @@ async function runHttpSuite(cdp) {
     await load('{"v":99,"wins":2,"outfit":"auditor","arena":0,"dock":0,"future":"keep"}');
     out.future = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, before = { v: p.v, future: p.future }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { before, after: { v: r.v, future: r.future, wins: r.wins } }; })()`);
     await cdp.eval(`window.__sublevel.qaResetProgress()`);
-    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 3 && out.old.loaded.pass2 === 0 && out.old.stamped === 3 && out.old.kept
-      && out.bad.wins === 0 && out.bad.v === 3
+    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 4 && out.old.loaded.pass2 === 0 && out.old.stamped === 4 && out.old.kept
+      && out.bad.wins === 0 && out.bad.v === 4
       && out.future.before.v === 99 && out.future.before.future === "keep" && out.future.after.v === 99 && out.future.after.future === "keep" && out.future.after.wins === 2;
     if (!ok) throw new Error(JSON.stringify(out));
     return out;

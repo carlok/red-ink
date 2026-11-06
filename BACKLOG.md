@@ -4,7 +4,7 @@ Ideas that were suggested or left out of a sprint and are not built. Nothing her
 
 ## Ranking
 
-Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items, a fourth look, from the play flow, added 13, and a fifth look, from two reviews (combat and feel; web robustness and tooling), added 25 more (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; Sprints 27 and 28 built items 21 to 31; Sprint 29 built items 32 to 40 and 57; item 41 is next.
+Every item below, best first. Score is value (1 to 5, counting risk removed) divided by effort (small 1, small-plus 1.5, medium 2, medium-large 3, large 4); ties go to the higher value, then to the lower risk to the bout table. The scores are a judgement, not a measurement. The first ten were built in Sprint 25. A third look after Sprint 25 added 19 items, a fourth look, from the play flow, added 13, a fifth look, from two reviews (combat and feel; web robustness and tooling), added 25 more, and a sixth, after the ambience complaint (audio; gameplay, onboarding and the Sprint 29 code), added 26 (sections at the end). Everything was ranked again each time, so numbers moved. Sprint 26 built items 11 to 20; Sprints 27 and 28 built items 21 to 31; Sprint 29 built items 32 to 40 and 57; Sprint 30 built the ambience redesign and items 89 to 99 (a sixth look, below). Numbers are ids and stay put; the order of the tables is the ranking, so after Sprint 30 the open items best first are 100, then 101 to 103, then the 2.0 rows of Tier 4.
 
 ### Tier 1: Sprint 25 (all ten built; see `TUNING_LOG.md`)
 
@@ -114,7 +114,42 @@ Every item below, best first. Score is value (1 to 5, counting risk removed) div
 | 87 | The camera side may flip when the fighters line up on z (guess) | S | 1.0 |
 | 88 | Screen wake lock for pad-only and autoplay play (guess) | S | 1.0 |
 
-### Tier 5: later
+### Tier 5: Sprint 30 (ambience, then the ten best of the sixth look)
+
+| # | Item | Size | Score |
+| --- | --- | --- | --- |
+| 89 | The ambience without looping noise: a tonal room hum, tonal events, the crowd as a reaction (asked for by the player) (built in Sprint 30) | M | n/a |
+| 90 | Medals respect difficulty and autoplay (save v4) (built in Sprint 30) | S | 4.0 |
+| 91 | A whoosh that is not white noise (built in Sprint 30) | S | 4.0 |
+| 92 | Gamepad input resets the card-quiet timer (built in Sprint 30) | S | 3.0 |
+| 93 | A pad can start the game from the splash (built in Sprint 30) | S | 3.0 |
+| 94 | A loading watchdog: after 10 s, say it failed and offer Reload (built in Sprint 30) | S | 3.0 |
+| 95 | The crash catcher ignores harmless rejections and re-arms after Keep playing (built in Sprint 30) | S | 3.0 |
+| 96 | Offer Training after the first loss (built in Sprint 30) | S | 3.0 |
+| 97 | The lose card shows the foe's tip (built in Sprint 30) | S | 3.0 |
+| 98 | Leave training to the title card (built in Sprint 30) | S | 3.0 |
+| 99 | Training inputs: the tip by input mode, a pad button, blur after the strip click (built in Sprint 30) | S+ | 2.7 |
+
+### Tier 6: from the sixth look, not built
+
+| # | Item | Size | Score |
+| --- | --- | --- | --- |
+| 100 | First-time hints: the red mark, its sound, the stamina bar, a denied press (one-shot, saved) | S+ | 2.7 |
+| 101 | Sprint 29 tests that pass while wrong (heartbeat repeat, a real foe tell, the live limiter, medal counters, the CPU test's missing frame parts) | S+ | 2.0 |
+| 102 | Medals are write-only: a goal on the dossier and title, a mark on new ones, one outfit or arena grade at 9 and 18 | S+ | 2.0 |
+| 103 | One `G.mode` in place of `practice`, `pass2` and `train` reset by hand in four places | S+ | 2.0 |
+| 104 | Hat noise: two white-noise loops run forever even with the drums at zero (harshness is a guess) | S | 2.0 |
+| 105 | Muted or zero-volume music still schedules notes | S | 2.0 |
+| 106 | A hit shortens the voice's duck; a jab during FIGHT cuts it | S | 2.0 |
+| 107 | Hit variation is a fixed cycle (every 15 jabs, 10 heavies) | S | 2.0 |
+| 108 | A possible click when a noise burst runs off the end of its buffer (not heard) | S | 2.0 |
+| 109 | Abrupt gain changes on mute and on a place change (guess) | S | 2.0 |
+| 110 | The limiter does not cover the voice clips or browser speech | S+ | 1.3 |
+| 111 | Music repeats exactly: a 2-bar lead motif for up to 40 s | M | 1.5 |
+| 112 | A ledger card per run (foe, medals, best time) | M | 1.5 |
+| 113 | About 450 lines of QA probes ship to players; dead `boutRows`, `bumpTex`, `part` | M | 1.0 |
+
+### Tier 7: later
 
 Settings card (M), daily challenge and share line (M, needs 20), installable offline app (M), visual diff of the six places (M), third language (M), long functions in `makeFighter` and `aiIntent` (M), more voice lines, footsteps, crowd roar and gasp, a referee, hair styles, beards and caps, a second punch and right-hand clips, head look-at and breathing, an optional CRT look, a luminance measurement of the rim light, shirts against the floor and the crowd, a thin move set with combos, counters and a parry (L, needs `balance-run` tuning), and a WebGPU engine (skip until the integrated-GPU check shows a frame-rate gap that WebGL cannot close).
 
@@ -347,4 +382,47 @@ Frame loop (the 0.05 s clamp, the 5-tick accumulator cap, interpolation), hit st
 - **On a phone the settings rows on the title card look uneven:** a long label ("Block as a toggle (tap to start and stop)") wraps under its checkbox. Cosmetic, there before the 44 px rows. Small.
 - **The foe's alert mark against the floor in bout 6** measured 2.4 to 1 against its own rim, probably the measurement's ring catching the head; check by eye or with a better sampler before calling it a fault. Small.
 - **The limiter is a safety net, not a mix.** It was added because a dense, synthetic scene (a hit every 110 ms, the crowd at full, the voice) read up to -0.4 dBFS; a real fight is rarely that dense, and nobody has listened for pumping on a hard hit. Yours.
+
+## A sixth look, after the ambience complaint
+
+Status after Sprint 30: the ambience redesign and items 90 to 99 are built; 100 to 113 are open. Two reviews (audio; gameplay, onboarding and the Sprint 29 code), line numbers at `9d35207`. Confirmed by reading unless marked "guess"; none touch the sim.
+
+### The ambience (item 89, built first)
+
+The bed was four looping noise sources (a 4 s random-noise buffer through a 380 Hz low-pass, two band-pass "crowd murmur" layers at 420 and 1500 Hz, and wind in bout 4) with the crowd gain swelling with `G.cheer` to 1.55. Filtered noise has no pitch or syllables, so it reads as hiss. It also ignored the card-quiet fade (after 40 s only the noise was left), kept running while muted, and left stale `PEAK` keys, a "1.5 s loops" comment and a README line behind.
+
+### Audio
+
+- **The whoosh sample is unfiltered white noise** (`tools/make-audio.mjs:129`), played on every swing and dodge start and again on a dodged strike, where it stacks with the dodge cue; pitch variation does nothing on noise (item 91).
+- **Gamepad input does not reset `audCardT`** (only keys, :2512, and pointer, :3634 do), so a pad-only player loses the music after 40 s (item 92).
+- **Hats are highpassed white noise** and two loops run forever, even with the drums at zero (:1439); harshness is a guess (item 104).
+- **Muted or zero-volume music still schedules notes** (`musicTick`, `musicSting` check neither `muted` nor `volMusic`) (item 105).
+- **A hit overwrites `duckLen`** (:1378), cutting the voice's 1.1 s duck short and dropping to 0.35 with no ramp (item 106).
+- **`hitPick` is shared and cycles** (:1374), so the pitch pattern repeats every 15 jabs and 10 heavies (item 107).
+- **`vNoise` starts at a random offset in an unlooped 1.5 s buffer** (:1450); a 0.9 to 1.0 s sting can run off the end (item 108, not heard).
+- **Abrupt gain changes** on mute (:1319), on a place change (:1758) and a hat filter type switch (:1466) (item 109, guess).
+- **The limiter covers only the robot voice:** own clips (`<audio>`) and browser speech bypass the graph (:1617, :1627) (item 110).
+- **The lead motif is two bars with no per-bar variation,** so a card can loop one phrase for 40 s (item 111).
+
+### Gameplay, onboarding, code
+
+- **Medals ignore difficulty and autoplay** (`medalsEarned`, :3050): a bot win on Easy earns what a Hard win does, and the limits were measured at Normal (item 90).
+- **A pad-only player cannot leave the splash** (`pollPad` has no splash branch, :2635-2640) (item 93).
+- **"Loading..." forever** if the main script fails to parse or throws before the error listener (:820); only the noscript line helps (item 94).
+- **The crash catcher counts any rejection,** including an `ac.resume()` or `ac.suspend()` rejection (no catch, :1328, :2559, guess), and after Keep playing `crashed` stays true so later errors are never reported (:815) (item 95).
+- **Training is easy to miss** (a small link, never mentioned on the Start path); the lose card's assist slot goes to Easy only after three losses (item 96).
+- **The lose card shows no tip** about the foe (item 97).
+- **The pause menu's Quit goes to the splash,** so there is no way from training back to the title card (item 98).
+- **Training inputs:** `train_key` says "T" for everyone; touch has only the strip button, a pad has nothing, and it is wrong if T is rebound; a focused strip button keeps focus and Space (Dodge) may flip his guard on key-up (guess) (item 99).
+- **The one lesson is missing:** the tutor is a 12 s key list; the red mark, its sound and the stamina bar are never explained, and "red mark" first appears in bout 2's text (item 100).
+- **Sprint 29 tests that would pass while wrong:** the heartbeat check (`length>=2 && %2==0`) passes on one double thump; the tell test sets `ai.tell` by hand; the limiter test runs an offline copy and `wired` would pass with a second route to the destination; medals are fed a hand-written `G.log`; the CPU test times step, AI and `scene.render` but not `updateSkin`, `crowdUpdate`, `updateFx`, `updateHud` or `audioTick` (item 101).
+- **Medals are write-only** (item 102). **Three mode flags** are reset by hand in four places (item 103). **A ledger card** would be the replay hook (item 112). **About 450 lines of QA probes ship to players** (:3721 to :4175; `probeAI` alone is 196 lines), with dead `boutRows`, `bumpTex` and `part` (item 113).
+
+### Found while building Sprint 30
+
+- **An unterminated `/*` comment in the main script swallowed the code after it and the script still parsed.** I caught it by reading, not by a check. A test that every function the UI wires to a button exists (or a lint for unclosed comments in `index.html`) would catch the next one. Small.
+- **Committed with two failing tests:** I read the regression result after committing. Fixed in the next commit; the habit to keep is reading the result before `git commit`. (Not a backlog item, a note to myself.)
+- **`tools/audio-probe.mjs` had been reading nothing since Sprint 22** (it never pressed Play, and read a `stems` field that did not exist). Fixed for the ambience; the other older probes (`input-probe`, `combat-probe`, `cam-probe`, `portrait`) may have the same age. Check which still run. Small.
+- **The crowd reaction levels and chances were set from numbers, not ears:** jab and block answer 15 and 10 percent of the time, a heavy 60, a dodge 30, the knockout always; `MIX.crowdReact = 0` turns it off. Yours.
+- **Headless Chrome here reports an Italian `navigator.language`,** so anything keyed on it (the loading message) shows Italian in the tests. The language is not picked on the first visit yet (item 49).
 
