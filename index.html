@@ -432,6 +432,13 @@ const STR={
   banner_ko:{en:'K.O.',it:'K.O.'},
   banner_down:{en:'DOWN',it:'A TERRA'},
   row_perfect:{en:'Perfect',it:'Perfetto'},
+  row_medals:{en:'Medals',it:'Medaglie'},
+  row_medal_goal:{en:'To earn',it:'Da ottenere'},
+  medal_untouched:{en:'Untouched',it:'Intatto'},
+  medal_sharp:{en:'Sharp',it:'Preciso'},
+  medal_quick:{en:'Quick',it:'Rapido'},
+  medal_none:{en:'none this time',it:'nessuna stavolta'},
+  medal_goal:{en:'no hit taken · {p}% of punches landed · won in under {s} s',it:'nessun colpo subito · {p}% dei pugni a segno · vinto in meno di {s} s'},
   row_save:{en:'Saving',it:'Salvataggio'},
   save_failed:{en:'Not saved: this browser blocks storage, so the win is lost when you close the page.',it:'Non salvato: il browser blocca la memoria, quindi la vittoria si perde alla chiusura della pagina.'},
   perfect_v:{en:'You took no hits.',it:'Non hai preso colpi.'},
@@ -734,13 +741,14 @@ const UNLOCK_CHAIN=[
 ];
 const SAVE_KEY='sublevel-progress';
 /* The save carries a version, so a later build can change its shape without wiping what players have won. migrateProgress upgrades an older save one step at a time; a save from a newer build is kept exactly as it is. */
-const PROGRESS_VER=2;
-const progressDefaults=()=>({v:PROGRESS_VER,wins:0,outfit:'auditor',arena:0,dock:0,pass2:0});
+const PROGRESS_VER=3;
+const progressDefaults=()=>({v:PROGRESS_VER,wins:0,outfit:'auditor',arena:0,dock:0,pass2:0,medals:[0,0,0,0,0,0]});   /* medals: one bitmask per bout (see MEDAL), six bouts */
 function migrateProgress(p){
   if(!p||typeof p!=='object'||Array.isArray(p)) return progressDefaults();
   if(typeof p.v!=='number') p.v=0;
   if(p.v<1) p.v=1;   /* 0 to 1: Sprint 25 and older saves had no version field; the fields are the same */
   if(p.v<2){ if(typeof p.pass2!=='number') p.pass2=0; p.v=2; }   /* 1 to 2: the second pass counts the bouts cleared in it */
+  if(p.v<3){ if(!Array.isArray(p.medals)) p.medals=[0,0,0,0,0,0]; p.v=3; }   /* 2 to 3: medals per bout */
   return sanitizeProgress(p);
 }
 /* A hand-edited or damaged save must not reach the game as it is. Each known field keeps its value when it is the right kind and is put right when it is not
@@ -749,6 +757,7 @@ function sanitizeProgress(p){
   const n=(x,hi)=>Number.isFinite(x)?Math.floor(clamp(x,0,hi)):0;
   p.wins=n(p.wins,BOUTS.length); p.pass2=n(p.pass2,BOUTS.length); p.dock=n(p.dock,1); p.arena=n(p.arena,3);
   if(typeof p.outfit!=='string'||!Object.prototype.hasOwnProperty.call(OUTFITS,p.outfit)) p.outfit='auditor';
+  const md=Array.isArray(p.medals)?p.medals:[]; p.medals=[0,1,2,3,4,5].map(i=>Number.isInteger(md[i])&&md[i]>=0&&md[i]<=7?md[i]:0);   /* a bitmask of three medals: 0 to 7, anything else is 0 */
   return p;
 }
 let progress=progressDefaults();
@@ -1136,6 +1145,7 @@ function mergeStoredProgress(){
     if(ahead){ progress.wins=s.wins; if(typeof s.outfit==='string') progress.outfit=s.outfit; if(Number.isFinite(s.arena)) progress.arena=s.arena; }
     if(Number.isFinite(s.pass2)&&s.pass2>(progress.pass2||0)) progress.pass2=s.pass2;
     if(Number.isFinite(s.dock)&&s.dock>(progress.dock||0)) progress.dock=s.dock;
+    if(Array.isArray(s.medals)) progress.medals=progress.medals.map((m,i)=>(m|0)|((s.medals[i]|0)&7));   /* a medal earned in another tab stays earned */
     if(ahead) applyArena(progress.arena);
   }catch(e){}
 }
@@ -3012,7 +3022,7 @@ function hubCard(nextIdx){
   G.practice=false; G.pass2=false; G.train=false;
   const n=BOUTS[nextIdx];
   showCard({stamp:L('hub_stamp'),kick:L('company_kick'),title:L('hub_title'),body:L('hub_body'),
-    rows:[[L('row_rules'),L('rule_1')+' · '+L('rule_2')+' · '+L('rule_3')],[L('row_hub_next'),boutPlace(n)+' · '+n.foe],[L('row_opp'),n.foe+' · '+boutRole(n)],[L('row_tip'),boutTip(n)]],
+    rows:[[L('row_rules'),L('rule_1')+' · '+L('rule_2')+' · '+L('rule_3')],[L('row_hub_next'),boutPlace(n)+' · '+n.foe],[L('row_opp'),n.foe+' · '+boutRole(n)],[L('row_tip'),boutTip(n)],[L('row_medals'),medalCount()+' / '+BOUTS.length*3],[L('row_medal_goal'),medalGoals(nextIdx)]],
     btn:L('hub_btn'),go:()=>introCard(nextIdx)});
 }
 function dockMission(next){
@@ -3024,10 +3034,26 @@ function showFinalCard(){
   showCard({stamp:L('final_stamp'),kick:L('final_kick'),title:L('final_title'),body:L('final_body'),
     rows:[[L('row_next'),L('final_next')],[L('row_you'),fightLine()],[L('row_punches'),punchLine()]],btn:L('final_btn'),go:()=>{ G.bout=0; titleCard(); }});
 }
+/* Medals: up to three per bout, earned in a first-pass win (not Practice, the training room or the second pass) and kept in progress.medals.
+   Untouched: no hit taken. Sharp: at least MEDAL_SHARP of the punches landed (and at least five thrown). Quick: won within MEDAL_QUICK_S[bout] seconds, counted as the result card counts them.
+   The numbers come from balance-run (bot at Normal, 200 fights, seeds 1 and 7): the bot's quickest quarter of wins was 26, 31, 40, 46.8, 38.9 and 39.8 s (25.3 to 47.5 across the two seeds); it lands 70 to 96 percent of its punches and never wins
+   without taking a hit. There is no human data yet: the playtest log is where to tune them. */
+const MEDAL={untouched:1,sharp:2,quick:4}, MEDAL_SHARP=.85, MEDAL_QUICK_S=[26,31,40,46,38,39];
+function medalsEarned(i){
+  const g=G.log||{}; let m=0;
+  if(g.hits===0) m|=MEDAL.untouched;
+  if((g.thrown||0)>=5&&g.landed/g.thrown>=MEDAL_SHARP) m|=MEDAL.sharp;
+  if((g.time||0)<=MEDAL_QUICK_S[i]) m|=MEDAL.quick;
+  return m;
+}
+const medalText=m=>['untouched','sharp','quick'].filter(k=>m&MEDAL[k]).map(k=>L('medal_'+k)).join(' · ')||L('medal_none');
+const medalGoals=i=>L('medal_goal').replace('{p}',Math.round(MEDAL_SHARP*100)).replace('{s}',MEDAL_QUICK_S[i]);
+const medalCount=()=>progress.medals.reduce((n,m)=>n+((m&1)+((m>>1)&1)+((m>>2)&1)),0);
 function winCard(){
   const i=G.bout, next=i+1, uLabel=unlockLabel(i);
+  const medals=medalsEarned(i); progress.medals[i]=(progress.medals[i]|0)|medals;
   const saved=grantWin(i);
-  const rows=[[L('row_you'),fightLine()],[L('row_punches'),punchLine()]], perfect=!!(G.log&&G.log.hits===0);
+  const rows=[[L('row_you'),fightLine()],[L('row_punches'),punchLine()],[L('row_medals'),medalText(medals)+' ('+medalCount()+' / '+BOUTS.length*3+')']], perfect=!!(G.log&&G.log.hits===0);
   if(perfect) rows.unshift([L('row_perfect'),L('perfect_v')]);
   if(uLabel) rows.unshift([L('row_unlock'),uLabel]);
   if(next<BOUTS.length) rows.unshift([L('row_next'),boutPlace(BOUTS[next])]);
@@ -3785,7 +3811,7 @@ function simMeet(opt){
         if(G.state!=='fight') break;
       }
       rows.push({win:G.winner===P,t:Math.round(real*10)/10,empty:real?empty/real:0,gap:Math.round(maxGap*10)/10,ko:G.state==='ko',ehp:Math.max(0,Math.round(E.hp)),php:Math.max(0,Math.round(P.hp)),
-        hits:G.log.hits,blocks:G.log.blocks,dodges:G.log.dodges,corner:G.log.corner,jh:G.log.jabHit,jb:G.log.jabBlock,jd:G.log.jabDodge});
+        hits:G.log.hits,blocks:G.log.blocks,dodges:G.log.dodges,corner:G.log.corner,jh:G.log.jabHit,jb:G.log.jabBlock,jd:G.log.jabDodge,th:G.log.thrown,ld:G.log.landed,lt:G.log.time});
     }
     const lens=rows.map(r=>r.t).sort((a,b)=>a-b);
     const empty=rows.reduce((s,r)=>s+r.empty,0)/n;
@@ -3803,6 +3829,10 @@ function simMeet(opt){
       blocks:Math.round(rows.reduce((s,r)=>s+r.blocks,0)/n*10)/10,
       dodges:Math.round(rows.reduce((s,r)=>s+r.dodges,0)/n*10)/10,
       corner:Math.round(rows.reduce((s,r)=>s+r.corner,0)/n*10)/10,
+      accuracy:(()=>{ const t=rows.reduce((s,r)=>s+r.th,0), l=rows.reduce((s,r)=>s+r.ld,0); return t?Math.round(l/t*1000)/10:0; })(),   /* % of the bot's punches that landed */
+      winMedian:(()=>{ const w=rows.filter(r=>r.win).map(r=>r.lt).sort((a,b)=>a-b); return w.length?Math.round(w[Math.floor(w.length/2)]*10)/10:0; })(),   /* median seconds of the fights the bot won, counted as the result card counts them (G.log.time) */
+      winP25:(()=>{ const w=rows.filter(r=>r.win).map(r=>r.lt).sort((a,b)=>a-b); return w.length?Math.round(w[Math.floor(w.length/4)]*10)/10:0; })(),
+      noHitWins:Math.round(rows.filter(r=>r.win&&r.hits===0).length/n*1000)/10,   /* % of fights the bot won without taking a hit */
       jabAnswered:(()=>{ const h=rows.reduce((s,r)=>s+r.jh,0), a=rows.reduce((s,r)=>s+r.jb+r.jd,0); return h+a?Math.round(a/(h+a)*1000)/10:0; })()   /* % of the player's jabs that reached the foe and were blocked or dodged */
     });
   }

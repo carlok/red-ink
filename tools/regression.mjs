@@ -708,6 +708,54 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("medals_are_earned_kept_and_never_given_for_practice", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const stored = () => JSON.parse(localStorage.getItem("sublevel-progress"));
+      const fight = async (bout, log, flags = {}) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); Object.assign(G, flags); Object.assign(G.log, log); const w = S.qaEndBout(true); await sleep(60); return { rows: $("cRows").textContent, title: $("cTitle").textContent, w }; };
+      S.setLang("en"); S.qaResetProgress();
+      o.freshHasMedals = Array.isArray(S.progress.medals) && S.progress.medals.length === 6 && S.progress.medals.every((m) => m === 0) && S.progress.v === 3;
+      /* an untouched, accurate, quick win: all three */
+      let f = await fight(0, { hits: 0, thrown: 10, landed: 9, time: 20 });
+      o.allThree = stored().medals[0] === 7 && /Untouched · Sharp · Quick/.test(f.rows) && f.rows.includes("3 / 18");
+      /* a worse win later keeps what was earned and shows none for itself */
+      f = await fight(0, { hits: 3, thrown: 10, landed: 4, time: 90 });
+      o.keptAndNoneThisTime = stored().medals[0] === 7 && /none this time/.test(f.rows);
+      /* each medal on its own, and the edges: 85 percent exactly, fewer than five punches, the time limit itself */
+      f = await fight(1, { hits: 2, thrown: 20, landed: 17, time: 99 }); o.sharpAtEightyFive = stored().medals[1] === 2;
+      f = await fight(2, { hits: 2, thrown: 4, landed: 4, time: 99 }); o.fewPunchesNotSharp = stored().medals[2] === 0;
+      f = await fight(2, { hits: 2, thrown: 10, landed: 3, time: 40 }); o.quickAtTheLimit = stored().medals[2] === 4;
+      f = await fight(3, { hits: 0, thrown: 10, landed: 3, time: 99 }); o.untouchedOnly = stored().medals[3] === 1;
+      /* no medals from Practice, the training room or the second pass */
+      const before = JSON.stringify(stored().medals);
+      await fight(4, { hits: 0, thrown: 10, landed: 10, time: 1 }, { practice: true }); o.practiceNone = JSON.stringify(stored().medals) === before;
+      await fight(4, { hits: 0, thrown: 10, landed: 10, time: 1 }, { pass2: true }); o.pass2None = JSON.stringify(stored().medals) === before;
+      G.practice = false; G.pass2 = false;
+      /* a medal earned in another tab stays earned when this tab saves */
+      const other = stored().medals.slice(); other[5] = 4; localStorage.setItem("sublevel-progress", JSON.stringify({ ...stored(), medals: other }));
+      await fight(0, { hits: 3, thrown: 10, landed: 4, time: 99 }); o.otherTabMedalKept = stored().medals[5] === 4 && stored().medals[0] === 7;
+      /* the hub counts them and says what to aim for */
+      S.hubCard(0); await sleep(100); o.hubTotal = $("cRows").textContent.includes("Medals") && $("cRows").textContent.includes(" / 18");
+      o.hubGoals = $("cRows").textContent.includes("under 26 s") && $("cRows").textContent.includes("85%");
+      /* Italian */
+      S.setLang("it"); S.hubCard(0); await sleep(100); o.italian = /Medaglie/.test($("cRows").textContent) && /meno di 26 s/.test($("cRows").textContent); S.setLang("en");
+      /* a save written by Sprint 28 (v2, no medals) loads with zeros and is stamped v3; garbage is put right */
+      localStorage.setItem("sublevel-progress", JSON.stringify({ v: 2, wins: 2, outfit: "auditor", arena: 0, dock: 0, pass2: 0 }));
+      return o; })()`, true);
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    const v2 = await cdp.eval(`(() => { const p = window.__sublevel.progress; return { v: p.v, wins: p.wins, medals: p.medals }; })()`);
+    r.v2Loads = v2.v === 3 && v2.wins === 2 && JSON.stringify(v2.medals) === "[0,0,0,0,0,0]";
+    await cdp.eval(`localStorage.setItem("sublevel-progress", JSON.stringify({ v: 3, wins: 1, medals: "abc" }))`);
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    r.badMedalsFixed = JSON.stringify(await cdp.eval(`window.__sublevel.progress.medals`)) === "[0,0,0,0,0,0]";
+    await cdp.eval(`localStorage.setItem("sublevel-progress", JSON.stringify({ v: 3, wins: 1, medals: [9, -1, 1.5, 7, "x", 2] }))`);
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    r.oddMedalsFixed = JSON.stringify(await cdp.eval(`window.__sublevel.progress.medals`)) === "[0,0,0,7,0,2]";
+    await cdp.eval(`window.__sublevel.qaResetProgress()`);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("held_esc_and_enter_do_not_repeat", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
@@ -1006,8 +1054,8 @@ async function runHttpSuite(cdp) {
     await load('{"v":99,"wins":2,"outfit":"auditor","arena":0,"dock":0,"future":"keep"}');
     out.future = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, before = { v: p.v, future: p.future }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { before, after: { v: r.v, future: r.future, wins: r.wins } }; })()`);
     await cdp.eval(`window.__sublevel.qaResetProgress()`);
-    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 2 && out.old.loaded.pass2 === 0 && out.old.stamped === 2 && out.old.kept
-      && out.bad.wins === 0 && out.bad.v === 2
+    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 3 && out.old.loaded.pass2 === 0 && out.old.stamped === 3 && out.old.kept
+      && out.bad.wins === 0 && out.bad.v === 3
       && out.future.before.v === 99 && out.future.before.future === "keep" && out.future.after.v === 99 && out.future.after.future === "keep" && out.future.after.wins === 2;
     if (!ok) throw new Error(JSON.stringify(out));
     return out;
