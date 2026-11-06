@@ -787,6 +787,29 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("limiter_holds_the_peak_and_leaves_normal_levels_alone", async () => {
+    const r = await cdp.eval(`(async () => {
+      const S = window.__sublevel, o = {}; S.audioReady(); const g = S.audioGraph(), L = g.LIMIT;
+      o.wired = !!g.limiter && !!g.limitOut && g.limiter.threshold.value === L.threshold && g.limiter.ratio.value === L.ratio && Math.abs(g.limitOut.gain.value - L.trim) < 1e-6;
+      /* the same chain, offline (no sound card needed): a steady tone at several levels */
+      const run = async (amp) => {
+        const oc = new OfflineAudioContext(1, 48000 * 2, 48000), os = oc.createOscillator(), a = oc.createGain(), c = oc.createDynamicsCompressor(), t = oc.createGain();
+        os.frequency.value = 220; a.gain.value = amp; c.threshold.value = L.threshold; c.knee.value = L.knee; c.ratio.value = L.ratio; c.attack.value = L.attack; c.release.value = L.release; t.gain.value = L.trim;
+        os.connect(a); a.connect(c); c.connect(t); t.connect(oc.destination); os.start();
+        const d = (await oc.startRendering()).getChannelData(0); let pk = 0; for (let i = 48000; i < d.length; i++) pk = Math.max(pk, Math.abs(d[i])); return pk;
+      };
+      const quiet = await run(0.25), loud = await run(0.5), full = await run(1.0), over = await run(2.0);
+      o.quietUnchanged = Math.abs(20 * Math.log10(quiet / 0.25)) < 0.3;      /* a sound well under the threshold keeps its level */
+      o.loudUnchanged = Math.abs(20 * Math.log10(loud / 0.5)) < 0.3;
+      o.fullScaleHeld = full <= 0.8;                                          /* 0 dBFS in, no more than about -2 dBFS out */
+      o.beyondFullScaleHeld = over <= 0.9;
+      o.numbers = { quiet: +quiet.toFixed(3), loud: +loud.toFixed(3), full: +full.toFixed(3), over: +over.toFixed(3) };
+      return o; })()`, true);
+    const { numbers, ...checks } = r;
+    if (!Object.values(checks).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("held_esc_and_enter_do_not_repeat", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};

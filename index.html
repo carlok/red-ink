@@ -1271,6 +1271,12 @@ function updateFx(dt){
 /* ---------- sound ---------- */
 let ac=null, muted=false, unlock='';
 let volSfx=1, volMusic=1, volAmb=1;
+/* A safety limiter between the master bus and the speakers. A hit every 110 ms with the crowd up and the voice on read up to -0.4 dBFS on master
+   (tools/audio-sum-probe.mjs, seven runs, the loudest of four scenes -5.1 to -0.4), too close to clipping. A compressor at -3 dB with a ratio of 20 and no knee
+   leaves what is under it alone and holds a full-scale input to about -1 dBFS; the Web Audio compressor adds a fixed makeup gain of +1.71 dB at this setting
+   (measured offline), which LIMIT_TRIM takes back so that nothing under the threshold changes level. */
+const LIMIT={threshold:-3,knee:0,ratio:20,attack:.001,release:.12,trim:Math.pow(10,-1.71/20)};
+let limiter=null, limitOut=null;
 let master=null, sfxGain=null, musicGain=null, duckGain=null, roomGain=null, crowdGain=null, ambGain=null;
 let duck=1, duckT=0, bufs={}, gains={}, audioP=null;
 const PEAK={jab:.5012,jab2:.5012,jab3:.5012,heavy:.5012,heavy2:.5012,block:.5012,block2:.5012,ko:.5012,whoosh:.1995,ui:.2512,room:.02512,crowd:.0631,calm:.1259,calm2:.1259,tense:.1259,tense2:.1259,finish:.1259,hub:.1259,dock:.1259};
@@ -1321,7 +1327,9 @@ function audioInit(src){
   if(!ac) return Promise.resolve();
   if(ac.state==='suspended') ac.resume();
   if(!master){
-    master=ac.createGain(); master.connect(ac.destination);
+    master=ac.createGain();
+    limiter=ac.createDynamicsCompressor(); limiter.threshold.value=LIMIT.threshold; limiter.knee.value=LIMIT.knee; limiter.ratio.value=LIMIT.ratio; limiter.attack.value=LIMIT.attack; limiter.release.value=LIMIT.release;
+    limitOut=ac.createGain(); limitOut.gain.value=LIMIT.trim; master.connect(limiter); limiter.connect(limitOut); limitOut.connect(ac.destination);
     sfxGain=ac.createGain(); sfxGain.connect(master);
     musicGain=ac.createGain(); duckGain=ac.createGain();
     musicGain.connect(duckGain); duckGain.connect(master);
@@ -4144,7 +4152,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={JAB_READ,step,aiIntent,resolveBodies,crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={JAB_READ,step,aiIntent,resolveBodies,crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,limiter,limitOut,LIMIT,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

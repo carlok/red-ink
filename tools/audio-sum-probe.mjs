@@ -1,9 +1,9 @@
 /**
  * Summed output level and main-thread stalls. Usage: node tools/audio-sum-probe.mjs
  *
- * audio-probe.mjs checks single sounds. This one taps `master` with an AnalyserNode and reports the highest sample seen while a lot plays at once (music and
+ * audio-probe.mjs checks single sounds. This one taps the output (after the limiter, before it on a build without one) with an AnalyserNode and reports the highest sample seen while a lot plays at once (music and
  * room tone, a crowd swell at full, a hit every 110 ms, the robot voice), and lists the long tasks (50 ms or more) the page runs while it starts all six bouts.
- * Ceiling: no clipping, so exit 1 above -1 dBFS. Sprint 29 measured -3.6 to -6.0 dBFS and no long task, so no limiter and no longer music lookahead were added.
+ * Ceiling: no clipping, so exit 1 above -1 dBFS. Sprint 29: before the limiter the loudest scene read -5.1 to -0.4 dBFS over seven runs (hence the limiter); stalls were 50 to 59 ms against a 140 ms music lookahead (so the lookahead was left alone).
  * Headless Chrome on a machine with no audio device may feed the analyser nothing: a peak under 0.05 is reported as "no signal" and exits 2.
  */
 import { bootSublevel, withPage } from "./cdp-session.mjs";
@@ -13,7 +13,7 @@ await withPage(async (cdp) => {
     const S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), g = S.audioGraph(), ac = g.ac, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     S.setAudio({ mute: false, sfx: 1, music: 1 });
     if (ac.state !== "running") { await ac.resume(); await sleep(200); }
-    const an = ac.createAnalyser(); an.fftSize = 2048; g.master.connect(an);
+    const an = ac.createAnalyser(); an.fftSize = 2048; (g.limitOut || g.master).connect(an);   /* what reaches the speakers: after the limiter */
     const buf = new Float32Array(an.fftSize), peaks = [];
     const peakNow = () => { an.getFloatTimeDomainData(buf); let m = 0; for (let i = 0; i < buf.length; i++) { const a = Math.abs(buf[i]); if (a > m) m = a; } return m; };
     const measure = async (label, ms, fn) => { let max = 0, n = 0; const t0 = performance.now(); let last = 0;
