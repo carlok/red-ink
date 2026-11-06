@@ -673,6 +673,37 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("medals_respect_difficulty_and_autoplay", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const stored = () => JSON.parse(localStorage.getItem("sublevel-progress"));
+      const setDiff = (d) => $("wrap").querySelector('[data-diff="' + d + '"]').click();
+      const fight = async (bout, log, setup) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); Object.assign(G.log, log); if (setup) setup(); S.qaEndBout(true); await sleep(60); return $("cRows").textContent; };
+      const clean = { hits: 0, thrown: 10, landed: 10, time: 10 };
+      S.setLang("en"); S.qaResetProgress(); S.titleCard(); await sleep(100);
+      setDiff("easy"); let rows = await fight(0, clean); o.easyNone = stored().medals[0] === 0 && rows.includes("none on Easy");
+      S.titleCard(); await sleep(100); setDiff("normal"); rows = await fight(0, clean, () => { G.assisted = true; }); o.autoplayNone = stored().medals[0] === 0 && rows.includes("none when the AI plays");
+      /* the real flag: Autoplay on and untouched keys, the bot plays ticks, the flag is set by the sim loop */
+      $("wrap").hidden = true; S.setAutoOn(true); S.startBout(0); await __until(() => G.state === "fight", "fight"); await sleep(400); o.botTicksSetTheFlag = G.assisted === true; S.setAutoOn(false);
+      rows = await fight(0, clean); o.humanNormal = stored().medals[0] === 7 && stored().medalsHard[0] === 0 && !rows.includes("(Hard)");
+      S.titleCard(); await sleep(100); setDiff("hard"); rows = await fight(1, clean); o.hardRecorded = stored().medals[1] === 7 && stored().medalsHard[1] === 7 && rows.includes("Untouched (Hard)");
+      S.titleCard(); await sleep(100); setDiff("normal");
+      /* a medal earned on Hard stays marked when a later Normal win earns the same one */
+      await fight(1, clean); o.hardMarkStays = stored().medalsHard[1] === 7;
+      o.goalSaysSo = true; S.hubCard(0); await sleep(100); o.goalSaysSo = $("cRows").textContent.includes("played by you");
+      /* a v3 save (medals, no medalsHard) upgrades; the Hard mask is a subset of the medals */
+      localStorage.setItem("sublevel-progress", JSON.stringify({ v: 3, wins: 2, medals: [7, 1, 0, 0, 0, 0] }));
+      return o; })()`, true);
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    r.v3Upgrades = await cdp.eval(`(() => { const p = window.__sublevel.progress; return p.v === 4 && JSON.stringify(p.medals) === "[7,1,0,0,0,0]" && JSON.stringify(p.medalsHard) === "[0,0,0,0,0,0]"; })()`);
+    await cdp.eval(`localStorage.setItem("sublevel-progress", JSON.stringify({ v: 4, wins: 1, medals: [1, 0, 0, 0, 0, 0], medalsHard: [7, 5, "x", 0, 0, 0] }))`);
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    r.hardIsASubset = await cdp.eval(`JSON.stringify(window.__sublevel.progress.medalsHard) === "[1,0,0,0,0,0]"`);
+    await cdp.eval(`window.__sublevel.qaResetProgress(); document.querySelector('[data-diff="normal"]').click()`);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("training_room_dummy_never_attacks_and_costs_are_shown", async () => {
     const r = await cdp.eval(`(async () => {
       const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
@@ -714,7 +745,7 @@ async function runHttpSuite(cdp) {
       const stored = () => JSON.parse(localStorage.getItem("sublevel-progress"));
       const fight = async (bout, log, flags = {}) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); Object.assign(G, flags); Object.assign(G.log, log); const w = S.qaEndBout(true); await sleep(60); return { rows: $("cRows").textContent, title: $("cTitle").textContent, w }; };
       S.setLang("en"); S.qaResetProgress();
-      o.freshHasMedals = Array.isArray(S.progress.medals) && S.progress.medals.length === 6 && S.progress.medals.every((m) => m === 0) && S.progress.v === 3;
+      o.freshHasMedals = Array.isArray(S.progress.medals) && S.progress.medals.length === 6 && S.progress.medals.every((m) => m === 0) && S.progress.v === 4;
       /* an untouched, accurate, quick win: all three */
       let f = await fight(0, { hits: 0, thrown: 10, landed: 9, time: 20 });
       o.allThree = stored().medals[0] === 7 && /Untouched · Sharp · Quick/.test(f.rows) && f.rows.includes("3 / 18");
@@ -744,7 +775,7 @@ async function runHttpSuite(cdp) {
       return o; })()`, true);
     await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
     const v2 = await cdp.eval(`(() => { const p = window.__sublevel.progress; return { v: p.v, wins: p.wins, medals: p.medals }; })()`);
-    r.v2Loads = v2.v === 3 && v2.wins === 2 && JSON.stringify(v2.medals) === "[0,0,0,0,0,0]";
+    r.v2Loads = v2.v === 4 && v2.wins === 2 && JSON.stringify(v2.medals) === "[0,0,0,0,0,0]";
     await cdp.eval(`localStorage.setItem("sublevel-progress", JSON.stringify({ v: 3, wins: 1, medals: "abc" }))`);
     await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
     r.badMedalsFixed = JSON.stringify(await cdp.eval(`window.__sublevel.progress.medals`)) === "[0,0,0,0,0,0]";
@@ -1147,8 +1178,8 @@ async function runHttpSuite(cdp) {
     await load('{"v":99,"wins":2,"outfit":"auditor","arena":0,"dock":0,"future":"keep"}');
     out.future = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, before = { v: p.v, future: p.future }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { before, after: { v: r.v, future: r.future, wins: r.wins } }; })()`);
     await cdp.eval(`window.__sublevel.qaResetProgress()`);
-    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 3 && out.old.loaded.pass2 === 0 && out.old.stamped === 3 && out.old.kept
-      && out.bad.wins === 0 && out.bad.v === 3
+    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 4 && out.old.loaded.pass2 === 0 && out.old.stamped === 4 && out.old.kept
+      && out.bad.wins === 0 && out.bad.v === 4
       && out.future.before.v === 99 && out.future.before.future === "keep" && out.future.after.v === 99 && out.future.after.future === "keep" && out.future.after.wins === 2;
     if (!ok) throw new Error(JSON.stringify(out));
     return out;

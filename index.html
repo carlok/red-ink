@@ -438,7 +438,9 @@ const STR={
   medal_sharp:{en:'Sharp',it:'Preciso'},
   medal_quick:{en:'Quick',it:'Rapido'},
   medal_none:{en:'none this time',it:'nessuna stavolta'},
-  medal_goal:{en:'no hit taken · {p}% of punches landed · won in under {s} s',it:'nessun colpo subito · {p}% dei pugni a segno · vinto in meno di {s} s'},
+  medal_none_easy:{en:'none on Easy',it:'nessuna in Facile'},
+  medal_none_auto:{en:'none when the AI plays',it:'nessuna se gioca l\'IA'},
+  medal_goal:{en:'no hit taken · {p}% of punches landed · won in under {s} s (Normal or Hard, played by you)',it:'nessun colpo subito · {p}% dei pugni a segno · vinto in meno di {s} s (Normale o Difficile, giocato da te)'},
   row_save:{en:'Saving',it:'Salvataggio'},
   save_failed:{en:'Not saved: this browser blocks storage, so the win is lost when you close the page.',it:'Non salvato: il browser blocca la memoria, quindi la vittoria si perde alla chiusura della pagina.'},
   perfect_v:{en:'You took no hits.',it:'Non hai preso colpi.'},
@@ -741,14 +743,15 @@ const UNLOCK_CHAIN=[
 ];
 const SAVE_KEY='sublevel-progress';
 /* The save carries a version, so a later build can change its shape without wiping what players have won. migrateProgress upgrades an older save one step at a time; a save from a newer build is kept exactly as it is. */
-const PROGRESS_VER=3;
-const progressDefaults=()=>({v:PROGRESS_VER,wins:0,outfit:'auditor',arena:0,dock:0,pass2:0,medals:[0,0,0,0,0,0]});   /* medals: one bitmask per bout (see MEDAL), six bouts */
+const PROGRESS_VER=4;
+const progressDefaults=()=>({v:PROGRESS_VER,wins:0,outfit:'auditor',arena:0,dock:0,pass2:0,medals:[0,0,0,0,0,0],medalsHard:[0,0,0,0,0,0]});   /* medals: one bitmask per bout (see MEDAL), six bouts; medalsHard: the ones among them earned on Hard */
 function migrateProgress(p){
   if(!p||typeof p!=='object'||Array.isArray(p)) return progressDefaults();
   if(typeof p.v!=='number') p.v=0;
   if(p.v<1) p.v=1;   /* 0 to 1: Sprint 25 and older saves had no version field; the fields are the same */
   if(p.v<2){ if(typeof p.pass2!=='number') p.pass2=0; p.v=2; }   /* 1 to 2: the second pass counts the bouts cleared in it */
   if(p.v<3){ if(!Array.isArray(p.medals)) p.medals=[0,0,0,0,0,0]; p.v=3; }   /* 2 to 3: medals per bout */
+  if(p.v<4){ if(!Array.isArray(p.medalsHard)) p.medalsHard=[0,0,0,0,0,0]; p.v=4; }   /* 3 to 4: which medals were earned on Hard */
   return sanitizeProgress(p);
 }
 /* A hand-edited or damaged save must not reach the game as it is. Each known field keeps its value when it is the right kind and is put right when it is not
@@ -757,7 +760,8 @@ function sanitizeProgress(p){
   const n=(x,hi)=>Number.isFinite(x)?Math.floor(clamp(x,0,hi)):0;
   p.wins=n(p.wins,BOUTS.length); p.pass2=n(p.pass2,BOUTS.length); p.dock=n(p.dock,1); p.arena=n(p.arena,3);
   if(typeof p.outfit!=='string'||!Object.prototype.hasOwnProperty.call(OUTFITS,p.outfit)) p.outfit='auditor';
-  const md=Array.isArray(p.medals)?p.medals:[]; p.medals=[0,1,2,3,4,5].map(i=>Number.isInteger(md[i])&&md[i]>=0&&md[i]<=7?md[i]:0);   /* a bitmask of three medals: 0 to 7, anything else is 0 */
+  const mask=a=>{ const md=Array.isArray(a)?a:[]; return [0,1,2,3,4,5].map(i=>Number.isInteger(md[i])&&md[i]>=0&&md[i]<=7?md[i]:0); };   /* a bitmask of three medals: 0 to 7, anything else is 0 */
+  p.medals=mask(p.medals); p.medalsHard=mask(p.medalsHard).map((m,i)=>m&p.medals[i]);   /* a Hard medal is a medal */
   return p;
 }
 let progress=progressDefaults();
@@ -1146,6 +1150,7 @@ function mergeStoredProgress(){
     if(Number.isFinite(s.pass2)&&s.pass2>(progress.pass2||0)) progress.pass2=s.pass2;
     if(Number.isFinite(s.dock)&&s.dock>(progress.dock||0)) progress.dock=s.dock;
     if(Array.isArray(s.medals)) progress.medals=progress.medals.map((m,i)=>(m|0)|((s.medals[i]|0)&7));   /* a medal earned in another tab stays earned */
+    if(Array.isArray(s.medalsHard)) progress.medalsHard=progress.medalsHard.map((m,i)=>(m|0)|((s.medalsHard[i]|0)&7));
     if(ahead) applyArena(progress.arena);
   }catch(e){}
 }
@@ -3055,26 +3060,29 @@ function showFinalCard(){
   showCard({stamp:L('final_stamp'),kick:L('final_kick'),title:L('final_title'),body:L('final_body'),
     rows:[[L('row_next'),L('final_next')],[L('row_you'),fightLine()],[L('row_punches'),punchLine()]],btn:L('final_btn'),go:()=>{ G.bout=0; titleCard(); }});
 }
-/* Medals: up to three per bout, earned in a first-pass win (not Practice, the training room or the second pass) and kept in progress.medals.
+/* Medals: up to three per bout, earned in a first-pass win (not Practice, the training room or the second pass) and kept in progress.medals. None on Easy and none when the AI played any of the
+   bout (Autoplay on at any point: G.assisted), since the limits below are for a person at Normal; the ones earned on Hard are also kept in progress.medalsHard.
    Untouched: no hit taken. Sharp: at least MEDAL_SHARP of the punches landed (and at least five thrown). Quick: won within MEDAL_QUICK_S[bout] seconds, counted as the result card counts them.
    The numbers come from balance-run (bot at Normal, 200 fights, seeds 1 and 7): the bot's quickest quarter of wins was 26, 31, 40, 46.8, 38.9 and 39.8 s (25.3 to 47.5 across the two seeds); it lands 70 to 96 percent of its punches and never wins
    without taking a hit. There is no human data yet: the playtest log is where to tune them. */
 const MEDAL={untouched:1,sharp:2,quick:4}, MEDAL_SHARP=.85, MEDAL_QUICK_S=[26,31,40,46,38,39];
 function medalsEarned(i){
+  if(medalWhyNot()) return 0;
   const g=G.log||{}; let m=0;
   if(g.hits===0) m|=MEDAL.untouched;
   if((g.thrown||0)>=5&&g.landed/g.thrown>=MEDAL_SHARP) m|=MEDAL.sharp;
   if((g.time||0)<=MEDAL_QUICK_S[i]) m|=MEDAL.quick;
   return m;
 }
-const medalText=m=>['untouched','sharp','quick'].filter(k=>m&MEDAL[k]).map(k=>L('medal_'+k)).join(' · ')||L('medal_none');
+const medalWhyNot=()=>G.assisted?'medal_none_auto':diff==='easy'?'medal_none_easy':'';
+const medalText=(m,hard)=>['untouched','sharp','quick'].filter(k=>m&MEDAL[k]).map(k=>L('medal_'+k)+(hard&MEDAL[k]?' ('+L('diff_hard')+')':'')).join(' · ')||L(medalWhyNot()||'medal_none');
 const medalGoals=i=>L('medal_goal').replace('{p}',Math.round(MEDAL_SHARP*100)).replace('{s}',MEDAL_QUICK_S[i]);
 const medalCount=()=>progress.medals.reduce((n,m)=>n+((m&1)+((m>>1)&1)+((m>>2)&1)),0);
 function winCard(){
   const i=G.bout, next=i+1, uLabel=unlockLabel(i);
-  const medals=medalsEarned(i); progress.medals[i]=(progress.medals[i]|0)|medals;
+  const medals=medalsEarned(i), hardNow=diff==='hard'?medals:0; progress.medals[i]=(progress.medals[i]|0)|medals; progress.medalsHard[i]=(progress.medalsHard[i]|0)|hardNow;
   const saved=grantWin(i);
-  const rows=[[L('row_you'),fightLine()],[L('row_punches'),punchLine()],[L('row_medals'),medalText(medals)+' ('+medalCount()+' / '+BOUTS.length*3+')']], perfect=!!(G.log&&G.log.hits===0);
+  const rows=[[L('row_you'),fightLine()],[L('row_punches'),punchLine()],[L('row_medals'),medalText(medals,hardNow)+' ('+medalCount()+' / '+BOUTS.length*3+')']], perfect=!!(G.log&&G.log.hits===0);
   if(perfect) rows.unshift([L('row_perfect'),L('perfect_v')]);
   if(uLabel) rows.unshift([L('row_unlock'),uLabel]);
   if(next<BOUTS.length) rows.unshift([L('row_next'),boutPlace(BOUTS[next])]);
@@ -3093,7 +3101,7 @@ const roundText=i=>G.train?L('train_label'):L('bout_stamp').toUpperCase()+' '+(i
 function startBout(i){
   if(G.state==='splash') splashHold=false; /* a bout started by a probe from the splash, which the interface cannot do */
   musicMoodSet('card'); if($('splash')) $('splash').hidden=true; audOut=false; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
-  G.fightVoiced=false; G.autoTaken=false; G.blockLatch=false; P.bot=null; G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i],G.pass2?i:-1); if(G.train) cfg.foe=L('train_dummy');
+  G.fightVoiced=false; G.autoTaken=false; G.assisted=false; G.blockLatch=false; P.bot=null; G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i],G.pass2?i:-1); if(G.train) cfg.foe=L('train_dummy');
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
   resetFighter(E,2.3,-Math.PI/2,cfg.hp);
@@ -3173,7 +3181,7 @@ function simTick(){
   let Ip=live?playerIntent():IDLE;
   if(live&&autoOn&&!G.autoTaken){
     if(Ip.mx||Ip.mz||Ip.jab||Ip.heavy||Ip.dodge||Ip.block) G.autoTaken=true; /* touch, pad or a key held from before */
-    else Ip=botIntent(P,E,dt,diff);
+    else { Ip=botIntent(P,E,dt,diff); G.assisted=true; }   /* the AI played: no medals for this bout */
   }
   const Ie=live?(G.train?{mx:0,mz:0,jab:false,heavy:false,block:!!G.trainBlock,dodge:false}:aiIntent(E,P,dt)):IDLE;   /* the training dummy never moves or attacks; his guard is a switch */
   P.prev.copyFrom(P.pos); E.prev.copyFrom(E.pos);
