@@ -70,6 +70,7 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .bar i{background:var(--tape);transition:width .1s}
 .right .bar i{background:var(--stain)}
 .bar i.st{background:#8fb9a8}
+.right .bar i.st{background:#8fb9a8}   /* the foe's stamina reads like yours, not like his red health */
 .round{font:600 11px/1 var(--f-data);letter-spacing:.18em;padding:3px;background:repeating-linear-gradient(-45deg,var(--tape) 0 8px,#111 8px 16px)}
 .round span{display:block;padding:5px 10px;background:#111;color:var(--tape);white-space:nowrap}
 .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
@@ -78,8 +79,25 @@ body{margin:0;background:var(--floor);color:var(--paper);font-family:var(--f-bod
 .keys kbd.on{background:var(--tape);color:#111;border-color:var(--tape)}
 .bar i.st.deny{background:var(--stain);animation:deny .25s}
 @keyframes deny{0%,60%{opacity:.35}30%,100%{opacity:1}}
+.lowHp{position:absolute;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 42%,rgba(176,24,16,.6) 100%);animation:lowpulse 1.1s ease-in-out infinite}   /* under 25 percent health */
+.lowHp[hidden]{display:none}
+.trainStrip{position:absolute;z-index:2;top:84px;left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 24px);pointer-events:none}
+.trainStrip[hidden]{display:none}
+.trainStrip .chip{font:600 11px/1 var(--f-data);letter-spacing:.1em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:1.5px solid var(--paper);padding:6px 8px}
+.trainStrip .chip.no{opacity:.4;text-decoration:line-through}
+.trainStrip .bind{pointer-events:auto;background:var(--paper)}
+.is-touch .trainStrip{top:150px}
+@media (max-height:520px){ .is-touch .trainStrip{top:84px} }   /* on its side the picture is short: keep the strip under the bars, off the fighters */
+.reduce-motion .lowHp{animation:none;opacity:.55}
+@keyframes lowpulse{0%,100%{opacity:.25}50%{opacity:.85}}
 .snd{pointer-events:auto;font:600 11px var(--f-data);letter-spacing:.12em;text-transform:uppercase;background:rgba(10,10,11,.55);color:var(--paper);border:1px solid var(--mute);padding:7px 10px;cursor:pointer}
 .is-touch .keys{display:none}
+/* touch: a control a thumb has to hit is at least 44 px high (WCAG 2.5.5, Apple's guideline); a row that is a label is the whole target */
+.is-touch .bind,.is-touch .btn2,.is-touch .snd,.is-touch .tutor button,.is-touch .pauseCard button,.is-touch .pauseCard label,.is-touch .tuneRow,.is-touch select,.is-touch input[type=range]{min-height:44px;box-sizing:border-box}
+.is-touch .bind,.is-touch .btn2,.is-touch .snd{display:inline-flex;align-items:center;justify-content:center}
+.is-touch .pauseCard button,.is-touch .pauseCard label{display:flex;align-items:center;gap:8px}
+.is-touch .tuneRow input[type=checkbox],.is-touch .pauseCard input[type=checkbox]{width:22px;height:22px;flex:none}
+.is-touch .go{position:sticky;bottom:10px;z-index:3}   /* the settings rows grew to 44 px: Start stays on screen while they scroll */
 .is-touch .snd{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:calc(76px + env(safe-area-inset-top,0px));padding:5px 8px;font-size:10px}
 .snd:focus-visible,.go:focus-visible,.btn2:focus-visible,.tb:focus-visible,.bind:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
 
@@ -132,8 +150,8 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .tutor{position:absolute;left:50%;bottom:max(24px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(460px,calc(100% - 32px));background:#0a0a0b;color:var(--paper);border:2px solid var(--tape);padding:10px 12px;display:flex;gap:12px;align-items:center;justify-content:space-between;pointer-events:auto;z-index:4}
 .tutor p{margin:0;font:600 14px/1.35 var(--f-data)}
 .tutor button{font:800 14px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:var(--tape);color:#111;border:0;padding:10px 12px;cursor:pointer}
-.pause{position:absolute;inset:0;display:grid;place-items:center;background:rgba(8,8,9,.55);z-index:5}
-.pauseCard{width:min(360px,calc(100% - 32px));background:var(--paper);color:var(--ink);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:8px 8px 0 var(--tape)}
+.pause{position:absolute;inset:0;display:flex;background:rgba(8,8,9,.55);z-index:5;overflow-y:auto}   /* flex and a card with margin:auto: centred when it fits, scrollable from the top when it does not */
+.pauseCard{margin:auto;width:min(360px,calc(100% - 32px));background:var(--paper);color:var(--ink);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:8px 8px 0 var(--tape)}
 .pauseHint{margin:0;font:600 13px/1.35 var(--f-body);background:var(--tape);color:var(--ink);padding:6px 8px}
 .pauseCard h2{margin:0;font:800 36px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
 .pauseCard button,.pauseCard label{font:600 13px/1 var(--f-data);letter-spacing:.06em;text-transform:uppercase}
@@ -141,6 +159,10 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .pause[data-mode=menu] #restart{display:none}
 .cardMenu{align-self:flex-start;margin:10px 20px 0}
 .pauseCard button.quiet{background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:10px 12px}
+@media (max-height:520px){   /* a phone on its side: the pause card goes two columns so 44 px rows still fit */
+  .pauseCard{width:min(640px,calc(100% - 32px));display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+  .pauseCard h2,.pauseCard .pauseHint{grid-column:1/-1}
+}
 .wrap.dossier{place-items:center end;padding-right:clamp(16px,6vw,96px);background:linear-gradient(to left,rgba(8,8,9,.74),rgba(8,8,9,.12) 64%)}
 .wrap.dossier .card{margin:auto 0 auto auto;max-height:calc(100% - 24px);overflow:auto}
 .wrap.dossier .go{position:sticky;bottom:8px;z-index:1}
@@ -148,6 +170,7 @@ dl.rows dd{margin:0;min-width:0;overflow-wrap:anywhere}
 @media (max-aspect-ratio:1/1){.wrap.dossier{place-items:end center;padding:0;overflow:hidden;background:linear-gradient(to top,rgba(8,8,9,.7) 50%,rgba(8,8,9,0) 62%)}.wrap.dossier .card{margin:0;width:100%;max-height:56vh;overflow:auto}}
 .splash{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at center,rgba(8,8,9,.55),rgba(8,8,9,.92) 78%);text-align:center}
 .splash[hidden]{display:none}
+.splash.loading .spPlay,.splash.loading .spCredits{visibility:hidden}   /* until the script has run there is nothing to press */
 .splash::before{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;pointer-events:none;opacity:.55;
   background:linear-gradient(to top,rgba(255,45,149,.22),rgba(255,45,149,0) 70%),
   repeating-linear-gradient(90deg,rgba(255,45,149,.55) 0 1px,transparent 1px 70px),repeating-linear-gradient(0deg,rgba(255,45,149,.45) 0 1px,transparent 1px 34px);
@@ -191,6 +214,8 @@ dl.rows dd a{color:inherit}
 <div id="app" role="main">
   <canvas id="view" tabindex="0" aria-label="Fight arena, 3D view"></canvas>
 
+  <div class="trainStrip" id="trainStrip" hidden><span class="chip" data-m="jab">Jab 10</span><span class="chip" data-m="heavy">Heavy 24</span><span class="chip" data-m="dodge">Dodge 16</span><button class="bind" id="trainBlock" type="button" aria-pressed="false">Dummy: stands</button></div>
+  <div class="lowHp" id="lowHp" hidden></div>
   <div class="hud" id="hud" hidden>
     <div class="bars">
       <div class="fighter left">
@@ -203,6 +228,7 @@ dl.rows dd a{color:inherit}
       <div class="fighter right">
         <div class="name" id="eName">Reyes</div>
         <div class="bar" role="img" aria-label="Opponent health"><b id="eGhost"></b><i id="eHp"></i></div>
+        <div class="bar thin" role="img" aria-label="Opponent stamina"><i class="st" id="eSt"></i></div>
       </div>
     </div>
     <div class="foot">
@@ -311,17 +337,19 @@ dl.rows dd a{color:inherit}
       <button class="btn2 cardMenu" id="cardMenu" type="button">Menu &middot; Esc</button>
       <div class="cardLinks" id="cardLinks" hidden>
         <button class="btn2" id="linkCredits" type="button">Credits</button>
+        <button class="btn2" id="linkTrain" type="button">Training</button>
         <button class="btn2" id="linkPractice" type="button" hidden>Practice</button>
         <button class="btn2" id="linkOut" type="button">Clock out</button>
       </div>
     </article>
   </div>
 
-  <div class="splash" id="splash" hidden>
+  <div class="splash loading" id="splash">   <!-- shown from the first paint: the scripts below take a while to parse, and the page used to be blank until they had -->
     <div class="splashIn">
       <div class="kick" id="spKick">Halvorsen Freight &middot; Form 7-B</div>
       <h1 id="spTitle">Sublevel Three</h1>
-      <p class="note" id="spNote" aria-live="polite"></p>
+      <p class="note" id="spNote" aria-live="polite">Loading&hellip;</p>
+      <noscript><style>#spNote{display:none}</style><p class="note">Sublevel Three needs JavaScript. Turn it on and reload the page.</p></noscript>
       <button class="spPlay" id="spPlay" type="button"><span id="spPlayTxt">Play</span><span aria-hidden="true">&rarr;</span></button>
       <button class="spCredits" id="spCredits" type="button">Credits</button>
     </div>
@@ -339,7 +367,7 @@ dl.rows dd a{color:inherit}
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-if(!window.BABYLON){ $('fail').hidden=false; $('wrap').hidden=true; return; }
+if(!window.BABYLON){ $('fail').hidden=false; $('wrap').hidden=true; $('splash').hidden=true; return; }
 const B=BABYLON, V3=B.Vector3, C3=B.Color3;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 const num=(x,lo,hi,def)=>{ x=Number(x); return Number.isFinite(x)?clamp(x,lo,hi):def; };   /* a number read from storage or a setting: NaN and Infinity give def */
@@ -404,6 +432,13 @@ const STR={
   banner_ko:{en:'K.O.',it:'K.O.'},
   banner_down:{en:'DOWN',it:'A TERRA'},
   row_perfect:{en:'Perfect',it:'Perfetto'},
+  row_medals:{en:'Medals',it:'Medaglie'},
+  row_medal_goal:{en:'To earn',it:'Da ottenere'},
+  medal_untouched:{en:'Untouched',it:'Intatto'},
+  medal_sharp:{en:'Sharp',it:'Preciso'},
+  medal_quick:{en:'Quick',it:'Rapido'},
+  medal_none:{en:'none this time',it:'nessuna stavolta'},
+  medal_goal:{en:'no hit taken · {p}% of punches landed · won in under {s} s',it:'nessun colpo subito · {p}% dei pugni a segno · vinto in meno di {s} s'},
   row_save:{en:'Saving',it:'Salvataggio'},
   save_failed:{en:'Not saved: this browser blocks storage, so the win is lost when you close the page.',it:'Non salvato: il browser blocca la memoria, quindi la vittoria si perde alla chiusura della pagina.'},
   perfect_v:{en:'You took no hits.',it:'Non hai preso colpi.'},
@@ -536,6 +571,16 @@ const STR={
   tutor_touch:{en:'Stick moves. Tap Jab or Heavy. Hold Block. Tap Dodge.',it:'Il joystick muove. Tocca Diretto o Potente. Tieni Para. Tocca Schiva.'},
   key_space:{en:'Space',it:'Spazio'},
   practice_btn:{en:'Practice',it:'Allenamento'},
+  train_link:{en:'Training',it:'Palestra'},
+  train_stamp:{en:'Training room',it:'Palestra'},
+  train_title:{en:'The dummy',it:'Il manichino'},
+  train_note:{en:'He never hits back and cannot be knocked out. Try every move. The strip shows what each costs in stamina, and a move you cannot afford is struck through. Switch his guard on to see a block.',it:'Non risponde e non va K.O. Prova ogni mossa. La barra mostra quanta resistenza costa ciascuna, e una mossa che non puoi permetterti è barrata. Attiva la sua guardia per vedere una parata.'},
+  train_costs:{en:'Stamina per move',it:'Resistenza per mossa'},
+  train_dummy:{en:'Dummy',it:'Manichino'},
+  train_label:{en:'TRAINING',it:'PALESTRA'},
+  train_stands:{en:'Dummy: stands',it:'Manichino: fermo'},
+  train_blocks:{en:'Dummy: blocks',it:'Manichino: para'},
+  train_key:{en:'T toggles his guard',it:'T attiva la sua guardia'},
   practice_stamp:{en:'Practice',it:'Allenamento'},
   practice_note:{en:'Practice: no progress changes.',it:'Allenamento: i progressi non cambiano.'},
   practice_next:{en:'Another opponent',it:'Altro avversario'},
@@ -570,6 +615,8 @@ const STR={
   aria_hp:{en:'Your health',it:'La tua salute'},
   aria_st:{en:'Your stamina',it:'La tua resistenza'},
   aria_ehp:{en:'Opponent health',it:"Salute dell'avversario"},
+  aria_est:{en:'Opponent stamina',it:"Resistenza dell'avversario"},
+  word_dodge:{en:'DODGE',it:'SCHIVATA!'},
   aria_view:{en:'Fight arena, 3D view',it:'Arena di combattimento, vista 3D'},
   word_blok:{en:'BLOK',it:'PARA!'},
   kw_move:{en:'move',it:'muovi'},
@@ -656,7 +703,7 @@ function paintLang(){
   const first=(id,k)=>{ const el=$(id)&&$(id).parentNode; if(el&&el.firstChild&&el.firstChild.nodeType===3) el.firstChild.textContent=L(k)+' '; };
   if($('cardAssist')&&$('cardAssist').hidden) set('cardAssist','assist_btn'); set('noGLTitle','gl_none_title'); set('noGLBody','gl_none_body'); set('noGLBtn','gl_reload');
   paintLog(); if(!logArmed) set('logClear','log_clear');
-  set('linkPractice','practice_btn');
+  set('linkPractice','practice_btn'); set('linkTrain','train_link'); paintTrain();
   set('tutorGo','got_it'); set('avLbl','fighter_lbl'); set('glbLbl','glb_load'); set('avReset','av_reset'); set('dropHint','drop_hint'); set('fail','fail_msg');
   if($('avReset')&&$('avReset').hidden) set('avName','av_placeholder');
   { const h=$('avHint'); if(h&&(h.textContent===STR.av_hint.en||h.textContent===STR.av_hint.it)) h.textContent=L('av_hint'); }
@@ -665,13 +712,13 @@ function paintLang(){
   document.querySelectorAll('[data-diff]').forEach(b=>{ b.textContent=L('diff_'+b.dataset.diff); });
   document.querySelectorAll('.tb[data-act]').forEach(b=>{ b.textContent=L('act_'+b.dataset.act); });
   document.querySelectorAll('[data-bind]').forEach(b=>{ if(b.firstChild&&b.firstChild.nodeType===3) b.firstChild.textContent=L('act_'+b.dataset.bind)+' '; });
-  { const A={pHp:'aria_hp',pSt:'aria_st',eHp:'aria_ehp'}; Object.keys(A).forEach(id=>{ const el=$(id); if(el&&el.parentNode) el.parentNode.setAttribute('aria-label',L(A[id])); }); }
+  { const A={pHp:'aria_hp',pSt:'aria_st',eHp:'aria_ehp',eSt:'aria_est'}; Object.keys(A).forEach(id=>{ const el=$(id); if(el&&el.parentNode) el.parentNode.setAttribute('aria-label',L(A[id])); }); }
   $('view').setAttribute('aria-label',L('aria_view')); if($('voiceSel')) $('voiceSel').setAttribute('aria-label',L('voice_lbl'));
   if(typeof paintAudio==='function') paintAudio();
   if(typeof paintBinds==='function') paintBinds();
   if(padOn) $('keys').innerHTML=padHtml();
   if(P&&G.bout!==undefined&&$('roundLbl')) $('roundLbl').textContent=roundText(G.bout);
-  if(WORDS.BLOK){ WORDS.BLOK.text=L('word_blok'); drawWords(); }
+  if(WORDS.BLOK){ WORDS.BLOK.text=L('word_blok'); if(WORDS.DODGE) WORDS.DODGE.text=L('word_dodge'); drawWords(); }
 }
 function boutPlace(c){ return L(c.placeKey); }
 function boutRole(c){ return L(c.roleKey); }
@@ -694,13 +741,14 @@ const UNLOCK_CHAIN=[
 ];
 const SAVE_KEY='sublevel-progress';
 /* The save carries a version, so a later build can change its shape without wiping what players have won. migrateProgress upgrades an older save one step at a time; a save from a newer build is kept exactly as it is. */
-const PROGRESS_VER=2;
-const progressDefaults=()=>({v:PROGRESS_VER,wins:0,outfit:'auditor',arena:0,dock:0,pass2:0});
+const PROGRESS_VER=3;
+const progressDefaults=()=>({v:PROGRESS_VER,wins:0,outfit:'auditor',arena:0,dock:0,pass2:0,medals:[0,0,0,0,0,0]});   /* medals: one bitmask per bout (see MEDAL), six bouts */
 function migrateProgress(p){
   if(!p||typeof p!=='object'||Array.isArray(p)) return progressDefaults();
   if(typeof p.v!=='number') p.v=0;
   if(p.v<1) p.v=1;   /* 0 to 1: Sprint 25 and older saves had no version field; the fields are the same */
   if(p.v<2){ if(typeof p.pass2!=='number') p.pass2=0; p.v=2; }   /* 1 to 2: the second pass counts the bouts cleared in it */
+  if(p.v<3){ if(!Array.isArray(p.medals)) p.medals=[0,0,0,0,0,0]; p.v=3; }   /* 2 to 3: medals per bout */
   return sanitizeProgress(p);
 }
 /* A hand-edited or damaged save must not reach the game as it is. Each known field keeps its value when it is the right kind and is put right when it is not
@@ -709,6 +757,7 @@ function sanitizeProgress(p){
   const n=(x,hi)=>Number.isFinite(x)?Math.floor(clamp(x,0,hi)):0;
   p.wins=n(p.wins,BOUTS.length); p.pass2=n(p.pass2,BOUTS.length); p.dock=n(p.dock,1); p.arena=n(p.arena,3);
   if(typeof p.outfit!=='string'||!Object.prototype.hasOwnProperty.call(OUTFITS,p.outfit)) p.outfit='auditor';
+  const md=Array.isArray(p.medals)?p.medals:[]; p.medals=[0,1,2,3,4,5].map(i=>Number.isInteger(md[i])&&md[i]>=0&&md[i]<=7?md[i]:0);   /* a bitmask of three medals: 0 to 7, anything else is 0 */
   return p;
 }
 let progress=progressDefaults();
@@ -1096,6 +1145,7 @@ function mergeStoredProgress(){
     if(ahead){ progress.wins=s.wins; if(typeof s.outfit==='string') progress.outfit=s.outfit; if(Number.isFinite(s.arena)) progress.arena=s.arena; }
     if(Number.isFinite(s.pass2)&&s.pass2>(progress.pass2||0)) progress.pass2=s.pass2;
     if(Number.isFinite(s.dock)&&s.dock>(progress.dock||0)) progress.dock=s.dock;
+    if(Array.isArray(s.medals)) progress.medals=progress.medals.map((m,i)=>(m|0)|((s.medals[i]|0)&7));   /* a medal earned in another tab stays earned */
     if(ahead) applyArena(progress.arena);
   }catch(e){}
 }
@@ -1179,12 +1229,12 @@ function buildParticles(){
 /* comic words */
 const WORDS={}, fxList=[];
 function buildWords(){
-  [['POW','#f0c400'],['WHAM','#f0c400'],['BLOK','#8fb9d9'],['KO','#d0432b']].forEach(w=>{
+  [['POW','#f0c400'],['WHAM','#f0c400'],['BLOK','#8fb9d9'],['DODGE','#8fb9a8'],['KO','#d0432b']].forEach(w=>{
     const tex=new B.DynamicTexture('w'+w[0],{width:512,height:320},scene,true); tex.hasAlpha=true;
     const p=B.MeshBuilder.CreatePlane('word'+w[0],{width:2.24,height:1.4},scene);
     p.billboardMode=B.Mesh.BILLBOARDMODE_ALL; p.isPickable=false; p.setEnabled(false);
     const m=new B.StandardMaterial('wm'+w[0],scene); m.emissiveTexture=tex; m.opacityTexture=tex; m.disableLighting=true; m.backFaceCulling=false; m.fogEnabled=false; m.specularColor=new C3(0,0,0);
-    p.material=m; WORDS[w[0]]={tex,plane:p,color:w[1],text:w[0]==='KO'?'K.O.!':w[0]==='BLOK'?L('word_blok'):w[0]+'!'};
+    p.material=m; WORDS[w[0]]={tex,plane:p,color:w[1],text:w[0]==='KO'?'K.O.!':w[0]==='BLOK'?L('word_blok'):w[0]==='DODGE'?L('word_dodge'):w[0]+'!'};
   });
 }
 function drawWords(){
@@ -1221,6 +1271,12 @@ function updateFx(dt){
 /* ---------- sound ---------- */
 let ac=null, muted=false, unlock='';
 let volSfx=1, volMusic=1, volAmb=1;
+/* A safety limiter between the master bus and the speakers. A hit every 110 ms with the crowd up and the voice on read up to -0.4 dBFS on master
+   (tools/audio-sum-probe.mjs, seven runs, the loudest of four scenes -5.1 to -0.4), too close to clipping. A compressor at -3 dB with a ratio of 20 and no knee
+   leaves what is under it alone and holds a full-scale input to about -1 dBFS; the Web Audio compressor adds a fixed makeup gain of +1.71 dB at this setting
+   (measured offline), which LIMIT_TRIM takes back so that nothing under the threshold changes level. */
+const LIMIT={threshold:-3,knee:0,ratio:20,attack:.001,release:.12,trim:Math.pow(10,-1.71/20)};
+let limiter=null, limitOut=null;
 let master=null, sfxGain=null, musicGain=null, duckGain=null, roomGain=null, crowdGain=null, ambGain=null;
 let duck=1, duckT=0, bufs={}, gains={}, audioP=null;
 const PEAK={jab:.5012,jab2:.5012,jab3:.5012,heavy:.5012,heavy2:.5012,block:.5012,block2:.5012,ko:.5012,whoosh:.1995,ui:.2512,room:.02512,crowd:.0631,calm:.1259,calm2:.1259,tense:.1259,tense2:.1259,finish:.1259,hub:.1259,dock:.1259};
@@ -1271,7 +1327,9 @@ function audioInit(src){
   if(!ac) return Promise.resolve();
   if(ac.state==='suspended') ac.resume();
   if(!master){
-    master=ac.createGain(); master.connect(ac.destination);
+    master=ac.createGain();
+    limiter=ac.createDynamicsCompressor(); limiter.threshold.value=LIMIT.threshold; limiter.knee.value=LIMIT.knee; limiter.ratio.value=LIMIT.ratio; limiter.attack.value=LIMIT.attack; limiter.release.value=LIMIT.release;
+    limitOut=ac.createGain(); limitOut.gain.value=LIMIT.trim; master.connect(limiter); limiter.connect(limitOut); limitOut.connect(ac.destination);
     sfxGain=ac.createGain(); sfxGain.connect(master);
     musicGain=ac.createGain(); duckGain=ac.createGain();
     musicGain.connect(duckGain); duckGain.connect(master);
@@ -1966,6 +2024,10 @@ function makeFighter(L,isPlayer){
   mergeJoints(f.root);
   if(!isPlayer){
     f.alert=new B.TransformNode('alert',scene); f.alert.parent=head; f.alert.position.y=.62;
+    /* a dark rim around the mark: a bigger copy with its faces flipped, so only its far side draws (an inverted hull). The red alone measured 1.6 to 1 against the pale floor of bout 4. */
+    const rim=toon('#08080a',{e:0}); rim.disableLighting=true; rim.emissiveColor=new C3(.02,.02,.025);   // unlit: a lit dark grey read 0.1 on the pale floor
+    pp(box(.1,.34,.1),rim,f.alert,0,.1,0,{cast:false,keep:true,sx:2.1,sy:1.4,sz:2.1}).flipFaces(false);
+    pp(sph(.13),rim,f.alert,0,-.18,0,{cast:false,keep:true,sx:1.9,sy:1.9,sz:1.9}).flipFaces(false);
     pp(box(.1,.34,.1),toon('#ff2a1a',{e:1}),f.alert,0,.1,0,{cast:false,keep:true});
     pp(sph(.13),toon('#ff2a1a',{e:1}),f.alert,0,-.18,0,{cast:false,keep:true});
     f.alert.setEnabled(false);
@@ -2086,7 +2148,12 @@ function applyPose(f,dt){
     f.face.sweat.scaling.setAll(.35+mk*1.1);
   }
   if(f.avatar) f.avatar.anchor.rotation.y=P.twist*.5;
-  if(f.alert) f.alert.setEnabled((f.ai&&f.ai.tell>0)||(f.state==='attack'&&f.atk&&f.atk.type==='heavy'&&f.atk.t<f.atk.def.a0));
+  if(f.alert){
+    const on=!!((f.ai&&f.ai.tell>0)||(f.state==='attack'&&f.atk&&f.atk.type==='heavy'&&f.atk.t<f.atk.def.a0));
+    f.alert.setEnabled(on);
+    if(on&&!f._alertOn&&!f.isPlayer) cueTone('tell',240,520,.17,.1,'sawtooth');   /* the mark has a sound too: once, when it appears (render only) */
+    f._alertOn=on;
+  }
 }
 
 /* ---------- combat ---------- */
@@ -2124,7 +2191,7 @@ function strike(a,d,D){
   if(d.state==='ko') return;
   const mid=a.pos.add(d.pos).scale(.5); mid.y=1.25;
   if(a.isPlayer&&D.dmg<=10) G.log[d.inv>0?'jabDodge':d.state==='block'?'jabBlock':'jabHit']++;
-  if(d.inv>0){ if(d.isPlayer) G.log.dodges++; SFX.whoosh(); return; }
+  if(d.inv>0){ if(d.isPlayer) G.log.dodges++; SFX.whoosh(); cueTone('dodge',520,1040,.14,.16,'triangle'); fxWord('DODGE',mid); return; }
   const dir=d.pos.subtract(a.pos); dir.y=0; dir.normalize();
   if(d.isPlayer){ if(d.state==='block') G.log.blocks++; else G.log.hits++; }
   else if(a.isPlayer&&d.state!=='block') G.log.landed++;
@@ -2414,6 +2481,25 @@ function capLight(k,on){
   if(act==='move'){ const down=[...keys].some(q=>MOVE_KEYS.has(q)); kb.classList.toggle('on',down); } else kb.classList.toggle('on',on);
 }
 /* A press that cannot start (not enough stamina) says so: the stamina bar blinks and a low tick plays. */
+/* Short synthesised cues for things the samples do not cover. Render only: constants, no rng(), nothing the sim reads. name goes to MUS.log for the tests. */
+function cueTone(name,f0,f1,dur,gain,type,at){
+  if(splashHold||!ac||muted||!sfxGain) return;
+  if(MUS.log) MUS.log.push('cue:'+name);
+  const t=ac.currentTime+(at||0), o=ac.createOscillator(), g=ac.createGain();
+  o.type=type||'sine'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(gain,t+.01); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+dur+.03);
+}
+/* Under 25 percent health in a fight: a red edge to the picture (still, under less motion) and a slow double thump. */
+let heartT=0;
+function lowHealthCue(real){
+  const el=$('lowHp'); if(!el) return;
+  const low=!!P&&G.state==='fight'&&P.hp>0&&P.hp/P.maxHp<.25;
+  if(low===el.hidden) el.hidden=!low;
+  if(!low){ heartT=0; return; }
+  heartT-=real; if(heartT>0) return; heartT=.95;
+  cueTone('heart',72,44,.13,.2,'sine'); cueTone('heart',66,42,.11,.14,'sine',.17);
+}
 let denyT=0;
 function denyCue(){
   const now=performance.now(); if(now-denyT<250) return; denyT=now;
@@ -2450,6 +2536,7 @@ window.addEventListener('keydown',e=>{
   if(e.repeat) return;
   keys.add(k); capLight(k,true);
   const act=actionFor(k);
+  if(G.train&&k==='t'&&!act&&G.state==='fight'){ toggleDummy(); return; }   /* T switches the training dummy's guard, unless it is bound to a move */
   if(autoOn&&G.state==='fight'&&(act||MOVE_KEYS.has(k))) G.autoTaken=true;
   if(blockToggle&&G.state==='fight'){ if(act==='block') G.blockLatch=!G.blockLatch; else if(act) G.blockLatch=false; }
   if(act==='jab') buf.jab=INPUT.buf;
@@ -2655,6 +2742,7 @@ function closeMenu(){
 function restartBout(){
   if($('pause')) $('pause').hidden=true;
   G.retry=true;   /* a restart begins at full health, like Retry on the lose card; without it the bout started at the damaged health plus 35 */
+  if($('pauseHint')) $('pauseHint').hidden=true;   /* the pad-unplugged hint belongs to the pause it was shown in */
   startBout(G.bout||0);
 }
 /* Quit: leave the fight, the fullscreen and the sound, and show the splash. Wins are saved when they happen (grantWin), so nothing is lost.
@@ -2662,7 +2750,7 @@ function restartBout(){
 function toSplash(withNote){
   try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen(); else if(document.webkitFullscreenElement&&document.webkitExitFullscreen) document.webkitExitFullscreen(); }catch(e){}
   if($('pause')) $('pause').hidden=true; G.menuOpen=false; $('pause').dataset.mode='fight'; $('resume').textContent=L('resume_btn'); $('pauseTitle').textContent=L('pause_title'); wrapEl.hidden=true; hudEl.hidden=true; $('touch').hidden=true;
-  G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0; voiceCancel();
+  G.hitstop=0; G.shake=0; G.koSlow=0; keys.clear(); buf.jab=buf.heavy=buf.dodge=0; voiceCancel(); if($('pauseHint')) $('pauseHint').hidden=true;
   G.state='splash'; splashHold=true; audOut=true; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
   if(ac&&ac.state!=='closed'){ try{ ac.suspend(); }catch(e){} }
   $('spNote').textContent=withNote?L('out_saved_v').replace('{n}',progress.wins).replace('{m}',BOUTS.length):'';
@@ -2726,6 +2814,9 @@ let resetArmed=false, resetTimer=0;
 function resetProgress(){
   progress=progressDefaults();
   saveProgressData(true); applyArena(0); syncPlayerOutfit(); skinEnsure(P);
+  /* the title card is still up and was drawn from the old save: take down what it offered (Practice, Continue) and the loss count */
+  G.loss=null; if($('linkPractice')) $('linkPractice').hidden=true;
+  if(G.state==='card'&&G.lastCard&&G.lastCard.assist){ G.lastCard.assist=null; if($('cardAssist')) $('cardAssist').hidden=true; }
 }
 function onResetClick(){
   const b=$('resetBtn'); if(!b) return;
@@ -2809,7 +2900,8 @@ function setW(id,pct){ pct=clamp(pct,0,100); if(cache[id]===undefined||Math.abs(
 function updateHud(){
   if(!P||!E) return;
   setW('pHp',P.hp/P.maxHp*100); setW('pGhost',P.hp/P.maxHp*100); setW('pSt',P.stam);
-  setW('eHp',E.hp/E.maxHp*100); setW('eGhost',E.hp/E.maxHp*100);
+  setW('eHp',E.hp/E.maxHp*100); setW('eGhost',E.hp/E.maxHp*100); setW('eSt',E.stam);
+  const ts=$('trainStrip'); if(ts){ const on=!!G.train&&(G.state==='fight'||G.state==='ready'||G.state==='pause'); if(ts.hidden===on) ts.hidden=!on; if(on) ts.querySelectorAll('.chip').forEach(c=>c.classList.toggle('no',P.stam<(MOVE_COST[c.dataset.m]||0))); }
   const cfg=E.cfg; let nm=cfg.foe;
   if(cfg.echo&&E.hp/E.maxHp<.35&&(G.t%1.4)<.14) nm='Auditor';
   if($('eName').textContent!==nm) $('eName').textContent=nm;
@@ -2868,6 +2960,21 @@ function showcaseOpponent(i){
   skinEnsure(E,skinLooks(i)[i]);
 }
 /* Practice: fight an opponent already beaten, with progress, unlocks and the save left alone. Opponents are cycled with the extra button; Esc or Back returns to the title card. */
+/* The training room: a dummy that stands (or holds his guard) and cannot be knocked out. It runs through Practice's flag, so nothing is saved or logged. */
+const MOVE_COST={get jab(){return ATK.jab.cost;},get heavy(){return ATK.heavy.cost;},dodge:16};   /* dodge: startDodge */
+function paintTrain(){
+  const b=$('trainBlock'); if(b){ b.textContent=L(G.trainBlock?'train_blocks':'train_stands'); b.setAttribute('aria-pressed',G.trainBlock?'true':'false'); }
+  document.querySelectorAll('#trainStrip .chip').forEach(c=>{ c.textContent=L('kw_'+c.dataset.m)+' '+MOVE_COST[c.dataset.m]; });
+}
+function toggleDummy(){ if(!G.train) return; G.trainBlock=!G.trainBlock; paintTrain(); }
+function trainingCard(){
+  showCard({stamp:L('train_stamp'),kick:L('company_kick'),title:L('train_title'),body:L('train_note'),
+    rows:[[L('train_costs'),['jab','heavy','dodge'].map(m=>L('kw_'+m)+' '+MOVE_COST[m]).join(' · ')],[L('row_tip'),L('train_key')]],
+    btn:L('bout_btn'),go:()=>{ G.practice=true; G.train=true; G.trainBlock=false; paintTrain(); maybeAutoFullscreen(); startBout(0); },
+    back:{label:L('back_btn'),go:()=>titleCard()}});
+}
+if($('linkTrain')) $('linkTrain').addEventListener('click',()=>{ audioInit('click'); SFX.ui(); trainingCard(); });
+if($('trainBlock')) $('trainBlock').addEventListener('click',toggleDummy);
 function practiceCard(i){
   const n=Math.min(progress.wins,BOUTS.length); if(n<1){ titleCard(); return; }
   i=((i%n)+n)%n; const c=BOUTS[i]; showcaseOpponent(i);
@@ -2898,7 +3005,7 @@ function pass2WinCard(){
     rows,btn:last?L('back_btn'):L('pass2_next'),go:()=>{ if(last) titleCard(); else pass2Card(i+1); },mood:'win'}); voiceSay(perfect?'perfect':'win',.45);
 }
 function introCard(i,lead){
-  G.practice=false; G.pass2=false;
+  G.practice=false; G.pass2=false; G.train=false;
   const c=BOUTS[i]; showcaseOpponent(i);
   showCard({stamp:L('bout_stamp')+' '+(i+1)+' / '+BOUTS.length,kick:lead||L('company_kick'),title:c.foe,body:boutPlace(c)+' · '+boutRole(c)+'. '+L(c.introKey),
     rows:dossierRows(c),btn:L('bout_btn'),showcase:true,mood:'dossier',moodArg:i,go:()=>{ maybeAutoFullscreen(); startBout(i); }});
@@ -2914,16 +3021,16 @@ function continueAction(){
   return {label:L('continue_btn')+' '+(w+1)+' · '+BOUTS[w].foe,go:()=>{ if(w>=2) dockMission(()=>hubCard(w)); else hubCard(w); }};
 }
 function titleCard(){
-  G.practice=false; G.pass2=false;
+  G.practice=false; G.pass2=false; G.train=false;
   $('linkPractice').hidden=!(progress.wins>0);
   showCard({stamp:L('card_title_stamp'),kick:L('company_form'),title:L('card_title_name'),
     body:L('card_title_body'),rows:titleRows(),avatar:true,links:true,btn:L('card_title_btn'),go:()=>introCard(0),assist:continueAction()});
 }
 function hubCard(nextIdx){
-  G.practice=false; G.pass2=false;
+  G.practice=false; G.pass2=false; G.train=false;
   const n=BOUTS[nextIdx];
   showCard({stamp:L('hub_stamp'),kick:L('company_kick'),title:L('hub_title'),body:L('hub_body'),
-    rows:[[L('row_rules'),L('rule_1')+' · '+L('rule_2')+' · '+L('rule_3')],[L('row_hub_next'),boutPlace(n)+' · '+n.foe],[L('row_opp'),n.foe+' · '+boutRole(n)],[L('row_tip'),boutTip(n)]],
+    rows:[[L('row_rules'),L('rule_1')+' · '+L('rule_2')+' · '+L('rule_3')],[L('row_hub_next'),boutPlace(n)+' · '+n.foe],[L('row_opp'),n.foe+' · '+boutRole(n)],[L('row_tip'),boutTip(n)],[L('row_medals'),medalCount()+' / '+BOUTS.length*3],[L('row_medal_goal'),medalGoals(nextIdx)]],
     btn:L('hub_btn'),go:()=>introCard(nextIdx)});
 }
 function dockMission(next){
@@ -2935,10 +3042,26 @@ function showFinalCard(){
   showCard({stamp:L('final_stamp'),kick:L('final_kick'),title:L('final_title'),body:L('final_body'),
     rows:[[L('row_next'),L('final_next')],[L('row_you'),fightLine()],[L('row_punches'),punchLine()]],btn:L('final_btn'),go:()=>{ G.bout=0; titleCard(); }});
 }
+/* Medals: up to three per bout, earned in a first-pass win (not Practice, the training room or the second pass) and kept in progress.medals.
+   Untouched: no hit taken. Sharp: at least MEDAL_SHARP of the punches landed (and at least five thrown). Quick: won within MEDAL_QUICK_S[bout] seconds, counted as the result card counts them.
+   The numbers come from balance-run (bot at Normal, 200 fights, seeds 1 and 7): the bot's quickest quarter of wins was 26, 31, 40, 46.8, 38.9 and 39.8 s (25.3 to 47.5 across the two seeds); it lands 70 to 96 percent of its punches and never wins
+   without taking a hit. There is no human data yet: the playtest log is where to tune them. */
+const MEDAL={untouched:1,sharp:2,quick:4}, MEDAL_SHARP=.85, MEDAL_QUICK_S=[26,31,40,46,38,39];
+function medalsEarned(i){
+  const g=G.log||{}; let m=0;
+  if(g.hits===0) m|=MEDAL.untouched;
+  if((g.thrown||0)>=5&&g.landed/g.thrown>=MEDAL_SHARP) m|=MEDAL.sharp;
+  if((g.time||0)<=MEDAL_QUICK_S[i]) m|=MEDAL.quick;
+  return m;
+}
+const medalText=m=>['untouched','sharp','quick'].filter(k=>m&MEDAL[k]).map(k=>L('medal_'+k)).join(' · ')||L('medal_none');
+const medalGoals=i=>L('medal_goal').replace('{p}',Math.round(MEDAL_SHARP*100)).replace('{s}',MEDAL_QUICK_S[i]);
+const medalCount=()=>progress.medals.reduce((n,m)=>n+((m&1)+((m>>1)&1)+((m>>2)&1)),0);
 function winCard(){
   const i=G.bout, next=i+1, uLabel=unlockLabel(i);
+  const medals=medalsEarned(i); progress.medals[i]=(progress.medals[i]|0)|medals;
   const saved=grantWin(i);
-  const rows=[[L('row_you'),fightLine()],[L('row_punches'),punchLine()]], perfect=!!(G.log&&G.log.hits===0);
+  const rows=[[L('row_you'),fightLine()],[L('row_punches'),punchLine()],[L('row_medals'),medalText(medals)+' ('+medalCount()+' / '+BOUTS.length*3+')']], perfect=!!(G.log&&G.log.hits===0);
   if(perfect) rows.unshift([L('row_perfect'),L('perfect_v')]);
   if(uLabel) rows.unshift([L('row_unlock'),uLabel]);
   if(next<BOUTS.length) rows.unshift([L('row_next'),boutPlace(BOUTS[next])]);
@@ -2953,11 +3076,11 @@ function winCard(){
 }
 
 /* ---------- flow ---------- */
-const roundText=i=>L('bout_stamp').toUpperCase()+' '+(i+1)+' / '+BOUTS.length+(G.pass2?' · II':'');
+const roundText=i=>G.train?L('train_label'):L('bout_stamp').toUpperCase()+' '+(i+1)+' / '+BOUTS.length+(G.pass2?' · II':'');
 function startBout(i){
   if(G.state==='splash') splashHold=false; /* a bout started by a probe from the splash, which the interface cannot do */
   musicMoodSet('card'); if($('splash')) $('splash').hidden=true; audOut=false; G.showcase=null; wrapEl.classList.remove('dossier'); if(P) P.root.setEnabled(true);
-  G.fightVoiced=false; G.autoTaken=false; G.blockLatch=false; P.bot=null; G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i],G.pass2?i:-1);
+  G.fightVoiced=false; G.autoTaken=false; G.blockLatch=false; P.bot=null; G.bout=i; resetLog(); syncPlayerOutfit(); applyEnv(i); const cfg=scaleCfg(BOUTS[i],G.pass2?i:-1); if(G.train) cfg.foe=L('train_dummy');
   disposeFighter(E);
   E=makeFighter(LOOKS[cfg.look],false); E.cfg=cfg; E.speed0=cfg.speed; E.reach=cfg.reach; E.dmgMul=cfg.dmg;
   resetFighter(E,2.3,-Math.PI/2,cfg.hp);
@@ -3039,10 +3162,10 @@ function simTick(){
     if(Ip.mx||Ip.mz||Ip.jab||Ip.heavy||Ip.dodge||Ip.block) G.autoTaken=true; /* touch, pad or a key held from before */
     else Ip=botIntent(P,E,dt,diff);
   }
-  const Ie=live?aiIntent(E,P,dt):IDLE;
+  const Ie=live?(G.train?{mx:0,mz:0,jab:false,heavy:false,block:!!G.trainBlock,dodge:false}:aiIntent(E,P,dt)):IDLE;   /* the training dummy never moves or attacks; his guard is a switch */
   P.prev.copyFrom(P.pos); E.prev.copyFrom(E.pos);
   step(P,E,Ip,dt); if(P.started&&buf[P.started]!==undefined) buf[P.started]=0;
-  step(E,P,Ie,dt);
+  step(E,P,Ie,dt); if(G.train) E.hp=E.maxHp;
   resolveBodies();
   if(live) noteCorner(SIM);
   if(G.state==='ko'){ G.koTimer-=dt; if(G.koTimer<=0){ G.state='card'; afterKO(); } }
@@ -3066,7 +3189,7 @@ function frame(){
   const a=Math.max(0,acc/SIM);
   simShow(P,a); simShow(E,a);
   if(SKIN.on){ updateSkin(P,real); updateSkin(E,real); }
-  updateFx(real); updateAmbient(dt); updateCamera(dt,real); updateHud();
+  updateFx(real); updateAmbient(dt); updateCamera(dt,real); updateHud(); lowHealthCue(real);
 }
 
 /* ---------- custom avatar (GLB) ---------- */
@@ -3541,7 +3664,7 @@ fontsDone();
 if(document.fonts&&document.fonts.load){
   Promise.all([document.fonts.load('800 40px "Big Shoulders Stencil Display"'),document.fonts.load('600 20px "IBM Plex Mono"')]).then(fontsDone).catch(()=>{});
 }
-wrapEl.hidden=true; hudEl.hidden=true; G.state='splash'; $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus({preventScroll:true}); }catch(e){} },60);
+wrapEl.hidden=true; hudEl.hidden=true; G.state='splash'; $('splash').classList.remove('loading'); $('spNote').textContent=''; $('splash').hidden=false; setTimeout(()=>{ try{ $('spPlay').focus({preventScroll:true}); }catch(e){} },60);
 const SKILL={easy:1.45,normal:1,hard:.72};
 const DIFF={
   easy:{hp:.85,speed:.92,react:1.18,dmg:.88,guard:.75,cd:1.12},
@@ -3696,7 +3819,7 @@ function simMeet(opt){
         if(G.state!=='fight') break;
       }
       rows.push({win:G.winner===P,t:Math.round(real*10)/10,empty:real?empty/real:0,gap:Math.round(maxGap*10)/10,ko:G.state==='ko',ehp:Math.max(0,Math.round(E.hp)),php:Math.max(0,Math.round(P.hp)),
-        hits:G.log.hits,blocks:G.log.blocks,dodges:G.log.dodges,corner:G.log.corner,jh:G.log.jabHit,jb:G.log.jabBlock,jd:G.log.jabDodge});
+        hits:G.log.hits,blocks:G.log.blocks,dodges:G.log.dodges,corner:G.log.corner,jh:G.log.jabHit,jb:G.log.jabBlock,jd:G.log.jabDodge,th:G.log.thrown,ld:G.log.landed,lt:G.log.time});
     }
     const lens=rows.map(r=>r.t).sort((a,b)=>a-b);
     const empty=rows.reduce((s,r)=>s+r.empty,0)/n;
@@ -3714,6 +3837,10 @@ function simMeet(opt){
       blocks:Math.round(rows.reduce((s,r)=>s+r.blocks,0)/n*10)/10,
       dodges:Math.round(rows.reduce((s,r)=>s+r.dodges,0)/n*10)/10,
       corner:Math.round(rows.reduce((s,r)=>s+r.corner,0)/n*10)/10,
+      accuracy:(()=>{ const t=rows.reduce((s,r)=>s+r.th,0), l=rows.reduce((s,r)=>s+r.ld,0); return t?Math.round(l/t*1000)/10:0; })(),   /* % of the bot's punches that landed */
+      winMedian:(()=>{ const w=rows.filter(r=>r.win).map(r=>r.lt).sort((a,b)=>a-b); return w.length?Math.round(w[Math.floor(w.length/2)]*10)/10:0; })(),   /* median seconds of the fights the bot won, counted as the result card counts them (G.log.time) */
+      winP25:(()=>{ const w=rows.filter(r=>r.win).map(r=>r.lt).sort((a,b)=>a-b); return w.length?Math.round(w[Math.floor(w.length/4)]*10)/10:0; })(),
+      noHitWins:Math.round(rows.filter(r=>r.win&&r.hits===0).length/n*1000)/10,   /* % of fights the bot won without taking a hit */
       jabAnswered:(()=>{ const h=rows.reduce((s,r)=>s+r.jh,0), a=rows.reduce((s,r)=>s+r.jb+r.jd,0); return h+a?Math.round(a/(h+a)*1000)/10:0; })()   /* % of the player's jabs that reached the foe and were blocked or dodged */
     });
   }
@@ -4025,7 +4152,7 @@ function poseStill(kind){
   else { E.state='hit'; E.hitSide=-1; E.stunT=.5; E.stunMax=.55; E.P={}; }
   return kind;
 }
-window.__sublevel={JAB_READ,step,aiIntent,resolveBodies,crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
+window.__sublevel={JAB_READ,step,aiIntent,resolveBodies,crashProbe:{frame:()=>engine.runRenderLoop(function boom(){ engine.stopRenderLoop(boom); throw new Error('test crash in frame'); }),timer:()=>setTimeout(()=>{ throw new Error('test crash in timer'); },0),promise:()=>{ Promise.reject(new Error('test crash in promise')); },reset:()=>{ crashed=false; $('noGL').hidden=true; }},buf,strike,ATK,binds,intent:()=>playerIntent(),pass2Card,PASS2_MODS,scaleCfg,setMoveCaps,G,CAM,SKIN,INPUT,MIX,STR,practiceCard,logRead,logFight,logJson,fightLine,tutorLine,setBlockToggle,diffNow:()=>diff,voiceSay,voicePick,voiceClipsInit,voiceFillList,setAutoOn,autoState:()=>({on:autoOn,taken:!!G.autoTaken}),musicMood:()=>MUS.mood,CROWD,crowd,introCard,titleCard,hubCard,showFinalCard,dockMission,BOUTS,play:playGame,toSplash,audioGraph:()=>({ac,master,limiter,limitOut,LIMIT,sfxGain,musicGain,roomGain,crowdGain,ambGain,BED,MUS,voices:()=>({snare:vSnare,kick:vKick,hat:vHat})}),skinLite,ENV,applyEnv,get envIdx(){return envIdx;},skinOn,skinFighter,randomLook,skinLooks,FLOOR_MIN,lookDeltas,lookOk,lookClash,lookSlots,colorDelta,LOOK_MIN,LOOK_UNIQUE,seed:s=>{ rng=mulberry32(s); },startBout,get P(){return P;},get E(){return E;},useAvatar,simMeet,probeAI,poseProbe,poseStill,audioReady:()=>audioInit(),audioState,audioMetrics,audioTick,setAudio,notePad:()=>audioInit('pad'),setUnlock:(v)=>{ unlock=v||''; },hit:()=>SFX.jab(),shakeMul,setLessMotion,pauseFight,resumeFight,restartBout,tutorInfo,setLang,storyMetrics,saveProbe,hubProbe,get progress(){return progress;},qaEndBout,qaClickGo,qaResetProgress,maybeAutoFullscreen,fullscreenProbe};
 })();
 </script>
 </body>

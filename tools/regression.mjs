@@ -607,6 +607,209 @@ async function runHttpSuite(cdp) {
     return r;
   });
 
+  await test("reset_restart_and_quit_leave_no_stale_state", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      $("wrap").hidden = true; S.qaResetProgress(); S.progress.wins = 3; S.titleCard(); await sleep(150);
+      o.offeredBefore = !$("linkPractice").hidden && !$("cardAssist").hidden;
+      G.loss = { bout: 1, n: 3 };
+      $("resetBtn").click(); $("resetBtn").click(); await sleep(100);
+      o.winsCleared = S.progress.wins === 0;
+      o.practiceGone = $("linkPractice").hidden;
+      o.continueGone = $("cardAssist").hidden;
+      o.lossCleared = !G.loss;
+      /* the pad hint is cleared by Restart and by Quit, not only by Resume */
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight");
+      S.pauseFight(); $("pauseHint").textContent = "hint"; $("pauseHint").hidden = false;
+      S.restartBout(); o.restartClearsHint = $("pauseHint").hidden;
+      await __until(() => G.state === "fight" || G.state === "ready", "bout"); S.pauseFight(); $("pauseHint").hidden = false;
+      S.toSplash(true); o.quitClearsHint = $("pauseHint").hidden; S.play();
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("dodge_low_health_and_foe_stamina_cues", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, g = S.audioGraph(), $ = (i) => document.getElementById(i), o = {};
+      S.setAudio({ mute: false }); if (g.ac.state !== "running") { await g.ac.resume(); for (let i = 0; i < 20 && g.ac.state !== "running"; i++) await sleep(50); }
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.setLessMotion(false);
+      const cues = async (fn, ms = 0) => { g.MUS.log = []; fn(); if (ms) await sleep(ms); const l = g.MUS.log.filter((x) => String(x).startsWith("cue:")); g.MUS.log = null; return l; };
+      /* a dodge that works: one cue per evaded punch, none for a punch that lands, none when muted */
+      S.P.inv = 0.2; let l = await cues(() => S.strike(S.E, S.P, S.ATK.jab)); o.dodgeCue = l.join() === "cue:dodge";
+      S.P.inv = 0; S.P.state = "idle"; l = await cues(() => S.strike(S.E, S.P, S.ATK.jab)); o.noCueOnAHit = l.length === 0;
+      S.setAudio({ mute: true }); S.P.inv = 0.2; l = await cues(() => S.strike(S.E, S.P, S.ATK.jab)); o.mutedSilent = l.length === 0; S.setAudio({ mute: false }); S.P.inv = 0;
+      /* the foe's stamina bar follows E.stam */
+      S.E.stam = 40; await raf(); await raf(); o.foeStaminaBar = Math.abs(parseFloat($("eSt").style.width) - 40) < 1;
+      S.E.stam = 100;
+      /* low health: red edge and a double thump while under 25 percent; still (no animation) under less motion; none when healthy */
+      S.P.hp = 80; await raf(); await raf(); o.healthyNoEdge = $("lowHp").hidden;
+      g.MUS.log = []; S.P.hp = 20; await raf(); await raf(); o.edgeShown = !$("lowHp").hidden && getComputedStyle($("lowHp")).animationName !== "none";
+      await sleep(1100); l = g.MUS.log.filter((x) => String(x).startsWith("cue:heart")); g.MUS.log = null; o.heartbeat = l.length >= 2 && l.length % 2 === 0;
+      S.setLessMotion(true); await raf(); o.stillUnderLessMotion = getComputedStyle($("lowHp")).animationName === "none"; S.setLessMotion(false);
+      S.setAudio({ mute: true }); g.MUS.log = []; await sleep(1100); o.heartMuted = g.MUS.log.filter((x) => String(x).startsWith("cue:")).length === 0; g.MUS.log = null; S.setAudio({ mute: false });
+      S.P.hp = 100; await raf(); await raf(); o.edgeGoes = $("lowHp").hidden;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("the_opponents_tell_has_a_sound", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, g = S.audioGraph(), $ = (i) => document.getElementById(i), o = {};
+      S.setAudio({ mute: false }); if (g.ac.state !== "running") { await g.ac.resume(); for (let i = 0; i < 20 && g.ac.state !== "running"; i++) await sleep(50); }
+      $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight");
+      S.E.ai.cd = 99;   /* the foe makes no tell of his own while the test holds the mark */
+      const tells = async (fn, frames = 6) => { g.MUS.log = []; fn(); for (let i = 0; i < frames; i++) await raf(); const l = g.MUS.log.filter((x) => x === "cue:tell"); g.MUS.log = null; return l.length; };
+      o.onceWhenItAppears = (await tells(() => { S.E.ai.tell = 5; }, 10)) === 1;       /* held on for 10 frames: still one sound */
+      S.E.ai.tell = 0; await raf(); await raf();
+      o.againForTheNext = (await tells(() => { S.E.ai.tell = 5; })) === 1;
+      S.E.ai.tell = 0; await raf(); await raf();
+      S.setAudio({ mute: true }); o.mutedSilent = (await tells(() => { S.E.ai.tell = 5; })) === 0; S.E.ai.tell = 0; S.setAudio({ mute: false }); await raf(); await raf();
+      /* the player's own heavy shows no mark and makes no sound */
+      o.playerNone = (await tells(() => { S.P.state = "attack"; S.P.atk = { type: "heavy", def: S.ATK.heavy, t: 0.05, done: true }; })) === 0; S.P.state = "idle"; S.P.atk = null;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("training_room_dummy_never_attacks_and_costs_are_shown", async () => {
+    const r = await cdp.eval(`(async () => {
+      const raf = () => new Promise((r) => requestAnimationFrame(r)), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const kd = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+      $("wrap").hidden = true; S.qaResetProgress(); S.setLang("en"); localStorage.removeItem("sublevel-log"); S.titleCard(); await sleep(150);
+      o.linkAtZeroWins = !$("linkTrain").hidden;                       /* no win needed, unlike Practice */
+      $("linkTrain").click(); await sleep(150);
+      o.cardUp = G.state === "card" && /dummy/i.test($("cTitle").textContent) && /10/.test($("cRows").textContent) && /24/.test($("cRows").textContent) && /16/.test($("cRows").textContent);
+      $("go").click(); await __until(() => G.state === "fight", "fight");
+      o.mode = G.train === true && G.practice === true && $("eName").textContent === "Dummy" && $("roundLbl").textContent === "TRAINING";
+      /* he stays put, never attacks, cannot be knocked out */
+      const E = S.E, P = S.P; let attacked = false, moved = 0; const x0 = E.pos.x;
+      let hits = 0;   /* a heavy every 0.4 s for 4 s: 10 blows, 160 damage against 70 hp, one at a time as in a fight */
+      for (let i = 0; i < 240; i++) { await raf(); if (i % 24 === 0) { E.state = "idle"; S.strike(P, E, S.ATK.heavy); hits++; } if (E.state === "attack") attacked = true; moved = Math.max(moved, Math.abs(E.pos.x - x0)); }
+      o.neverAttacks = !attacked; o.neverDies = E.hp === E.maxHp && E.state !== "ko" && G.state === "fight";
+      /* the strip shows the costs and strikes out what you cannot afford */
+      const chips = [...document.querySelectorAll("#trainStrip .chip")];
+      o.stripShown = !$("trainStrip").hidden && chips.map((c) => c.textContent).join("|") === "jab 10|heavy 24|dodge 16";
+      P.stam = 20; await raf(); await raf(); o.greyedHeavy = chips[1].classList.contains("no") && !chips[0].classList.contains("no") && !chips[2].classList.contains("no");
+      P.stam = 100; await raf(); await raf(); o.noneGreyedWhenRested = !chips.some((c) => c.classList.contains("no"));
+      /* his guard: off, a jab lands; on (button and T key), a jab is blocked */
+      const before = { ...G.log };
+      S.E.state = "idle"; S.strike(P, E, S.ATK.jab); o.standsTakesIt = G.log.jabHit === before.jabHit + 1;
+      $("trainBlock").click(); await sleep(120); o.buttonSwitches = G.trainBlock === true && $("trainBlock").getAttribute("aria-pressed") === "true";
+      await __until(() => E.state === "block", "the dummy raises his guard", 3000); const b1 = G.log.jabBlock; S.strike(P, E, S.ATK.jab); o.guardBlocks = G.log.jabBlock === b1 + 1;
+      kd("t"); o.keySwitchesBack = G.trainBlock === false;
+      /* nothing saved, nothing logged */
+      o.logUntouched = localStorage.getItem("sublevel-log") === null && S.progress.wins === 0;
+      /* leaving the room: the title card clears the mode and the strip */
+      $("wrap").hidden = true; S.titleCard(); await sleep(100); o.modeCleared = !G.train; S.pauseFight && 0;
+      return o; })()`, true);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("medals_are_earned_kept_and_never_given_for_practice", async () => {
+    const r = await cdp.eval(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
+      const stored = () => JSON.parse(localStorage.getItem("sublevel-progress"));
+      const fight = async (bout, log, flags = {}) => { $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); Object.assign(G, flags); Object.assign(G.log, log); const w = S.qaEndBout(true); await sleep(60); return { rows: $("cRows").textContent, title: $("cTitle").textContent, w }; };
+      S.setLang("en"); S.qaResetProgress();
+      o.freshHasMedals = Array.isArray(S.progress.medals) && S.progress.medals.length === 6 && S.progress.medals.every((m) => m === 0) && S.progress.v === 3;
+      /* an untouched, accurate, quick win: all three */
+      let f = await fight(0, { hits: 0, thrown: 10, landed: 9, time: 20 });
+      o.allThree = stored().medals[0] === 7 && /Untouched · Sharp · Quick/.test(f.rows) && f.rows.includes("3 / 18");
+      /* a worse win later keeps what was earned and shows none for itself */
+      f = await fight(0, { hits: 3, thrown: 10, landed: 4, time: 90 });
+      o.keptAndNoneThisTime = stored().medals[0] === 7 && /none this time/.test(f.rows);
+      /* each medal on its own, and the edges: 85 percent exactly, fewer than five punches, the time limit itself */
+      f = await fight(1, { hits: 2, thrown: 20, landed: 17, time: 99 }); o.sharpAtEightyFive = stored().medals[1] === 2;
+      f = await fight(2, { hits: 2, thrown: 4, landed: 4, time: 99 }); o.fewPunchesNotSharp = stored().medals[2] === 0;
+      f = await fight(2, { hits: 2, thrown: 10, landed: 3, time: 40 }); o.quickAtTheLimit = stored().medals[2] === 4;
+      f = await fight(3, { hits: 0, thrown: 10, landed: 3, time: 99 }); o.untouchedOnly = stored().medals[3] === 1;
+      /* no medals from Practice, the training room or the second pass */
+      const before = JSON.stringify(stored().medals);
+      await fight(4, { hits: 0, thrown: 10, landed: 10, time: 1 }, { practice: true }); o.practiceNone = JSON.stringify(stored().medals) === before;
+      await fight(4, { hits: 0, thrown: 10, landed: 10, time: 1 }, { pass2: true }); o.pass2None = JSON.stringify(stored().medals) === before;
+      G.practice = false; G.pass2 = false;
+      /* a medal earned in another tab stays earned when this tab saves */
+      const other = stored().medals.slice(); other[5] = 4; localStorage.setItem("sublevel-progress", JSON.stringify({ ...stored(), medals: other }));
+      await fight(0, { hits: 3, thrown: 10, landed: 4, time: 99 }); o.otherTabMedalKept = stored().medals[5] === 4 && stored().medals[0] === 7;
+      /* the hub counts them and says what to aim for */
+      S.hubCard(0); await sleep(100); o.hubTotal = $("cRows").textContent.includes("Medals") && $("cRows").textContent.includes(" / 18");
+      o.hubGoals = $("cRows").textContent.includes("under 26 s") && $("cRows").textContent.includes("85%");
+      /* Italian */
+      S.setLang("it"); S.hubCard(0); await sleep(100); o.italian = /Medaglie/.test($("cRows").textContent) && /meno di 26 s/.test($("cRows").textContent); S.setLang("en");
+      /* a save written by Sprint 28 (v2, no medals) loads with zeros and is stamped v3; garbage is put right */
+      localStorage.setItem("sublevel-progress", JSON.stringify({ v: 2, wins: 2, outfit: "auditor", arena: 0, dock: 0, pass2: 0 }));
+      return o; })()`, true);
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    const v2 = await cdp.eval(`(() => { const p = window.__sublevel.progress; return { v: p.v, wins: p.wins, medals: p.medals }; })()`);
+    r.v2Loads = v2.v === 3 && v2.wins === 2 && JSON.stringify(v2.medals) === "[0,0,0,0,0,0]";
+    await cdp.eval(`localStorage.setItem("sublevel-progress", JSON.stringify({ v: 3, wins: 1, medals: "abc" }))`);
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    r.badMedalsFixed = JSON.stringify(await cdp.eval(`window.__sublevel.progress.medals`)) === "[0,0,0,0,0,0]";
+    await cdp.eval(`localStorage.setItem("sublevel-progress", JSON.stringify({ v: 3, wins: 1, medals: [9, -1, 1.5, 7, "x", 2] }))`);
+    await cdp.send("Page.reload", { ignoreCache: true }); await bootSublevel(cdp);
+    r.oddMedalsFixed = JSON.stringify(await cdp.eval(`window.__sublevel.progress.medals`)) === "[0,0,0,7,0,2]";
+    await cdp.eval(`window.__sublevel.qaResetProgress()`);
+    if (!Object.values(r).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  /* CPU time, not frame rate: a software-GL runner's frame rate says little, CPU cost is steadier. Measured on a Mac in headless Chrome: the sim tick
+     (two steps, the AI and the body resolution) costs about 0.003 ms against a 16.7 ms frame, and the JS side of scene.render about 1.1 to 2.0 ms.
+     The ceilings are 0.1 ms and 8 ms: far enough above for a slow CI runner, near enough to catch an accidental 30-fold (sim) or 4-fold (render) cost. */
+  await test("cpu_time_per_sim_tick_and_render", async () => {
+    const r = await cdp.eval(`(async () => {
+      const S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), dt = 1 / 60, out = { sim: {}, render: {} };
+      const idle = { mx: 0, mz: 0, jab: false, heavy: false, block: false, dodge: false }, scene = BABYLON.Engine.LastCreatedScene;
+      for (const bout of [1, 2, 5]) {
+        $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight"); S.seed(3);
+        const E = S.E, P = S.P, N = 3000;
+        const run = () => { const t0 = performance.now();
+          for (let t = 0; t < N; t++) {
+            const ip = t % 45 === 0 ? { ...idle, jab: true } : (t % 150 === 100 ? { ...idle, heavy: true } : idle);
+            S.step(P, E, ip, dt); S.step(E, P, S.aiIntent(E, P, dt), dt); S.resolveBodies();
+            P.hp = 1e6; E.hp = 1e6; G.state = "fight";
+          }
+          return (performance.now() - t0) / N; };
+        run(); out.sim["bout" + (bout + 1)] = +Math.min(run(), run(), run()).toFixed(4);   /* the first run warms the JIT up; the best of three drops a hiccup */
+      }
+      for (const bout of [0, 3, 5]) {
+        $("wrap").hidden = true; S.startBout(bout); await __until(() => G.state === "fight", "fight");
+        for (let i = 0; i < 30; i++) await new Promise((r) => requestAnimationFrame(r));
+        const one = () => { const t0 = performance.now(); for (let i = 0; i < 60; i++) scene.render(); return (performance.now() - t0) / 60; };
+        out.render["bout" + (bout + 1)] = +Math.min(one(), one(), one()).toFixed(2);
+      }
+      return out; })()`, true, 300000);
+    const slowSim = Object.entries(r.sim).filter(([, v]) => v > 0.1), slowRender = Object.entries(r.render).filter(([, v]) => v > 8);
+    if (slowSim.length || slowRender.length) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
+  await test("limiter_holds_the_peak_and_leaves_normal_levels_alone", async () => {
+    const r = await cdp.eval(`(async () => {
+      const S = window.__sublevel, o = {}; S.audioReady(); const g = S.audioGraph(), L = g.LIMIT;
+      o.wired = !!g.limiter && !!g.limitOut && g.limiter.threshold.value === L.threshold && g.limiter.ratio.value === L.ratio && Math.abs(g.limitOut.gain.value - L.trim) < 1e-6;
+      /* the same chain, offline (no sound card needed): a steady tone at several levels */
+      const run = async (amp) => {
+        const oc = new OfflineAudioContext(1, 48000 * 2, 48000), os = oc.createOscillator(), a = oc.createGain(), c = oc.createDynamicsCompressor(), t = oc.createGain();
+        os.frequency.value = 220; a.gain.value = amp; c.threshold.value = L.threshold; c.knee.value = L.knee; c.ratio.value = L.ratio; c.attack.value = L.attack; c.release.value = L.release; t.gain.value = L.trim;
+        os.connect(a); a.connect(c); c.connect(t); t.connect(oc.destination); os.start();
+        const d = (await oc.startRendering()).getChannelData(0); let pk = 0; for (let i = 48000; i < d.length; i++) pk = Math.max(pk, Math.abs(d[i])); return pk;
+      };
+      const quiet = await run(0.25), loud = await run(0.5), full = await run(1.0), over = await run(2.0);
+      o.quietUnchanged = Math.abs(20 * Math.log10(quiet / 0.25)) < 0.3;      /* a sound well under the threshold keeps its level */
+      o.loudUnchanged = Math.abs(20 * Math.log10(loud / 0.5)) < 0.3;
+      o.fullScaleHeld = full <= 0.8;                                          /* 0 dBFS in, no more than about -2 dBFS out */
+      o.beyondFullScaleHeld = over <= 0.9;
+      o.numbers = { quiet: +quiet.toFixed(3), loud: +loud.toFixed(3), full: +full.toFixed(3), over: +over.toFixed(3) };
+      return o; })()`, true);
+    const { numbers, ...checks } = r;
+    if (!Object.values(checks).every(Boolean)) throw new Error(JSON.stringify(r));
+    return r;
+  });
+
   await test("held_esc_and_enter_do_not_repeat", async () => {
     const r = await cdp.eval(`(async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), o = {};
@@ -905,8 +1108,8 @@ async function runHttpSuite(cdp) {
     await load('{"v":99,"wins":2,"outfit":"auditor","arena":0,"dock":0,"future":"keep"}');
     out.future = await cdp.eval(`(() => { const S = window.__sublevel, p = S.progress, before = { v: p.v, future: p.future }; S.saveProbe({}); const r = JSON.parse(localStorage.getItem('sublevel-progress')); return { before, after: { v: r.v, future: r.future, wins: r.wins } }; })()`);
     await cdp.eval(`window.__sublevel.qaResetProgress()`);
-    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 2 && out.old.loaded.pass2 === 0 && out.old.stamped === 2 && out.old.kept
-      && out.bad.wins === 0 && out.bad.v === 2
+    const ok = out.old.loaded.wins === 3 && out.old.loaded.outfit === "sanitation" && out.old.loaded.v === 3 && out.old.loaded.pass2 === 0 && out.old.stamped === 3 && out.old.kept
+      && out.bad.wins === 0 && out.bad.v === 3
       && out.future.before.v === 99 && out.future.before.future === "keep" && out.future.after.v === 99 && out.future.after.future === "keep" && out.future.after.wins === 2;
     if (!ok) throw new Error(JSON.stringify(out));
     return out;
@@ -1121,6 +1324,54 @@ async function runHttpSuite(cdp) {
     if (v.draw >= 400) throw new Error(JSON.stringify(v));
     if (v.active >= 250) throw new Error(JSON.stringify(v));
     return v;
+  });
+
+  await test("touch_targets_are_44px_and_the_cards_fit", async () => {
+    const out = {};
+    for (const [w, h] of [[390, 844], [844, 390]]) {
+      await cdp.send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 2, mobile: true });
+      for (const lang of ["en", "it"]) {
+        const r = await cdp.eval(`(async () => {
+          const S = window.__sublevel, G = S.G, $ = (i) => document.getElementById(i), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), o = { small: {}, fit: {} };
+          $("app").classList.add("is-touch"); S.setLang("${lang}"); S.qaResetProgress(); S.progress.wins = 3;
+          const scan = (where) => document.querySelectorAll("button, input, select, a[href], [role=button], label").forEach((el) => {
+            const r = el.getBoundingClientRect();
+            if (!r.width || !r.height || getComputedStyle(el).visibility === "hidden" || el.closest("[hidden]")) return;
+            if (el.tagName === "LABEL" && !el.querySelector("input")) return;
+            if (el.type === "checkbox" && el.closest("label") && el.closest("label").getBoundingClientRect().height >= 44) return;   /* the label is the target */
+            if (r.height < 43.5 || r.width < 43.5) o.small[where + " " + (el.id || el.className || el.tagName)] = Math.round(r.width) + "x" + Math.round(r.height);
+          });
+          $("wrap").hidden = true; S.titleCard(); await sleep(150); scan("title"); o.fit.goOnScreen = $("go").getBoundingClientRect().bottom <= innerHeight + 1;
+          S.titleCard(); S.introCard(0); await sleep(150); scan("dossier");
+          $("wrap").hidden = true; S.startBout(0); await __until(() => G.state === "fight", "fight"); S.pauseFight(); await sleep(120); scan("pause");
+          const pc = document.querySelector(".pauseCard").getBoundingClientRect(); o.fit.pauseCardFits = pc.top >= 0 && pc.bottom <= innerHeight + 1;
+          S.resumeFight(); S.qaEndBout(true); await sleep(150); scan("win");
+          $("app").classList.remove("is-touch"); S.setLang("en"); S.qaResetProgress();
+          return o; })()`, true);
+        out[`${w}x${h} ${lang}`] = r;
+      }
+    }
+    await cdp.send("Emulation.clearDeviceMetricsOverride");
+    const bad = Object.entries(out).filter(([, r]) => Object.keys(r.small).length || !Object.values(r.fit).every(Boolean));
+    if (bad.length) throw new Error(JSON.stringify(bad));
+    return out;
+  });
+
+  /* Scripts off: what a visitor sees before the game has parsed, or with JavaScript disabled. Reloads the page. */
+  await test("page_is_not_blank_before_the_scripts_run", async () => {
+    await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await new Promise((r) => setTimeout(r, 800));
+    const r = await cdp.send("Runtime.evaluate", { returnByValue: true, expression: `(() => { const $ = (i) => document.getElementById(i), vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden" && getComputedStyle(el).display !== "none"; };
+      return { splashShown: !$("splash").hidden && vis($("splash")), title: $("spTitle").textContent, loadingNote: vis($("spNote")), playHidden: !vis($("spPlay")), noscript: [...document.querySelectorAll("noscript p")].some((p) => /JavaScript/.test(p.textContent) && vis(p)) }; })()` });
+    await cdp.send("Emulation.setScriptExecutionDisabled", { value: false });
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await bootSublevel(cdp);
+    const after = await cdp.eval(`(() => ({ loadingGone: !document.getElementById("splash").classList.contains("loading"), note: document.getElementById("spNote").textContent }))()`);
+    const v = r.result.value;
+    /* with scripts off the loading note is replaced by the noscript line (display:none from the noscript style); the Play button stays out of sight */
+    if (!(v.splashShown && v.title === "Sublevel Three" && !v.loadingNote && v.playHidden && v.noscript && after.loadingGone && after.note === "")) throw new Error(JSON.stringify({ v, after }));
+    return { v, after };
   });
 
   /* Last in the suite: it reloads the page twice. */

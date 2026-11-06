@@ -35,9 +35,11 @@ npm run regression
 
 ## Dependencies
 
-Dependabot owns dependency bumps (`.github/dependabot.yml`). Do not open version-bump or audit PRs by hand, and do not run a scheduled agent that does the same job. Every dependency here is a dev dependency (the page loads none of them), so an advisory is about the QA tooling, not the game.
+Dependabot owns dependency bumps (`.github/dependabot.yml`). Do not open version-bump or audit PRs by hand, and do not run a scheduled agent that does the same job. Every dependency here is a dev dependency (the page loads none of them), so an advisory is about tooling, not the game.
 
-`package.json` has three `overrides`, kept so `npm audit` stays clean for the transitive dependencies of `lighthouse` and `@axe-core/cli`. JSON cannot carry comments, so the reasons are here:
+There are two packages. The root `package.json` is the build tooling (Babylon.js and esbuild) and is all the regression's CI install pulls. `tools/qa/` holds Lighthouse and axe (`npm run qa:a11y` installs it first) with its own lock file, so the regression does not download about 230 MB it never uses; Dependabot and the audit workflow cover both. CI also checks that `lib/babylon.js` equals what `npm run build:engine` makes (a hand edit or a stale build fails the run) and runs Chrome pinned to one release line (`chrome-version` in `.github/workflows/test.yml`: change it on purpose, and re-run the regression when you do).
+
+`tools/qa/package.json` has three `overrides`, kept so `npm audit` stays clean for the transitive dependencies of `lighthouse` and `@axe-core/cli`. JSON cannot carry comments, so the reasons are here:
 
 | Override | Why |
 | --- | --- |

@@ -4,7 +4,7 @@ name: audit
 # ships none of these packages. Dependabot opens the fix. (Every dependency here is a dev dependency, so --omit=dev would audit nothing.)
 on:
   pull_request:
-    paths: [package.json, package-lock.json]
+    paths: [package.json, package-lock.json, tools/qa/package.json, tools/qa/package-lock.json]
   schedule:
     - cron: "17 5 * * 1"
   workflow_dispatch:
@@ -23,4 +23,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm audit --audit-level=high
+          cache-dependency-path: |
+            package-lock.json
+            tools/qa/package-lock.json
+      - name: Build tooling (root)
+        run: npm audit --audit-level=high
+      - name: QA tooling (Lighthouse and axe, tools/qa)
+        working-directory: tools/qa
+        run: npm audit --audit-level=high

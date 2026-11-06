@@ -14,6 +14,14 @@ updates:
     groups:
       qa-tools:
         patterns: ["*"]
+  - package-ecosystem: npm   # Lighthouse and axe, split into tools/qa so the regression's install does not pull them
+    directory: /tools/qa
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      qa-tools:
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

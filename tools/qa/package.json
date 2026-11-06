@@ -1,0 +1,16 @@
+{
+  "name": "sublevel-qa",
+  "private": true,
+  "type": "module",
+  "description": "Accessibility audit tooling (Lighthouse and axe). Kept apart from the root package so the regression's CI install does not pull about 300 MB it never uses.",
+  "devDependencies": {
+    "@axe-core/cli": "^4.14.0",
+    "lighthouse": "^13.6.0"
+  },
+  "license": "Apache-2.0",
+  "overrides": {
+    "minimatch": "^11.0.1",
+    "basic-ftp": "^6.2.5",
+    "glob": "^14.0.3"
+  }
+}

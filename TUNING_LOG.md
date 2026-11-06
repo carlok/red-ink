@@ -1641,3 +1641,49 @@ The bout table moved, by at most 3.5 points at n = 200 (Pike) and 2.7 on the n =
 - The first test drove the wrong foe. Dag's style punishes a whiff with a heavy, so a "second jab" test against him measured the punish loop. The test uses Voss (style teach), pins both fighters at jab range and silences the foe's own attacks, then checks: the first jab lands, the next is answered (f forced high), the read fades after 2 s, f 0 turns it off, and Reyes gives the same result with the read on and off. It fails with the read removed.
 - `step-probe`: identical to 60 fps over 900 ticks at 20, 30, 60, 120 and 144 fps. Regression: 61 of 61.
 - Not measured: how this feels to a human. The bot throws a jab every 1.55 s; a person who chains jabs faster meets the read earlier. The number of jabs a person lands on each foe is the thing to watch in the playtest log (`G.log` now carries `jabHit`, `jabBlock`, `jabDodge`, but the exported log entries do not yet).
+
+## Sprint 29: the training room, medals, cues, a limiter, and CI hygiene
+
+The ten best-ranked items after Sprint 28: 57, 39, 37, 36, 33, 32, 34, 35, 38 and 40 (the numbers in `BACKLOG.md`). No foe behaviour changed; the bout table and the second-pass table are as Sprint 28 left them (90.5 / 69.0 / 40.5 / 37.0 / 30.5 / 21.0 and 71.5 / 54.5 / 14.5 / 17.0 / 12.0 / 11.0, checked after every item). Regression 61 tests at the start, 70 at the end; `step-probe` is untouched.
+
+| # | Item | What it does | Test |
+| --- | --- | --- | --- |
+| 57 | Stale state | Reset progress clears the Practice link, the Continue button and the loss count; Restart and Quit clear the pad-unplugged hint | five checks, all failing on the old code |
+| 39 | Touch targets | `.is-touch` gives every control 44 px; Start is sticky; the pause card scrolls and goes two columns on a phone on its side | every visible control, four cards, two sizes, two languages: 56 under 44 px before, 0 after; Start and the pause card on screen |
+| 37 | Splash in the first paint | the page is no longer blank until about 4 MB of scripts parse; a noscript line | scripts disabled: splash, title and noscript line shown, Play out of sight; reloaded with scripts on: loading state gone |
+| 36 | Cues | DODGE word and a rising tone for a dodge that works; red edge and double thump under 25 percent health (still under Less motion); a stamina bar under the foe's health | one cue per evaded punch, none for a hit, none muted; the bar follows `E.stam`; edge, beat, stillness, silence |
+| 33 | Audible tell | a short rising tone when the alert mark appears; the mark gets a dark rim | one sound per tell however long held, again for the next, none muted, none for the player; contrast numbers below |
+| 32 | Training room | a dummy, a strip of move costs (jab 10, heavy 24, dodge 16) that strikes out what you cannot afford, a guard switch (button, T) | 240 frames of heavies: never attacks, moves or dies; strip text and greying; guard blocks; progress and log untouched |
+| 34 | Medals | Untouched, Sharp, Quick per bout, in `progress.medals` (save v3); win card, rule board | edges (85 percent, four punches, the time limit), no medals from Practice or the second pass, another tab's medal kept, v2 save upgraded, garbage repaired, Italian |
+| 35 | CPU time | a regression test for time, not frame rate | see numbers below |
+| 38 | Limiter | a compressor on the output, trimmed back | see numbers below |
+| 40 | CI hygiene | QA tools in `tools/qa`; `lib/babylon.js` checked against a rebuild; Chrome pinned | clean worktree: install, rebuild (identical) and 70 of 70 |
+
+### Numbers
+
+| Measure | Result |
+| --- | --- |
+| Tell mark against what surrounds it (six places), before the rim | 4.1, 3.6, 4.5, **1.6**, 4.0, 3.8 to 1; bout 4 has a pale floor |
+| After the dark rim, mark against its rim | 4.5, 4.5, 4.7, 3.9, 4.6, 2.4 to 1 (bout 6's ring picks up other things) |
+| After the rim, mark against the floor beyond it | 3.5, 3.5, 4.6, 2.6, 4.3, 2.9 to 1; bout 4 went from 1.6 to 2.6 |
+| Bot accuracy at Normal (200 fights, seed 1) | 69.6 / 92.9 / 95.6 / 86.7 / 89.7 / 96.0 percent |
+| Bot win time, quickest quarter (seeds 1 and 7) | 26.6 / 31.2 / 40.3 / 46.8 / 38.9 / 39.8 s and 25.3 / 31 / 39.8 / 47.5 / 39.4 / 39.7 s |
+| Bot wins without taking a hit | 0 percent in every bout |
+| Medal limits chosen | Sharp 85 percent (five punches or more); Quick 26 / 31 / 40 / 46 / 38 / 39 s |
+| Sim tick (two steps, the AI, bodies) | 0.0025 to 0.0026 ms against a 16.7 ms frame; the AI is under the timer's noise; the test's ceiling is 0.1 ms (a 400,000-iteration loop dropped into the AI read 0.117 and failed it) |
+| JS side of `scene.render` | 1.21 to 1.38 ms; ceiling 8 ms |
+| Output peak, loudest of four scenes, eight runs, no limiter | -4.4, -1.0, -5.1, -4.4, -4.6, -3.0, -3.2, -0.4 dBFS |
+| Output peak, same scene, six runs, with the limiter | -4.6, -2.7, -4.0, -2.5, -2.4, -3.4 dBFS |
+| Limiter, offline tone: 0.25 in / 0.5 in / 1.0 in / 2.0 in | 0.250 / 0.500 / 0.730 / 0.763 out |
+| Main-thread stalls (50 ms or more) starting all six bouts | 50 to 59 ms in six of eight runs, none in two; the music lookahead is 140 ms, so it stays |
+| `node_modules` for the regression's CI install | 346 MB to 114 MB; the lock 252 to 30 packages; `tools/qa` 222 packages, 233 MB |
+
+### What it took
+
+- **The first audio measurement was wrong, and I wrote a commit message from it before the second run said so.** One run read -3.6 to -6.0 dBFS and no stall; the next read -1.0 and two stalls. I reran it eight times, rewrote the message, and then the plan's own rule (a compressor if the sum passes about -3 dBFS) applied. The compressor's fixed makeup gain (+1.71 dB at every level under the threshold) had to be measured offline and trimmed, or it would have made the whole mix louder.
+- **The tell mark's contrast** was measured, not assumed: 1.6 to 1 in bout 4. A brighter orange did not fix it (the floor there is lighter than the mark). A dark rim did, but a negative scale and a `zOffset` both drew the rim in front and hid the red; `flipFaces` gave a true inverted hull.
+- **Touch rules found two older faults.** Growing rows to 44 px pushed Start 694 px below the fold on the portrait title card (so it is sticky now), and the pause card was already 36 to 51 px taller than a phone on its side and could not scroll.
+- **Medals first went on the dossier card,** which a test holds at exactly 10 rows; the goals live on the rule board instead.
+- `-1` in a medal bitmask is `7` under `& 7`; the sanitiser now accepts 0 to 7 as integers and nothing else.
+- The Lighthouse half of `qa:a11y` times out after 180 s on this machine, on master as well; axe runs (0 violations, 1 incomplete). Not fixed.
+- Not checked: how the tell tone, the DODGE tone, the heartbeat and the limiter sound (a listening test); how the training room, the strip and the medals read on a real phone; whether the medal limits suit a person (there is no human data: the playtest log is the way to tune them); the five new Italian strings and `Palestra`, `Intatto`, `Preciso`, `Rapido` for a native read; the new CI steps on a runner (the PR's run).
