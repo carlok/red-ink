@@ -131,12 +131,16 @@ export async function withPage(fn, opts = {}) {
       "--no-first-run",
       "--disable-background-networking",
       "--hide-scrollbars",
+      ...(process.env.CI ? ["--no-sandbox"] : []),   /* a CI runner is a throwaway VM, and Chrome for Testing cannot make its sandbox under Ubuntu's user-namespace limits */
       ...(opts.file ? ["--allow-file-access-from-files"] : []),
       ...(opts.args || []),
       "about:blank",
     ],
-    { stdio: "ignore" },
+    { stdio: ["ignore", "ignore", "pipe"] },
   );
+  let chromeErr = "", chromeExit = "";
+  chrome.stderr.on("data", (d) => { chromeErr = (chromeErr + d).slice(-1500); });
+  chrome.on("exit", (code, sig) => { chromeExit = ` (Chrome exited: ${code ?? sig})`; });
   let ws;
   try {
     let page = null;
@@ -147,7 +151,7 @@ export async function withPage(fn, opts = {}) {
       } catch { /* boot */ }
       if (!page) await new Promise((r) => setTimeout(r, 100));
     }
-    if (!page) throw new Error("no Chrome page");
+    if (!page) throw new Error(`no Chrome page${chromeExit}${chromeErr ? ": " + chromeErr.trim().split("\n").slice(-6).join(" | ") : ""}`);
     ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((resolve, reject) => {
       ws.addEventListener("open", resolve);
