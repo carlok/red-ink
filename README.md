@@ -1,4 +1,4 @@
-# Sublevel Three
+# Sublevel Three (red-ink)
 
 ![A jab lands inside the yellow tape. The auditor, in a white shirt and black hand wraps, snaps Reyes back, red-haired in a green shirt, with a POW burst and orange sparks between them and the crowd dark behind.](tuning/s18-hero.jpg)
 
